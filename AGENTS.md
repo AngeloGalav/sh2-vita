@@ -41,6 +41,7 @@ or approximated".
 | --- | --- | --- |
 | `port/source/` | The 3DS engine in C (libctru, citro3d). One file per system; see the README's project layout | yes |
 | `port/source/game/view/` | The PC camera module translated to C, with `PORTING_NOTES.md` | yes |
+| `port/vita/` | The PS Vita build: the citro3d / libctru layer on vitaGL, Makefile, Docker build | yes |
 | `tools/sh2conv/` | Converters from the PC formats to the 3DS pack (`pack.py` runs them) | yes |
 | `sh2-3ds-port-kit/` | Reverse-engineering kit: Ghidra scripts, label data, version tools | yes |
 | `sh2-3ds-port-kit/data/dc/project/` | **The Ghidra project as text**: every function, name, tag, label and comment | yes |
@@ -58,6 +59,7 @@ or approximated".
 | Doc | Read it for |
 | --- | --- |
 | [README.md](README.md) | Install, build, debug file, project layout |
+| [port/vita/README.md](port/vita/README.md) | The PS Vita build: how the layer works, install, what is open |
 | [port/STATUS.md](port/STATUS.md) | What works and the gaps in order of weight. **Read first when picking up work** |
 | [port/ROADMAP.md](port/ROADMAP.md) | Phase 2 workstreams |
 | [port/TESTING.md](port/TESTING.md) | Smoke run, warp autotest, playthrough suite, console checklist |

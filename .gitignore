@@ -1,4 +1,7 @@
 # Game files: never commit
+useful_resources/
+/pack-vita/
+/pack-vita.log
 Silent Hill 2/
 Silent*Hill*2*/
 *.exe
@@ -108,3 +111,14 @@ port/meta/banner/__pycache__/
 .packtrace.log
 .webpack/
 .webpack.log
+
+# PS Vita build outputs
+port/vita/build/
+port/vita/deps/
+port/vita/*.vpk
+port/vita/*.elf
+port/vita/*.velf
+port/vita/eboot.bin
+/ghidra-rebuild.log
+/vita_log.txt
+port/vita/*.d
