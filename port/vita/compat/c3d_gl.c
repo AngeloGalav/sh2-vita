@@ -147,6 +147,9 @@ static GLuint s_present_prog;
 static GLint s_present_tex;
 static void present_init(void);
 static GLuint compile(GLenum type, const char* s);
+// The game textures' t turned over in the vertex programs (vertex_shader). vflip0.txt: in the
+// fragment programs, as before (a test switch)
+static bool s_vflip = true;
 
 void vita_gl_init(void)
 {
@@ -186,6 +189,12 @@ void vita_gl_init(void)
 		fclose(low);
 		s_view_w = 416, s_view_h = 720;
 		vita_log("game view at 720 x 416 (res416.txt)");
+	}
+	FILE* vf = fopen(VITA_DATA_DIR "/vflip0.txt", "r");
+	if (vf) {
+		fclose(vf);
+		s_vflip = false;
+		vita_log("texture t turned over in the fragment programs (vflip0.txt)");
 	}
 	vglInitExtended(0, 960, 544, 16 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
 	// The programs are Cg with their semantics written out, so nothing needs the GLSL translator's
@@ -1301,7 +1310,28 @@ static bool link(GLuint p, GLuint vs, GLuint fs)
 	return true;
 }
 
-static GLuint s_vs[8];
+// Each vertex program, by the texture coordinates it turns over (bit i: o_tc<i>.y)
+static GLuint s_vs[8][8];
+
+// The game's textures keep the PICA's row order, top row first, which the PICA samples at t = 1 and
+// GL at t = 0, so their t is turned over. Done here, per vertex: 1 - t is linear, so it interpolates
+// to the same value on every pixel, and a fragment program that reads a coordinate as it arrives
+// spares the SGX a dependent texture read (Imagination's and Apple's advice for this GPU family; what
+// it saves here is to be measured, vflip0.txt puts it back).
+static GLuint vertex_shader(int vprog, int flip)
+{
+	GLuint* vs = &s_vs[vprog][flip];
+	if (*vs)
+		return *vs;
+	static char src[8192];
+	const char* base = c3d_vertex_programs[vprog].source;
+	int n = snprintf(src, sizeof src, "%.*s", (int)(strrchr(base, '}') - base), base);
+	for (int i = 0; i < 3; i++)
+		if (flip & (1 << i))
+			n += snprintf(src + n, sizeof src - n, "o_tc%d.y = 1.0 - o_tc%d.y;\n", i, i);
+	snprintf(src + n, sizeof src - n, "}\n");
+	return *vs = compile(GL_VERTEX_SHADER, src);
+}
 
 // The half-size fog's program needs full precision for the depth (half overflows in z / w), so it is
 // compiled without fastprecision, which would turn every float to half. Its colour work is written
@@ -1339,9 +1369,9 @@ static Program* build(const FragKey* k)
 	       "uniform sampler2D ptcol, uniform float4 ptparam, uniform float4 ptc, uniform float4 k[6], uniform float4 fogc,\n"
 	       "uniform float4 aref, uniform float4 amb, uniform float4 L[48], uniform float4 d0) : COLOR\n{\n");
 	int body = len;
-	// The game's textures keep the PICA's row order, top row first, which the PICA samples at
-	// t = 1 and GL at t = 0: their t is turned over here (the same on every wrap mode as turning
-	// the rows over, and ETC1 stays exactly as packed). Render targets are GL's own rows.
+	// The game's textures keep the PICA's row order (vertex_shader): their t is turned over, the same
+	// on every wrap mode as turning the rows over, and ETC1 stays exactly as packed. Render targets
+	// are GL's own rows.
 	// only the units some stage reads: the rest are not sampled at all
 	bool used[3] = { false, false, false };
 	for (int st = 0; st < k->nstages; st++)
@@ -1350,12 +1380,19 @@ static Program* build(const FragKey* k)
 			for (int i = 0; i < 3; i++)
 				used[i] |= a == GPU_TEXTURE0 + i || b == GPU_TEXTURE0 + i;
 		}
+	// Turned over in the vertex program, unless the procedural texture reads the same coordinate
+	// (below, as the game wrote it) or the unit holds a render target. The clamp to border's test
+	// below gives the same answer for t and 1 - t.
+	int vflip = 0;
+	for (int i = 0; i < 3; i++)
+		if (s_vflip && used[i] && !(k->rt_mask & (1 << i)) && !(k->pt_on && (k->pt_tc ? 1 : 0) == i))
+			vflip |= 1 << i;
 	for (int i = 0; i < 3; i++) {
 		if (!used[i]) {
 			APPEND("float4 t%d = float4(0.0);\n", i);
 			continue;
 		}
-		if (k->rt_mask & (1 << i))
+		if ((k->rt_mask | vflip) & (1 << i))
 			APPEND("float4 t%d = tex2D(tex%d, o_tc%d.xy);\n", i, i, i);
 		else
 			APPEND("float4 t%d = tex2D(tex%d, float2(o_tc%d.x, 1.0 - o_tc%d.y));\n", i, i, i, i);
@@ -1483,8 +1520,7 @@ static Program* build(const FragKey* k)
 		vita_log("fragment program cache full");
 		s_nprogs = 0;
 	}
-	if (!s_vs[k->vprog])
-		s_vs[k->vprog] = compile(GL_VERTEX_SHADER, c3d_vertex_programs[k->vprog].source);
+	GLuint vs = vertex_shader(k->vprog, vflip);
 	static int dump = -1;             // ux0:data/sh23ds/dumpshaders.txt: every fragment program into the log
 	if (dump < 0) {
 		FILE* f = fopen(VITA_DATA_DIR "/dumpshaders.txt", "r");
@@ -1505,7 +1541,7 @@ static Program* build(const FragKey* k)
 	memset(p, 0, sizeof *p);
 	p->key = *k;
 	p->prog = glCreateProgram();
-	if (!link(p->prog, s_vs[k->vprog], fs)) {
+	if (!link(p->prog, vs, fs)) {
 		vita_log("program %s not built", c3d_vertex_programs[k->vprog].name);
 		glDeleteProgram(p->prog);
 		p->prog = 0;
