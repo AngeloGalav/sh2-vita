@@ -106,16 +106,16 @@ static struct {
 	unsigned passes, draws;      // per second, for the log
 	const u32* zdata;            // the depth's memory, for the log's samples
 	u16 zw, zh;
-} HF = { .on = true, .fog_prog = -2 };
+} HF = { .on = false, .fog_prog = -2 };   // off until it reads the depth right (SELECT + L)
 
-// ux0:data/sh23ds/halffog0.txt starts with it off (a test switch)
+// ux0:data/sh23ds/halffog1.txt starts with it on (a test switch)
 static void half_fog_init(void)
 {
-	FILE* f = fopen(VITA_DATA_DIR "/halffog0.txt", "r");
+	FILE* f = fopen(VITA_DATA_DIR "/halffog1.txt", "r");
 	if (f) {
 		fclose(f);
-		HF.on = false;
-		vita_log("fog at half size off (halffog0.txt)");
+		HF.on = true;
+		vita_log("fog at half size on (halffog1.txt)");
 	}
 }
 
@@ -159,6 +159,20 @@ void vita_gl_init(void)
 		vita_log("ur0:data/libshacccg.suprx is missing: no shader can be compiled");
 	else
 		vita_log("ur0:data/libshacccg.suprx: %lld bytes", (long long)st.st_size);
+	// ux0:data/sh23ds/gxmrings.txt (a test switch, read here because these must precede vitaGL's
+	// start): larger GXM rings than the defaults (VDM 128 KB, vertex 2 MB, fragment 512 KB, USSE
+	// 16 KB), and more scenes per FBO for frames split between targets, the settings other vitaGL
+	// ports use for a frame with many draws and passes
+	FILE* rings = fopen(VITA_DATA_DIR "/gxmrings.txt", "r");
+	if (rings) {
+		fclose(rings);
+		vglSetVDMBufferSize(1024 * 1024);
+		vglSetVertexBufferSize(4 * 1024 * 1024);
+		vglSetFragmentBufferSize(1024 * 1024);
+		vglSetUSSEBufferSize(2048 * 1024);
+		vglSetupRenderTargetScenesNum(1, 4);
+		vita_log("larger GXM rings, 4 scenes per FBO (gxmrings.txt)");
+	}
 	vglInitExtended(0, 960, 544, 16 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
 	// The programs are Cg with their semantics written out, so nothing needs the GLSL translator's
 	// postponed binding; compiling in glCompileShader reports failures there, where compile() checks
@@ -1387,9 +1401,10 @@ static Program* build(const FragKey* k)
 	if (k->halffog > 1) {
 		// the half-size fog's depth test against the scene's depth (the frame's own depth buffer as a
 		// texture): a sprite behind the map leaves the pixel alone, as GL's test would have
+		// (abs: the depth format keeps its mask bit in the sign, so stored values read negative)
 		static const char* const CMPZ[8] = { "false", "true", "==", "!=", "<", "<=", ">", ">=" };
 		int f = k->halffog - 2;
-		APPEND("{ float2 suv = o_scr.xy / o_scr.w * 0.5 + 0.5; float sz = tex2D(zbuf, suv).x;\n"
+		APPEND("{ float2 suv = o_scr.xy / o_scr.w * 0.5 + 0.5; float sz = abs(tex2D(zbuf, suv).x);\n"
 		       "float fz = o_scr.z / o_scr.w * 0.5 + 0.5;\n");
 		if (f <= 1)
 			APPEND("if (!%s) prev.a = 0.0; }\n", CMPZ[f]);
@@ -1795,7 +1810,7 @@ static void half_fog_begin(void)
 	glActiveTexture(GL_TEXTURE6);
 	glBindTexture(GL_TEXTURE_2D, HF.ztex);
 	vglTexImageDepthBuffer(GL_TEXTURE_2D);
-	HF.zdata = vglGetTexDataPointer(GL_TEXTURE_2D);
+	HF.zdata = sceGxmTextureGetData(vglGetGxmTexture(GL_TEXTURE_2D));   // vitaGL keeps no data pointer for it
 	HF.zw = m->gl_w, HF.zh = m->gl_h;
 	HF.passes++;
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

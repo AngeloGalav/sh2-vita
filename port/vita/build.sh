@@ -7,15 +7,16 @@
 # Needs Docker and git. The image carries the toolchain, vitaShaRK and math-neon. vitaGL is built
 # here from a pinned commit (deps/, kept across make clean) with NO_DEBUG (no per-call error
 # checks) and NO_SPLASHSCREEN (no boot splash, whose own thread on the display queue Vita3K never
-# got past) and STORE_DEPTH_STENCIL (each depth buffer loaded and stored with its scene, so the
-# depth lasts when the frame's drawing is split between targets and the half-size fog can read it
-# as a texture); vitaGL's riskier speed hacks ("may cause crashes", its README) are left out.
+# got past); vitaGL's riskier speed hacks ("may cause crashes", its README) are left out.
 set -e
 cd "$(dirname "$0")"
 IMAGE=${SH2VITA_BUILD_IMAGE:-vitasdk/vitasdk@sha256:acd15285e1ae473e925c6f83fa41e2de45eb8b9e8ba89be7df03e194c35c11d3}
 JOBS=${SH2VITA_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}
 VITAGL_REV=c2b3b8ab9cf7a3b2a12671fffc09dcb7cd68c56c
-VITAGL_FLAGS="NO_DEBUG=1 NO_SPLASHSCREEN=1 STORE_DEPTH_STENCIL=1"
+VITAGL_FLAGS="NO_DEBUG=1 NO_SPLASHSCREEN=1"
+# SH2VITA_STORE_DEPTH=1: each depth buffer loaded and stored with its scene, which the half-size
+# fog test (SELECT + L) needs to read the depth as a texture; its cost is still to be measured
+[ "${SH2VITA_STORE_DEPTH:-0}" = "1" ] && VITAGL_FLAGS="$VITAGL_FLAGS STORE_DEPTH_STENCIL=1"
 run() {
 	docker run --rm -v "$PWD/../..":/work -w /work/port/vita -e HOME=/tmp --user "$(id -u):$(id -g)" "$IMAGE" "$@"
 }
