@@ -285,8 +285,16 @@ def write_screens(data, pack, out_voice=True):
     img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA').crop((0, 0, 256, 256))
     img.save(os.path.join(pack, 'ui', 'gameover.png'))
     jobs.append(('ui/gameover.png', 'ui/gameover.t3x', True, 'la4'))
-    # the title's white logo that pulses over start00's red one (start01.tex's first item, 0x496dd0)
-    img = load_tex(os.path.join(data, 'pic', 'etc', 'start01.tex')).convert('RGBA').crop((0, 0, 512, 96))
+    # the title's white logo that pulses over start00's red one (start01.tex's first item, 0x496dd0):
+    # the top 512x96 of the PC's 512x512. It must outline start00's letters, so it is the original's
+    # as start00 is: the Enhanced Edition's start00 doesn't decode here (the original is packed),
+    # and its start01 (2048x2048) lays a smaller logo out over "ENHANCED EDITION"; its top-left
+    # 512x96 was a corner of it, a white blob pulsing over the title. Larger ones are scaled down.
+    img = decode_tex(os.path.join(data, 'pic', 'etc', 'start01.tex')).convert('RGBA')
+    w, h = img.size
+    img = img.crop((0, 0, w, h * 96 // 512))
+    if img.size != (512, 96):
+        img = img.resize((512, 96), Image.LANCZOS)
     glow = Image.new('RGBA', (512, 128), (255, 255, 255, 0))
     glow.paste(img, (0, 0))
     glow.save(os.path.join(pack, 'ui', 'titleglow.png'))
