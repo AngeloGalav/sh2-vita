@@ -33,6 +33,14 @@ void pausemenu_where(const char* place, float play_time)
 // first tap; Save Game is dim where it can't be used.
 static void touch(void)
 {
+#ifdef SH2_VITA
+	// one screen: the menu is drawn on the game screen (draw_vita), not listed on the page
+	s_touch_sel = s_sel;
+	s_touch_yes = s_yes;
+	touchui_menu_close(TOUI_PAUSE);
+	touchui_box(NULL, NULL, 0);
+	return;
+#endif
 	static const TouiButton prompts[2] = { { "Select", KEY_A }, { "Back", KEY_B } };
 	touchui_box(NULL, NULL, 0);
 	if (s_ask) {
@@ -146,10 +154,44 @@ static void text(float x, float y, const char* s, int align, u32 rgb, u32 a)
 	font_text(FONT_BIG, x, y, s, align, rgb | a, rgb | a);
 }
 
+#ifdef SH2_VITA
+// One screen: the whole menu on the game screen as the PC draws it. 0x407310: centred on x 256
+// (0x47f2b0 sets the centring flag 0x100), PAUSED at y 164 at full alpha, the rows from y 230 in
+// steps of 30 at alpha 0x60 (Save Game 0x55 grey where 0x44c7d0 says it can't be used), then the
+// chosen row again at full alpha 2 up and 2 left. The port's Map and Memos follow the PC's five at
+// the same step (the 3DS touch screen's rows; Memos has no other way in). 0x407620 state 10: the
+// question at (256, 232), then No left-aligned at (286, 266) and Yes right-aligned (flag 0x200,
+// 0x47f2d0) at (226, 266), the chosen one again at full alpha 2 up and 2 left.
+static void draw_vita(void)
+{
+	const u32 grey = 0xfefefe00u, dark = 0xaaaaaa00u;
+	if (s_ask) {
+		text(256, 232, str(S_ASK), FONT_CENTER, grey, 0xff);
+		text(286, 266, str(S_NO), FONT_LEFT, grey, 0xc0);
+		text(226, 266, str(S_YES), FONT_RIGHT, grey, 0xc0);
+		if (s_yes == 0)
+			text(224, 264, str(S_YES), FONT_RIGHT, grey, 0xff);
+		else
+			text(284, 264, str(S_NO), FONT_LEFT, grey, 0xff);
+		return;
+	}
+	text(256, 164, str(S_TITLE), FONT_CENTER, grey, 0xff);
+	const char* rows[7] = { str(S_ROW), str(S_ROW + 1), str(S_ROW + 2), str(S_ROW + 3), str(S_ROW + 4), "Map", "Memos" };
+	for (int i = 0; i < 7; i++)
+		text(256, 230 + 30 * i, rows[i], FONT_CENTER, i == 1 && !s_can_save ? dark : grey, 0xc0);
+	if (s_sel != 1 || s_can_save)
+		text(254, 228 + 30 * s_sel, rows[s_sel], FONT_CENTER, grey, 0xff);
+}
+#endif
+
 void pausemenu_draw_top(void)
 {
 	if (!s_on || !font_ready())
 		return;
+#ifdef SH2_VITA
+	draw_vita();
+	return;
+#endif
 	const u32 grey = 0xfefefe00u;
 	if (s_ask) {
 		// 0x407620 state 10: the question at (256, 232); the answers are on the touch screen

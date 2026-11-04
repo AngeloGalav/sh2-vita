@@ -867,8 +867,18 @@ bool movie_play(const char* name)
 	// Music and effects stop for the movie: their channels are paused (nothing refills them while
 	// this loop runs) and continue afterwards from where they were.
 	bool paused[24] = { false };
+#ifdef SH2_VITA
+	// The PC doesn't stop the music for a movie: its caller (0x4a2b30, from the stage programs
+	// such as EvProgPrologueInToilet) and what it calls (0x43ddb0, 0x43dd30 Movie_BinkPlay,
+	// 0x43dde0) touch no other sound. Music and voices keep playing (their reader threads refill
+	// them on their own). The effects channels (sfx.c, 8..23) are still held as the 3DS port holds
+	// them, which is the port's, not checked against the PC's per-frame movie code.
+	if (s_ndsp)
+		for (int ch = 8; ch < 24; ch++)
+#else
 	if (s_ndsp)
 		for (int ch = 0; ch < 24; ch++)
+#endif
 			if (ch != MOVIE_CH && !ndspChnIsPaused(ch)) {
 				ndspChnSetPaused(ch, true);
 				paused[ch] = true;

@@ -45,6 +45,21 @@ u32 controls_default(ControlsLayout layout, ControlsAction act)
 	// circle pad alone moves James, the shoulders aim and turn him round, the D-Pad holds four
 	// actions. The New 3DS adds the PC's strafe keys on ZL / ZR (both together turn him round,
 	// 0x54b290) and the target keys on the C-Stick.
+#ifdef SH2_VITA
+	// The Vita's own defaults, PlayStation style (Vita-only, the port's choice like the 3DS's):
+	// Cross acts, Square runs, Triangle the flashlight, Circle the items (and back in menus), R aims,
+	// L turns round; the D-Pad as on the 3DS, the right stick the C-Stick's targets, the rear pad's
+	// outer lower corners the strafe keys
+	switch (act) {
+	case ACT_RUN: return KEY_Y;
+	case ACT_ACTION: return KEY_A;
+	case ACT_AIM: return KEY_R;
+	case ACT_TURN180: return KEY_L;
+	case ACT_FLASHLIGHT: return KEY_X;
+	case ACT_ITEMS: return KEY_B;
+	default: break;
+	}
+#endif
 	switch (act) {
 	case ACT_RUN: return KEY_B;
 	case ACT_ACTION: return KEY_A;
@@ -165,14 +180,35 @@ void controls_game(u32 down, u32 held, u32* gdown, u32* gheld)
 static const char* key_names(u32 k, char* out, size_t n)
 {
 	static const struct { u32 bit; const char* name; } K[] = {
+#ifdef SH2_VITA
+		{ KEY_A, "Confirm" }, { KEY_B, "Back" }, { KEY_X, "Triangle" }, { KEY_Y, "Square" }, { KEY_L, "L" },
+		{ KEY_R, "R" }, { KEY_ZL, "Rear left" }, { KEY_ZR, "Rear right" }, { KEY_START, "START" },
+		{ KEY_SELECT, "SELECT" },
+#else
 		{ KEY_A, "A" }, { KEY_B, "B" }, { KEY_X, "X" }, { KEY_Y, "Y" }, { KEY_L, "L" }, { KEY_R, "R" },
 		{ KEY_ZL, "ZL" }, { KEY_ZR, "ZR" }, { KEY_START, "START" }, { KEY_SELECT, "SELECT" },
+#endif
 		{ KEY_DUP, "Up" }, { KEY_DDOWN, "Down" }, { KEY_DLEFT, "Left" }, { KEY_DRIGHT, "Right" },
+#ifdef SH2_VITA
+		{ KEY_CSTICK_UP, "R-Stick up" }, { KEY_CSTICK_DOWN, "R-Stick down" }, { KEY_CSTICK_LEFT, "R-Stick left" },
+		{ KEY_CSTICK_RIGHT, "R-Stick right" },
+#else
 		{ KEY_CSTICK_UP, "C-Up" }, { KEY_CSTICK_DOWN, "C-Down" }, { KEY_CSTICK_LEFT, "C-Left" },
 		{ KEY_CSTICK_RIGHT, "C-Right" },
+#endif
 	};
 	size_t len = 0;
 	out[0] = 0;
+#ifdef SH2_VITA
+	// Cross and Circle by the system's confirm button
+	if (k & (KEY_A | KEY_B)) {
+		bool x = vita_cross_confirms();
+		len = snprintf(out, n, "%s", (k & KEY_A) ? (x ? "Cross" : "Circle") : (x ? "Circle" : "Cross"));
+		if ((k & KEY_A) && (k & KEY_B))
+			len += snprintf(out + len, len < n ? n - len : 0, " / %s", x ? "Circle" : "Cross");
+		k &= ~(KEY_A | KEY_B);
+	}
+#endif
 	for (unsigned i = 0; i < sizeof K / sizeof K[0]; i++)
 		if (k & K[i].bit)
 			len += snprintf(out + len, len < n ? n - len : 0, "%s%s", len ? " / " : "", K[i].name);

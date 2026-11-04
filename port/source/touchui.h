@@ -68,3 +68,9 @@ int touchui_quick(int* item);
 // A finger that came down where the screen shows nothing to tap: how far it moved since the last
 // call, in pixels (the behind camera turns with it). False when no such finger is down.
 bool touchui_free_drag(int* dx, int* dy);
+
+#ifdef SH2_VITA
+// Whether the page has something to choose now (a menu, choices, a box, the map's controls, a
+// panel): the Vita lays it over the game screen only then (port/vita/compat/c3d_gl.c)
+bool touchui_overlay(void);
+#endif

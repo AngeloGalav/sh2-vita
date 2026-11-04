@@ -202,6 +202,13 @@ void supersample_frame_end(int fps, int cap)
 	bool wanted = S.wanted;
 	S.wanted = false, S.used = 0;
 	int mode = quality()->supersample;
+#ifdef SH2_VITA
+	// The Vita always draws at 2x2: 800 x 480, about its own 960 x 544, where the 3DS's 400 x 240
+	// was scaled up. The 3DS's own choice would stay at 1x: it steps up only at a full 60 fps (the
+	// console logged 48 to 52 frames a second) and the layer has no GPU time to give it
+	// (C3D_GetDrawingTime is 0).
+	mode = 3;
+#endif
 	int most = soft ? 1 : 2;
 	if (mode != 1) {                     // 0 off, 2 always 2x, 3 always 2x2 (debug.txt), Soft at most 2x
 		S.level = mode == 2 ? 1 : mode == 3 ? most : 0;

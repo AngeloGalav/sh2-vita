@@ -118,7 +118,21 @@ void titlemenu_reset(bool saves)
 
 // ---------------------------------------------------------------- the touch screen
 
+static void touch_lists(void);
+
+// One screen (Vita): the rows are drawn on the game screen as the PC draws them
+// (titlemenu_draw_top), not listed on the page; the lists still set s_touch_sel to the chosen row,
+// which titlemenu_update reads back.
 static void touch(void)
+{
+	touch_lists();
+#ifdef SH2_VITA
+	touchui_menu_close(TOUI_TITLE);
+	touchui_menu_close(TOUI_LEVELS);
+#endif
+}
+
+static void touch_lists(void)
 {
 	static const TouiButton prompts[2] = { { "Select", KEY_A }, { "Back", KEY_B } };
 	static const TouiButton play[2] = { { "Play", KEY_A }, { "Back", KEY_B } };
@@ -356,6 +370,60 @@ static void item(float x, float y, const char* s, bool chosen, float bright)
 		font_text(FONT_SMALL, x - 1, y - 1, s, FONT_CENTER, c | 0xff, c | 0xff);
 }
 
+#ifdef SH2_VITA
+// One screen: every row on the picture, as the PC draws them, the chosen one again at full alpha a
+// pixel up and left (item). Coordinates in the PC's 512 x 448 screen.
+static void draw_vita(float bright)
+{
+	switch (s_screen) {
+	case SC_MENU:
+		// 0x496280: LOAD 284, CONTINUE 306, NEW GAME 328, OPTIONS 350, MOVIES 372, EXIT 394, each
+		// at its own place whether the ones above show or not, centred on x 256; the room viewer
+		// (debug.txt) below them
+		for (int it = 0; it < IT_N; it++)
+			if (listed(it))
+				item(256, 284 + 22 * it, it == IT_VIEWER ? "Room viewer (debug)" : msg(238 + it, "?"),
+				     it == s_sel, bright);
+		break;
+	case SC_SCENARIO:
+		// 0x4968c0: MAIN SCENARIO at (234, 324), SUB SCENARIO at (234, 350)
+		item(234, 324, msg(252, "MAIN SCENARIO"), s_sel == 0, bright);
+		item(234, 350, msg(253, "SUB SCENARIO"), s_sel == 1, bright);
+		break;
+	case SC_LEVELS:
+		if (s_wish) {
+			// 0x496490, Born From a Wish: ACTION LEVEL alone on x 256, its title lit
+			item(256, 290, msg(246, "ACTION LEVEL"), true, bright);
+			for (int i = 0; i < 4; i++)
+				item(256, 322 + 22 * i, msg(248 + i, "?"), s_action_sel == i + 1, bright);
+		} else {
+			// 0x496490 (step 0) / 0x497fc0 (step 1): ACTION LEVEL's four on x 128, RIDDLE LEVEL's
+			// three on x 384, titles at y 290 and the levels from 322, 22 apart; the column being
+			// chosen has its title and its level lit
+			item(128, 290, msg(246, "ACTION LEVEL"), s_step == 0, bright);
+			item(384, 290, msg(247, "RIDDLE LEVEL"), s_step == 1, bright);
+			for (int i = 0; i < 4; i++)
+				item(128, 322 + 22 * i, msg(248 + i, "?"), s_step == 0 && s_action_sel == i + 1, bright);
+			for (int i = 0; i < 3; i++)
+				item(384, 322 + 22 * i, msg(248 + i, "?"), s_step == 1 && s_riddle_sel == i + 1, bright);
+		}
+		break;
+	case SC_MOVIES: {
+		// The port's: the PC's own Movie Menu screen is not ported yet. Its title and up to nine
+		// movies around the chosen one, in the menu's style.
+		item(256, 230, msg(210, "Movie Menu"), false, bright);
+		int first = s_sel - 4 < 0 ? 0 : s_sel - 4;
+		if (first + 9 > s_movie_n)
+			first = s_movie_n - 9 < 0 ? 0 : s_movie_n - 9;
+		for (int i = first; i < s_movie_n && i < first + 9; i++)
+			item(256, 262 + 22 * (i - first), msg(214 + s_movie_msg[i], MOVIE_FILE[s_movie_msg[i]]), i == s_sel,
+			     bright);
+		break;
+	}
+	}
+}
+#endif
+
 bool titlemenu_draw_top(MapDrawFn draw, float bright)
 {
 	if (s_screen == SC_BOOT) {
@@ -389,6 +457,10 @@ bool titlemenu_draw_top(MapDrawFn draw, float bright)
 	}
 	if (!font_ready())
 		return s_bg_ok;
+#ifdef SH2_VITA
+	draw_vita(bright);
+	return s_bg_ok;
+#endif
 	// The rows are on the touch screen (port/UI.md); the top keeps the picture and shows what has
 	// been chosen: the scenario, both levels (the one being chosen lit), the movie.
 	switch (s_screen) {

@@ -700,6 +700,9 @@ static void load_current(void)
 		}
 	} else {
 		snprintf(s_status, sizeof s_status, "%s", err);
+#ifdef SH2_VITA
+		vita_log("room %s/%s not loaded: %s", s_areas[s_area], s_rooms[s_room], err);
+#endif
 	}
 }
 
@@ -2909,6 +2912,7 @@ static u32 draw_room_group(const Room* r, int group)
 	C3D_BufInfo* bi = C3D_GetBufInfo();
 	BufInfo_Init(bi);
 	BufInfo_Add(bi, r->vertices, ROOM_VERTEX_SIZE, 4, 0x3210);
+	u32 bound_base = 0;          // the vertex the buffer starts at (a batch's vbase, room.h)
 	// consecutive batches often share the texenv, the material constants, the texture and the
 	// alpha test: only what changes is set again (citro3d re-sends whatever is touched)
 	int env_mode = -1, alpha = -1;
@@ -2960,6 +2964,11 @@ static u32 draw_room_group(const Room* r, int group)
 			C3D_AlphaTest(a != 0, GPU_GREATER, 0);
 			alpha = a;
 		}
+		if (b->vbase != bound_base) {
+			BufInfo_Init(bi);
+			BufInfo_Add(bi, (const u8*)r->vertices + b->vbase * ROOM_VERTEX_SIZE, ROOM_VERTEX_SIZE, 4, 0x3210);
+			bound_base = b->vbase;
+		}
 		while (c < nc) {
 			u32 end = c + 1;
 			// a run goes on over a gap of a few hidden chunks: sending their triangles costs less
@@ -2972,7 +2981,7 @@ static u32 draw_room_group(const Room* r, int group)
 			C3D_DrawElements(GPU_TRIANGLES, i1 - i0, C3D_UNSIGNED_SHORT, b->indices + i0);
 			calls++;
 			if (gpucost_sampled()) {     // debug.txt gpucost (gpucost.h): the run's area on screen
-				const u8* vb = r->vertices;
+				const u8* vb = (const u8*)r->vertices + b->vbase * ROOM_VERTEX_SIZE;
 				bool shown = false;
 				for (u32 k = i0; k + 2 < i1; k += 3)
 					shown |= gpucost_tri(group == GROUP_OPAQUE ? GC_MAP : GC_MAP_BLEND, &s_frustum_clip,
@@ -4152,7 +4161,13 @@ static void options_apply(void)
 	audio_set_output(s_opt.speaker);
 	map_set_open_zoomed(s_opt.map_zoom == 0);
 	noise_set(s_opt.noise, s_opt.bright, s_opt.noise_ps2);
+#ifdef SH2_VITA
+	// Soft draws the scene into a texture of its own at 2x one way at most and filters it, for the
+	// 3DS's 400 x 240; the Vita draws it at its own 960 x 544, each pixel as the GPU drew it
+	picture_set_soft(false);
+#else
 	picture_set_soft(s_opt.picture == 0);
+#endif
 	blood_set_color(s_opt.blood);
 	profile_set_choices(s_opt.hwprofile, s_opt.quality, s_opt.ctrllayout, s_opt.framerate);   // profile.c
 	s_env_dirty = true;
@@ -5844,6 +5859,9 @@ int main(void)
 		// goes by the GPU's own time, which a console measures. Both eyes of a lit room take about
 		// twice one eye's 6 to 9 ms, inside a 60 fps frame; the fogged roads drop to 30 as in 2D
 		int cap = quality()->frame_cap;
+#ifdef SH2_VITA
+		cap = 30;                    // the Vita holds an even 30, every frame two refreshes
+#endif
 		if ((frame % 60) == 59) {
 			u32 behind, all;
 			if (tpcam_behind_count(&behind, &all)) {
