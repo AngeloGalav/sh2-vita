@@ -13,10 +13,9 @@ cd "$(dirname "$0")"
 IMAGE=${SH2VITA_BUILD_IMAGE:-vitasdk/vitasdk@sha256:acd15285e1ae473e925c6f83fa41e2de45eb8b9e8ba89be7df03e194c35c11d3}
 JOBS=${SH2VITA_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}
 VITAGL_REV=c2b3b8ab9cf7a3b2a12671fffc09dcb7cd68c56c
-VITAGL_FLAGS="NO_DEBUG=1 NO_SPLASHSCREEN=1"
-# SH2VITA_STORE_DEPTH=1: each depth buffer loaded and stored with its scene, which the half-size
-# fog test (SELECT + L) needs to read the depth as a texture; its cost is still to be measured
-[ "${SH2VITA_STORE_DEPTH:-0}" = "1" ] && VITAGL_FLAGS="$VITAGL_FLAGS STORE_DEPTH_STENCIL=1"
+# STORE_DEPTH_STENCIL: each depth buffer loaded and stored with its scene, so the half-size fog can
+# read the depth as a texture and what is drawn after it still has it
+VITAGL_FLAGS="NO_DEBUG=1 NO_SPLASHSCREEN=1 STORE_DEPTH_STENCIL=1"
 run() {
 	docker run --rm -v "$PWD/../..":/work -w /work/port/vita -e HOME=/tmp --user "$(id -u):$(id -g)" "$IMAGE" "$@"
 }

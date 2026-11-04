@@ -15,6 +15,11 @@ gives) and the format byte gets 0x80:
             untiled, with the byte order c3d_tex.c's untile gives
   LA4, L4, A4 left as they are (GL takes them a byte a texel; the font and a few small ones)
 
+The smaller levels of ETC1 and DXT5 textures are then made again from level 0: the 3DS pack's own
+levels hold saturated stray texels where level 0 is black (red 148, 48, 49 over 0, 0, 0 on Angela's
+hair), which the console showed as coloured specks. DXT5 is written by this file; ETC1 needs
+tools/texenc/build.sh native, and without it those levels stay as they are.
+
 A pack can mix converted and unconverted files: the Vita build reads both. Converted files are
 skipped, so running it twice changes nothing. The 3DS build cannot read the converted files.
 """
@@ -240,6 +245,97 @@ def level(fmt, src, w, h):
     return px.tobytes()
 
 
+def dxt5_decode(buf, w, h):
+    """n DXT5 blocks in rows to (h, w, 4) float RGBA."""
+    b = np.frombuffer(buf, np.uint8).reshape(-1, 16)
+    n, ids = len(b), np.arange(len(b))
+    c0 = b[:, 8].astype(np.int32) | b[:, 9].astype(np.int32) << 8
+    c1 = b[:, 10].astype(np.int32) | b[:, 11].astype(np.int32) << 8
+    e0, e1 = _from565(c0), _from565(c1)
+    pal = np.stack([e0, e1, (2 * e0 + e1) / 3, (e0 + 2 * e1) / 3], 1)
+    a0, a1 = b[:, 0].astype(np.float32), b[:, 1].astype(np.float32)
+    step8 = np.array([0, 7, 1, 2, 3, 4, 5, 6], np.float32)
+    step6 = np.array([0, 5, 1, 2, 3, 4], np.float32)
+    lev8 = ((7 - step8)[None] * a0[:, None] + step8[None] * a1[:, None]) / 7
+    lev6 = np.concatenate([((5 - step6)[None] * a0[:, None] + step6[None] * a1[:, None]) / 5,
+                           np.zeros((n, 1), np.float32), np.full((n, 1), 255, np.float32)], 1)
+    lev = np.where((a0 > a1)[:, None], lev8, lev6)
+    cbits = b[:, 12:16].copy().view('<u4')[:, 0].astype(np.uint64)
+    abits = np.zeros(n, np.uint64)
+    for k in range(6):
+        abits |= b[:, 2 + k].astype(np.uint64) << np.uint64(8 * k)
+    px = np.empty((n, 16, 4), np.float32)
+    for t in range(16):
+        px[:, t, :3] = pal[ids, ((cbits >> np.uint64(2 * t)) & np.uint64(3)).astype(np.int64)]
+        px[:, t, 3] = lev[ids, ((abits >> np.uint64(3 * t)) & np.uint64(7)).astype(np.int64)]
+    return px.reshape(h // 4, w // 4, 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(h, w, 4)
+
+
+def etc1_rows_decode(buf, w, h):
+    """ETC1 blocks in the Vita's form to (h, w, 4) float RGBA, alpha 255."""
+    words = np.frombuffer(buf, np.uint8).reshape(-1, 8)[:, ::-1].copy().view('<u8')[:, 0]
+    rgb = etc1_decode(words).reshape(h // 4, w // 4, 4, 4, 3).transpose(0, 2, 1, 3, 4).reshape(h, w, 3)
+    return np.concatenate([rgb.astype(np.float32), np.full((h, w, 1), 255, np.float32)], 2)
+
+
+def box_down(px):
+    """Half the size, each colour weighted by its alpha so transparent black does not darken edges."""
+    h, w = px.shape[:2]
+    q = px.reshape(h // 2, 2, w // 2, 2, 4)
+    a = q[..., 3:]
+    total = a.sum((1, 3))
+    rgb = (q[..., :3] * a).sum((1, 3)) / np.maximum(total, 1e-6)
+    return np.concatenate([rgb, total / 4], 2)
+
+
+def to_blocks(px):
+    """(h, w, 4) to (n, 16, 4), texel t = row * 4 + column."""
+    h, w = px.shape[:2]
+    return px.reshape(h // 4, 4, w // 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(-1, 16, 4)
+
+
+def rebuild_mips(path):
+    """Levels 1.. of a converted ETC1 or DXT5 file made again from its level 0."""
+    with open(path, 'rb') as f:
+        d = bytearray(f.read())
+    fmt, mips = d[3], d[4]
+    if fmt not in (VITA | ETC1, VITA | ETC1A4) or not mips:
+        return
+    hdr = 5 + (d[0] | d[1] << 8) * 12
+    pos = hdr + (4 if d[hdr] == 0 else 8)
+    w, h = 1 << ((d[2] & 7) + 3), 1 << ((d[2] >> 3 & 7) + 3)
+    dxt = fmt == VITA | ETC1A4
+    if not dxt:
+        import t3x
+        try:
+            t3x._encode_level(ETC1, bytes(8 * 8 * 4), 8, 8)
+        except OSError:
+            return                                             # no texenc library
+    n = w * h if dxt else w * h // 2
+    px = (dxt5_decode if dxt else etc1_rows_decode)(bytes(d[pos:pos + n]), w, h)
+    pos += n
+    for k in range(1, mips + 1):
+        lw, lh = w >> k, h >> k
+        px = box_down(px)
+        rgba = np.clip(np.rint(px), 0, 255).astype(np.uint8)
+        if dxt:
+            data = bc3_encode(to_blocks(rgba)).tobytes()
+        else:
+            data = level(ETC1, t3x._encode_level(ETC1, rgba.tobytes(), lw, lh), lw, lh)
+        d[pos:pos + len(data)] = data
+        pos += len(data)
+    tmp = path + '.tmp'
+    with open(tmp, 'wb') as f:
+        f.write(d)
+    os.replace(tmp, path)
+
+
+def process(path):
+    res = convert(path)
+    rebuild_mips(path)
+    return res
+
+
 def convert(path):
     """One .t3x in place. Returns 'converted', 'done' (already) or 'kept' (a format left alone)."""
     with open(path, 'rb') as f:
@@ -277,7 +373,7 @@ def convert_pack(root, jobs=None):
     paths = [os.path.join(r, n) for r, _, fs in os.walk(root) for n in fs if n.endswith('.t3x')]
     counts = {}
     with ProcessPoolExecutor(jobs) as ex:
-        for i, res in enumerate(ex.map(convert, paths, chunksize=4)):
+        for i, res in enumerate(ex.map(process, paths, chunksize=4)):
             counts[res] = counts.get(res, 0) + 1
             if (i + 1) % 200 == 0 or i + 1 == len(paths):
                 print(f'  {i + 1}/{len(paths)} textures', flush=True)

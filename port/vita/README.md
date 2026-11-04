@@ -18,7 +18,8 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 2. Copy the pack to `ux0:data/sh23ds/`, so that `ux0:data/sh23ds/ui/font.t3x` exists. Make it with
    the packer and `-e VITA=1`, or convert a 3DS pack with
    `python3 tools/sh2conv/vitatex.py <pack>/3ds/sh23ds` (10 seconds; the 3DS cannot read it after).
-   This writes the textures in the Vita's form, so they are not untiled or decoded as they load. A 3DS
+   This writes the textures in the Vita's form, so they are not untiled or decoded as they load, and
+   makes the smaller levels again from level 0 (the ETC1 ones need `tools/texenc/build.sh native`). A 3DS
    pack still works, at the cost of the conversion every time new textures come in. Saves, `options.txt` and `debug.txt` live there too.
 3. The shaders are compiled on the console at run time: `ur0:data/libshacccg.suprx` must be
    installed (the usual step for vitaGL ports; extract it with ShaRKBR33D).

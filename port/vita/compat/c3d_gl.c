@@ -106,16 +106,16 @@ static struct {
 	unsigned passes, draws;      // per second, for the log
 	const u32* zdata;            // the depth's memory, for the log's samples
 	u16 zw, zh;
-} HF = { .on = false, .fog_prog = -2 };   // off until it reads the depth right (SELECT + L)
+} HF = { .on = true, .fog_prog = -2 };
 
-// ux0:data/sh23ds/halffog1.txt starts with it on (a test switch)
+// ux0:data/sh23ds/halffog0.txt starts with it off (a test switch)
 static void half_fog_init(void)
 {
-	FILE* f = fopen(VITA_DATA_DIR "/halffog1.txt", "r");
+	FILE* f = fopen(VITA_DATA_DIR "/halffog0.txt", "r");
 	if (f) {
 		fclose(f);
-		HF.on = true;
-		vita_log("fog at half size on (halffog1.txt)");
+		HF.on = false;
+		vita_log("fog at half size off (halffog0.txt)");
 	}
 }
 
@@ -159,19 +159,20 @@ void vita_gl_init(void)
 		vita_log("ur0:data/libshacccg.suprx is missing: no shader can be compiled");
 	else
 		vita_log("ur0:data/libshacccg.suprx: %lld bytes", (long long)st.st_size);
-	// ux0:data/sh23ds/gxmrings.txt (a test switch, read here because these must precede vitaGL's
-	// start): larger GXM rings than the defaults (VDM 128 KB, vertex 2 MB, fragment 512 KB, USSE
-	// 16 KB), and more scenes per FBO for frames split between targets, the settings other vitaGL
-	// ports use for a frame with many draws and passes
-	FILE* rings = fopen(VITA_DATA_DIR "/gxmrings.txt", "r");
+	// Larger GXM rings than the defaults (VDM 128 KB, vertex 2 MB, fragment 512 KB, USSE 16 KB), and
+	// more scenes per FBO for frames split between targets, as other vitaGL ports set them for a frame
+	// with many draws and passes. ux0:data/sh23ds/gxmrings0.txt keeps the defaults (a test switch,
+	// read here because these must precede vitaGL's start)
+	FILE* rings = fopen(VITA_DATA_DIR "/gxmrings0.txt", "r");
 	if (rings) {
 		fclose(rings);
+		vita_log("default GXM rings (gxmrings0.txt)");
+	} else {
 		vglSetVDMBufferSize(1024 * 1024);
 		vglSetVertexBufferSize(4 * 1024 * 1024);
 		vglSetFragmentBufferSize(1024 * 1024);
 		vglSetUSSEBufferSize(2048 * 1024);
 		vglSetupRenderTargetScenesNum(1, 4);
-		vita_log("larger GXM rings, 4 scenes per FBO (gxmrings.txt)");
 	}
 	vglInitExtended(0, 960, 544, 16 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
 	// The programs are Cg with their semantics written out, so nothing needs the GLSL translator's
