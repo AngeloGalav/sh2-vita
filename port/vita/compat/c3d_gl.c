@@ -27,6 +27,7 @@
 #include <string.h>
 #include "vita.h"
 #include "c3d_internal.h"
+#include "perf.h"
 
 #define SHADER_CACHE VITA_DATA_DIR "/shader_cache"   // compiled programs (compile)
 
@@ -264,6 +265,7 @@ static unsigned s_draws[3];
 void C3D_FrameEnd(u8 flags)
 {
 	(void)flags;
+	u64 tp = svcGetSystemTick();
 	half_fog_end();
 	G.frame_cpu = sceKernelGetProcessTimeWide() - G.frame_start;
 	vbo_frame();
@@ -300,6 +302,14 @@ void C3D_FrameEnd(u8 flags)
 		last = G.frame_start;
 	}
 	present();
+	// r_end in parts for perf.txt's slow frame lines: r_pres the frame's last draws and the once a
+	// second log line, r_pace the wait for the 30 fps beat, r_swap vitaGL's swap (a full display queue,
+	// its garbage collector), r_swap1 the swap before this one, which sets this frame's beat through
+	// last_vc
+	static u64 swap_ticks;
+	perf_part("r_pres", tp);
+	perf_part("r_swap1", svcGetSystemTick() - swap_ticks);
+	tp = svcGetSystemTick();
 	// 30 fps: swaps at least two refreshes apart, each flipped at the next refresh (vsync). A frame
 	// that takes longer goes out at the next refresh, a 20 fps frame; vitaGL's own swap interval 2
 	// waits two refreshes after the frame is ready (its display callback, gxm.c), so a frame a
@@ -308,9 +318,13 @@ void C3D_FrameEnd(u8 flags)
 	if (G.fps <= 30.5f)
 		while ((int)(sceDisplayGetVcount() - last_vc) < 2)
 			sceDisplayWaitVblankStart();
+	perf_part("r_pace", tp);
+	tp = svcGetSystemTick();
 	u64 ts = sceKernelGetProcessTimeWide();
 	vglSwapBuffers(GL_FALSE);
 	c3d_stats.swap_us += sceKernelGetProcessTimeWide() - ts;
+	swap_ticks = svcGetSystemTick() - tp;
+	perf_part("r_swap", tp);
 	last_vc = sceDisplayGetVcount();
 	G.target = NULL;
 }
