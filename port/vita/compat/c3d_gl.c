@@ -132,6 +132,12 @@ void c3d_half_fog_toggle(void)
 
 static void half_fog_end(void);
 
+// The game view's surface, portrait as the PICA's. ux0:data/sh23ds/res416.txt draws it at 720 x 416,
+// a little over half the pixels, and the present stretches it (a test switch, read at start-up). 416
+// and not 408: a depth surface's rows are whole multiples of 32 samples, and the half-size fog reads
+// the depth as a texture of exactly that width.
+static int s_view_w = 544, s_view_h = 960;
+
 enum { LUT_D0 = 0, LUT_FOG = 1, LUT_LIGHT0 = 2, LUT_PT_RGB = 18, LUT_PT_ALPHA = 19, LUT_ROWS = 32 };
 
 // ---------------------------------------------------------------- init
@@ -173,6 +179,12 @@ void vita_gl_init(void)
 		vglSetFragmentBufferSize(1024 * 1024);
 		vglSetUSSEBufferSize(2048 * 1024);
 		vglSetupRenderTargetScenesNum(1, 4);
+	}
+	FILE* low = fopen(VITA_DATA_DIR "/res416.txt", "r");
+	if (low) {
+		fclose(low);
+		s_view_w = 416, s_view_h = 720;
+		vita_log("game view at 720 x 416 (res416.txt)");
 	}
 	vglInitExtended(0, 960, 544, 16 * 1024 * 1024, SCE_GXM_MULTISAMPLE_NONE);
 	// The programs are Cg with their semantics written out, so nothing needs the GLSL translator's
@@ -349,7 +361,7 @@ C3D_RenderTarget* C3D_RenderTargetCreate(int width, int height, GPU_COLORBUF col
 	// 480 x 800 and its viewports are scaled (C3D_SetViewport)
 	t->gl_w = width, t->gl_h = height;
 	if (width == 480 && height == 800)
-		t->gl_w = 544, t->gl_h = 960;
+		t->gl_w = (u16)s_view_w, t->gl_h = (u16)s_view_h;
 	t->sx = (float)t->gl_w / width, t->sy = (float)t->gl_h / height;
 	t->screen = -1;
 	t->tex = calloc(1, sizeof(C3D_Tex));
@@ -1841,7 +1853,7 @@ static void half_fog_route(void)
 	bool fog = G.program == HF.fog_prog;
 	if (HF.active && !fog)
 		half_fog_end();
-	else if (!HF.active && fog && HF.on && G.target && G.target->gl_w == 544 && G.target->gl_h == 960)
+	else if (!HF.active && fog && HF.on && G.target && G.target->gl_w == s_view_w && G.target->gl_h == s_view_h)
 		half_fog_begin();
 }
 
