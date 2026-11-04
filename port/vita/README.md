@@ -15,8 +15,11 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 ## Install
 
 1. Install `sh2vita.vpk` with VitaShell.
-2. Copy the pack (the same one the 3DS uses, made by the packer) to `ux0:data/sh23ds/`, so that
-   `ux0:data/sh23ds/ui/font.t3x` exists. Saves, `options.txt` and `debug.txt` live there too.
+2. Copy the pack to `ux0:data/sh23ds/`, so that `ux0:data/sh23ds/ui/font.t3x` exists. Make it with
+   the packer and `-e VITA=1`, or convert a 3DS pack with
+   `python3 tools/sh2conv/vitatex.py <pack>/3ds/sh23ds` (10 seconds; the 3DS cannot read it after).
+   This writes the textures in the Vita's form, so they are not untiled or decoded as they load. A 3DS
+   pack still works, at the cost of the conversion every time new textures come in. Saves, `options.txt` and `debug.txt` live there too.
 3. The shaders are compiled on the console at run time: `ur0:data/libshacccg.suprx` must be
    installed (the usual step for vitaGL ports; extract it with ShaRKBR33D).
 
@@ -31,7 +34,7 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 | `compat/ndsp.c` | The DSP's 24 channels mixed in software into one 48 kHz SceAudioOut port |
 | `compat/y2r.c` | No Y2R: `movie.c` takes its CPU conversion path |
 | `compat/c3d_math.c` | citro3d's matrices, PICA depth range and tilted projections kept |
-| `compat/c3d_tex.c` | Textures kept in PICA layout (the game reads and writes them), untiled on upload; ETC1 stays compressed, ETC1A4 and 4-bit formats are expanded; `.t3x` import |
+| `compat/c3d_tex.c` | Textures kept in PICA layout (the game reads and writes them), untiled on upload; ETC1 stays compressed, ETC1A4 and 4-bit formats are expanded; `.t3x` import. A converted pack's textures (format `0x80 \|` the PICA's, `tools/sh2conv/vitatex.py`) go up as they are: ETC1 in GL's block order, ETC1A4 as DXT5 with its levels, the raw formats untiled |
 | `compat/c3d_shaders.c` | The six `.v.pica` programs translated to Cg, register for register |
 | `compat/c3d_gl.c` | State, render targets (FBOs in the PICA's portrait orientation), draws, the fragment programs generated from the TEV, fragment lighting, alpha test and fog state, and presenting |
 
@@ -70,7 +73,7 @@ used to check the picture. What is open, roughly in order:
    laid out in 400 x 240, is drawn across the whole width, 6.7% wider than on the 3DS.
    Textures at the PC's sizes: profile.c reads the 3DS's heaps, which the layer reports as the New
    3DS's 124 MB mode (`__wrap_main`); left at 0 they had every texture halved.
-6. Memory (textures held twice), a Vita pack with the PC's DXT textures, a shader cache.
+6. Memory (textures held twice), DXT from the PC's own textures in the packer (vitatex.py starts from the 3DS's ETC1A4), a shader cache.
 7. No 3D (stereo.c's right eye is never shown), no surround (`ndspSetOutputMode` mono or stereo).
 
 Shaders are compiled through vitashark directly and handed to vitaGL as programs

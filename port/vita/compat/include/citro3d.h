@@ -182,8 +182,8 @@ void C3D_DrawElements(GPU_Primitive_t primitive, int count, int type, const void
 typedef struct { void* data[6]; } C3D_TexCube;
 struct C3D_Tex {
 	union { void* data; C3D_TexCube* cube; };   // the PICA-layout pixels for textures the CPU writes
-	GPU_TEXCOLOR fmt : 4;
-	size_t size : 28;
+	GPU_TEXCOLOR fmt : 8;          // 0x80 | the format: already in the Vita's form (c3d_tex.c, vitatex.py)
+	size_t size : 24;
 	union { u32 dim; struct { u16 height, width; }; };
 	u32 param;
 	u32 border;
@@ -196,7 +196,7 @@ struct C3D_Tex {
 typedef struct {
 	u16 width, height;
 	u8 maxLevel : 4;
-	GPU_TEXCOLOR format : 4;
+	GPU_TEXCOLOR format : 8;
 	GPU_TEXTURE_MODE_PARAM type : 3;
 	bool onVram : 1;
 } C3D_TexInitParams;

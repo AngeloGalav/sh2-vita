@@ -11,6 +11,9 @@ typedef enum {
 	GPU_RGBA8 = 0, GPU_RGB8 = 1, GPU_RGBA5551 = 2, GPU_RGB565 = 3, GPU_RGBA4 = 4, GPU_LA8 = 5,
 	GPU_HILO8 = 6, GPU_L8 = 7, GPU_A8 = 8, GPU_LA4 = 9, GPU_L4 = 10, GPU_A4 = 11,
 	GPU_ETC1 = 12, GPU_ETC1A4 = 13,
+	// Vita only: 0x80 | a format above is that format already laid out as GL uploads it, ETC1A4's as
+	// DXT5 (tools/sh2conv/vitatex.py writes them into the pack; c3d_tex.c uploads them as they are)
+	GPU_VITA_FORM = 0x80, GPU_VITA_DXT5 = 0x80 | GPU_ETC1A4,
 } GPU_TEXCOLOR;
 typedef enum { GPU_TEXFACE_2D = 0, GPU_POSITIVE_X = 0, GPU_NEGATIVE_X = 1, GPU_POSITIVE_Y = 2,
                GPU_NEGATIVE_Y = 3, GPU_POSITIVE_Z = 4, GPU_NEGATIVE_Z = 5 } GPU_TEXFACE;

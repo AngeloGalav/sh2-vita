@@ -12,7 +12,7 @@
 
 static int bits_per_texel(u8 fmt)
 {
-	switch (fmt) {
+	switch (fmt & 0x7f) {                                            // 0x80: the Vita's form, same sizes
 	case 0x00: return 32;                                            // RGBA8
 	case 0x01: return 24;                                            // RGB8
 	case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: return 16;

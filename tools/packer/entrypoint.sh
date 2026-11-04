@@ -6,6 +6,8 @@
 # Set HALF_MOVIES=1 to add the half-size movies the Old 3DS profile plays (about 75 MB more).
 # A game folder with the Enhanced Edition's sh2e folder (its Image, FMV and Audio Enhancement Packs
 # and Essential Files) gives the improved files (tools/sh2conv/EE_PACKS.md); SH2EE=0 ignores them.
+# Set VITA=1 for the PS Vita build: the textures are then rewritten in the Vita's form
+# (tools/sh2conv/vitatex.py), which the 3DS cannot read.
 set -e
 if [ ! -f /game/sh2pc.exe ] || [ ! -d /game/data ]; then
 	echo "Mount your Silent Hill 2 folder at /game: it must hold sh2pc.exe and the data folder." >&2
@@ -18,6 +20,10 @@ if [ "${KEEP_EXTRAS:-0}" = "1" ]; then
 	/opt/sh23ds/tools/make_pack.sh /game "$OUT"
 else
 	/opt/sh23ds/tools/make_pack.sh /game "$OUT" --strip-extras
+fi
+if [ "${VITA:-0}" = "1" ]; then
+	echo "== textures in the PS Vita's form"
+	python3 /opt/sh23ds/tools/sh2conv/vitatex.py "$OUT"
 fi
 echo
 echo "Done. Copy the 3ds folder inside your output folder to the root of the SD card."

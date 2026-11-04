@@ -8,7 +8,9 @@
 // the rows go to GL in the same order, top row first, and the fragment programs sample the game's
 // textures at 1 - t (c3d_gl.c), since the PICA reads its row 0 at t = 1. ETC1
 // tiles hold four 4 x 4 blocks in row order, each a little-endian 64-bit ETC1 word, ETC1A4 with
-// 8 bytes of 4-bit alpha (column-major) before each block. Vita-only.
+// 8 bytes of 4-bit alpha (column-major) before each block. A pack converted by
+// tools/sh2conv/vitatex.py has its textures already in GL's form, format 0x80 | the PICA's
+// (GPU_VITA_FORM): those go up as they are, ETC1A4's as DXT5 with its levels. Vita-only.
 #include <citro3d.h>
 #include <tex3ds.h>
 #include <vitaGL.h>
@@ -23,7 +25,7 @@ static const u8 BPP[16] = { 32, 24, 16, 16, 16, 16, 16, 8, 8, 8, 4, 4, 4, 8, 0, 
 static size_t level_size(const C3D_Tex* t, int level)
 {
 	size_t w = t->width >> level, h = t->height >> level;
-	return w * h * BPP[t->fmt] / 8;
+	return w * h * BPP[t->fmt & 15] / 8;
 }
 
 static size_t total_size(const C3D_Tex* t)
@@ -277,7 +279,7 @@ static void apply_params(C3D_Tex* t)
 	u32 p = t->param;
 	bool mag = (p >> 1) & 1, min = (p >> 2) & 1, mip = (p >> 24) & 1;
 	GLint minf = min ? GL_LINEAR : GL_NEAREST;
-	if (t->maxLevel > 0 && t->fmt != GPU_ETC1)    // upload(): mipmaps made for all but ETC1
+	if (t->maxLevel > 0 && (t->fmt & 15) != GPU_ETC1)   // upload(): mipmaps for all but ETC1
 		minf = min ? (mip ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_NEAREST)
 		           : (mip ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag ? GL_LINEAR : GL_NEAREST);
@@ -297,12 +299,41 @@ static void upload(C3D_Tex* t)
 	c3d_stats.tex_us += sceKernelGetProcessTimeWide() - t0;
 }
 
+// A texture already in the Vita's form (vitatex.py): no untiling, DXT5 with the pack's own levels
+static void upload_vita_form(C3D_Tex* t)
+{
+	GPU_TEXCOLOR base = (GPU_TEXCOLOR)(t->fmt & 15);
+	const u8* d = t->data;
+	if (base == GPU_ETC1A4) {
+		for (int k = 0; k <= t->maxLevel; k++) {
+			u32 w = t->width >> k, h = t->height >> k;
+			glCompressedTexImage2D(GL_TEXTURE_2D, k, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, w, h, 0, w * h, d);
+			d += w * h;
+		}
+		return;
+	}
+	GlForm g = gl_form(base, t->width, t->height);
+	if (g.compressed)
+		glCompressedTexImage2D(GL_TEXTURE_2D, 0, g.format, t->width, t->height, 0, g.bytes, d);
+	else
+		glTexImage2D(GL_TEXTURE_2D, 0, g.format, t->width, t->height, 0, g.format, g.type, d);
+	if (t->maxLevel > 0 && !g.compressed)
+		glGenerateMipmap(GL_TEXTURE_2D);
+}
+
 static void upload_timed(C3D_Tex* t)
 {
 	if (!t->gl)
 		glGenTextures(1, &t->gl);
 	glBindTexture(GL_TEXTURE_2D, t->gl);
-	if (t->data) {
+	if (t->data && (t->fmt & GPU_VITA_FORM)) {
+		upload_vita_form(t);
+		GLenum e = glGetError();
+		static unsigned failures;
+		if (e != GL_NO_ERROR && failures++ < 50)
+			vita_log("texture %ux%u format 0x%x not uploaded: GL error 0x%x, vitaGL %u KB free", t->width,
+			         t->height, (unsigned)t->fmt, e, (unsigned)(vglMemFree(VGL_MEM_ALL) >> 10));
+	} else if (t->data) {
 		GlForm g = gl_form(t->fmt, t->width, t->height);
 		u8* tmp = malloc(g.bytes);
 		// Level 0, and the smaller levels from glGenerateMipmap where the texture has some and is
