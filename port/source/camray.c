@@ -41,7 +41,11 @@ u32 camray_stat[4];                      // rays, cells walked, triangles tested
 
 static bool opaque(const RoomBatch* b) { return b->group == GROUP_OPAQUE && b->indices; }
 
-static const float* vtx(const Room* r, u16 i) { return (const float*)((const u8*)r->vertices + i * ROOM_VERTEX_SIZE); }
+// b's vertex i (its indices count from b->vbase, room.h)
+static const float* vtx(const Room* r, const RoomBatch* b, u16 i)
+{
+	return (const float*)((const u8*)r->vertices + (b->vbase + i) * ROOM_VERTEX_SIZE);
+}
 
 static void grid_free(Grid* g)
 {
@@ -87,11 +91,11 @@ static Grid* find(const Room* r, bool make)
 }
 
 // The cells a triangle's ground-plane box covers
-static void cells_of(const Grid* g, const Room* r, const u16* ix, int c[4])
+static void cells_of(const Grid* g, const Room* r, const RoomBatch* b, const u16* ix, int c[4])
 {
 	float lx = 1e30f, hx = -1e30f, lz = 1e30f, hz = -1e30f;
 	for (int k = 0; k < 3; k++) {
-		const float* p = vtx(r, ix[k]);
+		const float* p = vtx(r, b, ix[k]);
 		lx = fminf(lx, p[0]), hx = fmaxf(hx, p[0]), lz = fminf(lz, p[2]), hz = fmaxf(hz, p[2]);
 	}
 	c[0] = (int)((lx - g->x0) / g->cell), c[1] = (int)((lz - g->z0) / g->cell);
@@ -160,13 +164,13 @@ static bool grid_step(Grid* g, u32 budget)
 		const u16* ix = b->indices + g->ti * 3;
 		if (g->state == G_BOUNDS) {
 			for (int k = 0; k < 3; k++) {
-				const float* p = vtx(r, ix[k]);
+				const float* p = vtx(r, b, ix[k]);
 				g->lo[0] = fminf(g->lo[0], p[0]), g->hi[0] = fmaxf(g->hi[0], p[0]);
 				g->lo[1] = fminf(g->lo[1], p[2]), g->hi[1] = fmaxf(g->hi[1], p[2]);
 			}
 		} else {
 			int c[4];
-			cells_of(g, r, ix, c);
+			cells_of(g, r, b, ix, c);
 			for (int z = c[1]; z <= c[3]; z++)
 				for (int x = c[0]; x <= c[2]; x++) {
 					int k = z * g->nx + x;
@@ -233,7 +237,7 @@ static float tri_ref(const Room* r, u32 ref, const float o[3], const float d[3],
 		return best;                     // a part the stage code has switched off
 	const u16* ix = b->indices + (ref & 0x3ffff) * 3;
 	camray_stat[2]++;
-	float h = tri_hit(vtx(r, ix[0]), vtx(r, ix[1]), vtx(r, ix[2]), o, d, best);
+	float h = tri_hit(vtx(r, b, ix[0]), vtx(r, b, ix[1]), vtx(r, b, ix[2]), o, d, best);
 	return h < best ? h : best;
 }
 

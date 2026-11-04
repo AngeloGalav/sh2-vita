@@ -384,6 +384,8 @@ u8* room_prepare(u8* data, long* size)
 	    h->ofs_indices + h->n_indices * sizeof(u16) > (u32)*size ||
 	    h->ofs_vertices + h->n_vertices * ROOM_VERTEX_SIZE > (u32)*size)
 		return data;
+	if (h->n_vertices > 65536)
+		return data;                     // past 16-bit indices: room_load_mem keeps them per batch
 	const RoomBatchFile* fb = (const RoomBatchFile*)(data + h->ofs_batches);
 	u16* idx = (u16*)(data + h->ofs_indices);
 	for (u32 i = 0; i < h->n_batches; i++) {
@@ -588,12 +590,10 @@ bool room_load_mem(Room* room, const char* pack, const char* area, const char* n
 
 	room->materials = calloc(h->n_materials ? h->n_materials : 1, sizeof(RoomMaterial));
 	room->batches = calloc(h->n_batches ? h->n_batches : 1, sizeof(RoomBatch));
-	if (h->n_vertices > 65536) {
-		unsigned long verts = h->n_vertices;
-		free(data);
-		snprintf(err, errlen, "%lu vertices: room needs splitting", verts);
-		return false;
-	}
+	// Past 65536 vertices (the Enhanced Edition's own maps: ob01, ma49, cc44, cc45, cd11) the
+	// indices can't be room-global in 16 bits: each batch keeps its own, counted from its first
+	// vertex (vbase), and its draw points the vertex buffer there (main.c draw_room_group)
+	bool big = h->n_vertices > 65536;
 	room->vertices = linearAlloc(h->n_vertices * ROOM_VERTEX_SIZE);
 	if (!room->materials || !room->batches || !room->vertices) {
 		unsigned long verts = h->n_vertices;
@@ -637,11 +637,12 @@ bool room_load_mem(Room* room, const char* pack, const char* area, const char* n
 		// Rebase to room-global vertex indices: every batch then draws from one vertex buffer
 		// binding, and no two batches share index values (a post-transform vertex cache keyed by
 		// index would otherwise hand later batches stale vertices from earlier ones).
-		if (rebased)
+		if (rebased || big)
 			memcpy(b->indices, fidx + fb[i].first_index, b->index_count * sizeof(u16));
 		else
 			for (u32 k = 0; k < b->index_count; k++)
 				b->indices[k] = (u16)(fidx[fb[i].first_index + k] + b->first_vertex);
+		b->vbase = big ? b->first_vertex : 0;
 	}
 	memcpy(room->vertices, data + h->ofs_vertices, h->n_vertices * ROOM_VERTEX_SIZE);
 	// the culling boxes of each chunk of each batch (room.h), from room_prepare on the reader thread
@@ -662,7 +663,8 @@ bool room_load_mem(Room* room, const char* pack, const char* area, const char* n
 			b->chunks = box;
 			b->groups = group;
 			if (!boxed)
-				chunk_boxes(room->vertices, h->n_vertices, b->indices, b->index_count, box);
+				chunk_boxes((const u8*)room->vertices + b->vbase * ROOM_VERTEX_SIZE,
+				            big ? b->vertex_count : h->n_vertices, b->indices, b->index_count, box);
 			for (u32 c = 0; c < b->n_chunks; c += ROOM_GROUP_CHUNKS)
 				*group++ = box_merge(box + c, b->n_chunks - c < ROOM_GROUP_CHUNKS ? b->n_chunks - c : ROOM_GROUP_CHUNKS);
 			box += b->n_chunks;

@@ -414,6 +414,8 @@ static void local_of(Mtx34* L, const Character* c, const AnmKey* k, u32 b)
 // linearly. A looping clip (lo..hi, hi > lo) blends its last frame back to its first, as the PC's
 // anime step does (0x551820 mode 1: the next key after the end is the clip's start), never on into
 // the clip stored after it. False when the animation does not fit the model (the bind pose is used then).
+static const float* s_bone_w;     // chr_pose_weighted: each bone's weight between keys 0 and 1
+
 static bool pose_locals(const Character* c, const Anim* a, float frame, int lo, int hi, Mtx34* out)
 {
 	if (!a || !a->keys || a->bones != c->n_bones) {
@@ -431,6 +433,8 @@ static bool pose_locals(const Character* c, const Anim* a, float frame, int lo, 
 	for (u32 b = 0; b < c->n_bones; b++) {
 		Mtx34 L0, L1, L;
 		local_of(&L0, c, &a->keys[f0 * a->bones + b], b);
+		if (s_bone_w)
+			t = s_bone_w[b];
 		if (t > 0.001f && f1 != f0) {
 			// blend matrices then re-orthonormalise the rotation (cheap and adequate for 30 fps keys)
 			local_of(&L1, c, &a->keys[f1 * a->bones + b], b);
@@ -495,6 +499,13 @@ void chr_pose_loop(Character* c, const Anim* a, float frame, int start, int end)
 }
 
 void chr_pose(Character* c, const Anim* a, float frame) { chr_pose_loop(c, a, frame, 0, 0); }
+
+void chr_pose_weighted(Character* c, const Anim* a, const float* w)
+{
+	s_bone_w = w;
+	chr_pose_loop(c, a, 0.0f, 0, 0);
+	s_bone_w = NULL;
+}
 
 // a + (b - a) * w for a rotation and translation, then Gram-Schmidt so the result stays a rotation
 // even when the two are far apart (lerping matrices alone would shear and shrink the bone).

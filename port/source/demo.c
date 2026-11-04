@@ -237,8 +237,14 @@ typedef struct {
 	bool own_model;
 	const DemMotion* mot;      // motion playing, NULL: bind pose
 	float mot_start;           // scene frame it started at
-	int dec_frame;             // frame held in cur (-1: none decoded yet)
-	BoneState prev[CHR_MAX_BONES], cur[CHR_MAX_BONES];
+	int dec_frame;             // -1: the key tables below are for another motion (motion_keys)
+	// The motion's keys bone by bone: bone b's are kframe / kstate [kfirst[b] .. + kcount[b]), the
+	// frames where it has data and its state there (motion_keys)
+	const DemMotion* kmot;
+	u16 kcount[CHR_MAX_BONES];
+	u32 kfirst[CHR_MAX_BONES];
+	u16* kframe;
+	BoneState* kstate;
 } DemoChar;
 
 static struct {
@@ -363,7 +369,8 @@ static int bone_trans2(float out[3], const u8* p, bool root)
 
 // One frame of a motion into the bone states, like FUN_0054fa10 (shExec) with param_2 = 0. A u32
 // header holds a 4-bit code per bone for 8 bones; bit 3 is a flag, bits 0..2 the layout.
-static const u8* decode_frame(BoneState* st, const u8* p, const Character* c)
+// had (may be NULL): which bones the frame carried data for.
+static const u8* decode_frame(BoneState* st, const u8* p, const Character* c, u8* had)
 {
 	u32 hdr = 0;
 	for (u32 b = 0; b < c->n_bones; b++) {
@@ -372,6 +379,8 @@ static const u8* decode_frame(BoneState* st, const u8* p, const Character* c)
 			p += 4;
 		}
 		int t = (hdr >> (4 * (b & 7))) & 7;
+		if (had)
+			had[b] = t != 0 && t != 7;
 		BoneState* s = &st[b];
 		bool root = c->parents[b] == 255;
 		switch (t) {
@@ -419,36 +428,81 @@ static const u8* decode_frame(BoneState* st, const u8* p, const Character* c)
 	return p;
 }
 
-// Bone states of frames f and f + 1 of the character's motion (decoded forward from the last call;
-// a jump back starts over from frame 0, which every motion stores in full).
-static void motion_frames(DemoChar* dc, int f)
+// The motion's keys bone by bone. A frame of a scene motion carries data for some bones only (the
+// 4-bit code 0, mostly with flag 8, for the rest), and the PC moves a bone between its keys: its
+// motion player (0x550d00) decodes the key it is at and the next one (shExec 0x54fa10 into slots
+// 0 and 1), takes the turn between them as an axis and an angle (0x550b60) and goes round that
+// axis by the share of the way through (sin and cos of the angle times it, 0x550d00), the
+// translation lerped from one slot to the other. Held at the last key instead, as this did before,
+// the bones moved in steps (characters like stop motion while the camera ran smooth). Here each
+// bone is lerped from its key to its next one by the frame's share of the way between them and
+// re-orthonormalised (chr.c pose_locals), not turned about the axis: between keys a few frames
+// apart the two agree to well under a degree.
+static void motion_keys(DemoChar* dc)
 {
 	const DemMotion* m = dc->mot;
-	int last = m->frames - 1;
-	if (f > last)
-		f = last;
-	int want = f + 1 > last ? last : f + 1;
+	if (dc->kmot == m && dc->dec_frame >= 0)
+		return;
+	free(dc->kframe);
+	free(dc->kstate);
+	dc->kframe = NULL;
+	dc->kstate = NULL;
+	dc->kmot = m;
+	dc->dec_frame = 0;
+	u32 nb = dc->model->n_bones;
 	const u32* ofs = (const u32*)(S.file + m->ofs);
 	const u8* data = (const u8*)(ofs + m->frames + 1);
-	if (dc->dec_frame < 0 || dc->dec_frame > want) {
-		memset(dc->cur, 0, sizeof dc->cur);         // start over: bind pose until frame 0 is read
-		dc->dec_frame = -1;
+	static BoneState st[CHR_MAX_BONES];
+	static u8 had[CHR_MAX_BONES];
+	// one pass to count each bone's keys, one to keep them
+	u32 total = 0;
+	memset(dc->kcount, 0, sizeof dc->kcount);
+	memset(st, 0, sizeof st);
+	for (u32 f = 0; f < m->frames; f++) {
+		decode_frame(st, data + ofs[f], dc->model, had);
+		for (u32 b = 0; b < nb; b++)
+			if (had[b] || f == 0)
+				dc->kcount[b]++, total++;
 	}
-	while (dc->dec_frame < want) {
-		int n = dc->dec_frame + 1;
-		if (n == want)
-			memcpy(dc->prev, dc->cur, sizeof dc->prev);
-		decode_frame(dc->cur, data + ofs[n], dc->model);
-		dc->dec_frame = n;
+	dc->kframe = malloc(total * sizeof *dc->kframe);
+	dc->kstate = malloc(total * sizeof *dc->kstate);
+	if (!dc->kframe || !dc->kstate) {
+		free(dc->kframe);
+		free(dc->kstate);
+		dc->kframe = NULL;
+		dc->kstate = NULL;
+		return;
 	}
-	if (want == f)                   // last frame: nothing to blend towards
-		memcpy(dc->prev, dc->cur, sizeof dc->prev);
+	u32 at = 0;
+	for (u32 b = 0; b < nb; b++)
+		dc->kfirst[b] = at, at += dc->kcount[b];
+	u16 fill[CHR_MAX_BONES] = { 0 };
+	memset(st, 0, sizeof st);
+	for (u32 f = 0; f < m->frames; f++) {
+		decode_frame(st, data + ofs[f], dc->model, had);
+		for (u32 b = 0; b < nb; b++)
+			if (had[b] || f == 0) {
+				u32 k = dc->kfirst[b] + fill[b]++;
+				dc->kframe[k] = (u16)f;
+				dc->kstate[k] = st[b];
+			}
+	}
+}
+
+static void motion_keys_free(DemoChar* dc)
+{
+	free(dc->kframe);
+	free(dc->kstate);
+	dc->kframe = NULL;
+	dc->kstate = NULL;
+	dc->kmot = NULL;
 }
 
 // Poses the character; returns the motion frame (for its face track).
 static float pose_char(DemoChar* dc)
 {
 	static AnmKey keys[2 * CHR_MAX_BONES];
+	static float w[CHR_MAX_BONES];
 	Character* c = dc->model;
 	if (!dc->mot || !dc->mot->frames) {
 		chr_pose(c, NULL, 0.0f);
@@ -465,10 +519,25 @@ static float pose_char(DemoChar* dc)
 		t = fmodf(t, (float)m->frames);
 	if (t > (float)(m->frames - 1))
 		t = (float)(m->frames - 1);
-	int f = (int)t;
-	motion_frames(dc, f);
+	motion_keys(dc);
+	if (!dc->kstate) {
+		chr_pose(c, NULL, 0.0f);
+		return t;
+	}
 	for (u32 b = 0; b < c->n_bones; b++) {
-		const BoneState* s[2] = { &dc->prev[b], &dc->cur[b] };
+		// the bone's last key at or before t, and the next one
+		const u16* kf = dc->kframe + dc->kfirst[b];
+		int n = dc->kcount[b], lo = 0, hi = n - 1;
+		while (lo < hi) {
+			int mid = (lo + hi + 1) / 2;
+			if ((float)kf[mid] <= t)
+				lo = mid;
+			else
+				hi = mid - 1;
+		}
+		int j = lo + 1 < n ? lo + 1 : lo;
+		w[b] = j != lo ? (t - (float)kf[lo]) / (float)(kf[j] - kf[lo]) : 0.0f;
+		const BoneState* s[2] = { &dc->kstate[dc->kfirst[b] + lo], &dc->kstate[dc->kfirst[b] + j] };
 		for (int k = 0; k < 2; k++) {
 			AnmKey* o = &keys[k * c->n_bones + b];
 			memcpy(o->rot, s[k]->rot, sizeof o->rot);
@@ -477,7 +546,7 @@ static float pose_char(DemoChar* dc)
 		}
 	}
 	Anim a = { c->n_bones, 2, keys };
-	chr_pose(c, &a, t - (float)f);
+	chr_pose_weighted(c, &a, w);
 	return t;
 }
 
@@ -764,6 +833,8 @@ static void scene_cues(void)
 // Frees the scene (models, motions, its voice); a sequence going on is kept.
 static void scene_end(void)
 {
+	for (int i = 0; i < DEMO_MAX_CHARS; i++)
+		motion_keys_free(&S.chars[i]);
 	for (int i = 0; i < DEMO_MAX_CHARS; i++)
 		if (S.chars[i].own_model && S.chars[i].model) {
 			morph_free(S.chars[i].morph);
@@ -1117,6 +1188,23 @@ static bool scene_update(float dt)
 					step = want > S.cur ? want - S.cur : 0.0f;
 			}
 		}
+#ifdef SH2_VITA
+		{   // the scene clock, once a second in vita_log.txt: frames gone by, frames held for the
+			// voice, jumps onto the voice's clock, the largest step
+			static float adv, big;
+			static int calls, held, jumps;
+			static u64 last;
+			calls++, adv += step, big = step > big ? step : big;
+			held += step == 0.0f;
+			jumps += step > 1.5f * dt * DEMO_FPS || (step > 0.0f && step < 0.5f * dt * DEMO_FPS);
+			u64 now = svcGetSystemTick();
+			if (now - last >= SYSCLOCK_ARM11) {
+				vita_log("scene %.10s: %d updates, %.1f frames, %d held, %d jumps, step max %.2f", S.key, calls, adv,
+				         held, jumps, big);
+				calls = held = jumps = 0, adv = big = 0.0f, last = now;
+			}
+		}
+#endif
 		S.elapsed += step;
 		if (S.cur < (float)S.h->total_frames)
 			S.cur += step;
@@ -1242,9 +1330,10 @@ bool demo_camera(C3D_Mtx* view, float* fovy, float eye_out[3], float* focus)
 	// Enhanced Edition "ReduceCutsceneFOV" (WidescreenFixesPack, bundled with the EE, on by default):
 	// the scene keeps the horizontal extent of its 4:3 framing (the PC constant 0x6b0684 times
 	// aspect / (4/3), at most the 16:9 factor), so characters parked just outside the 4:3 frame
-	// waiting for their entrance stay hidden. The 5:3 top screen gives 1.25 and crops a little height.
+	// waiting for their entrance stay hidden. The 5:3 top screen gives 1.25 and crops a little height
+	// (the Vita's 960 x 544, 1.32).
 	if (s_reduce_fov)
-		scr_z *= (400.0f / 240.0f) / (4.0f / 3.0f);
+		scr_z *= C3D_AspectRatioTop / (4.0f / 3.0f);
 	if (scr_z < 50.0f)
 		scr_z = SCREEN_SY;
 	*fovy = 2.0f * atanf(SCREEN_SY * 0.5f / scr_z);

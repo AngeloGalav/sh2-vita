@@ -32,6 +32,8 @@ typedef struct { float c[3], e[3]; } RoomBox;
 typedef struct {
 	u32 group, material, first_vertex, vertex_count, index_count;
 	u16* indices;       // own linear allocation: the PICA index buffer address must be aligned
+	u32 vbase;          // the vertex its indices count from: 0 (room-global indices), or first_vertex
+	                    // in a room of more than 65536 vertices, whose batches keep their own (room.c)
 	u16 part;           // the map geometry's id: variant (low byte) and part group (high byte)
 	u8 hidden;          // a part the stage code has not switched on (see room_parts_apply)
 	RoomBox box;        // around all its triangles

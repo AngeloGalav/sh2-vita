@@ -68,6 +68,9 @@ int clips_load(AnimClip* clips, int max, const char* path);
 
 // Poses the character at a (fractional) frame; frames are blended linearly.
 void chr_pose(Character* c, const Anim* a, float frame);
+// A two-key Anim with each bone's own weight between them (w[bone], 0 key 0 .. 1 key 1): demo.c's
+// scene motions, whose bones each keep keys of their own
+void chr_pose_weighted(Character* c, const Anim* a, const float* w);
 // The same for a frame of the looping clip start..end: past its last frame it blends back to start
 // (0x551820). end <= start: no loop, as chr_pose.
 void chr_pose_loop(Character* c, const Anim* a, float frame, int start, int end);

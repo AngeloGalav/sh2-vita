@@ -45,7 +45,7 @@
 #define MAX_QUADS 32
 #define FPS       30.0f
 #define SCR_H     480.0f                 // the PC's picture: its sizes are pixels of 480 lines
-#define SCR_W     (SCR_H * 400.0f / 240.0f)
+#define SCR_W     (SCR_H * C3D_AspectRatioTop)
 
 typedef struct { float x, y, z, u, v; u8 c[4]; s8 n[4]; } V;   // the world program's vertex
 
