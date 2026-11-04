@@ -1289,19 +1289,42 @@ static bool link(GLuint p, GLuint vs, GLuint fs)
 
 static GLuint s_vs[8];
 
+// The half-size fog's program needs full precision for the depth (half overflows in z / w), so it is
+// compiled without fastprecision, which would turn every float to half. Its colour work is written
+// in half by hand instead, in s[0..]: only the texture coordinates and the depth test stay float.
+static int half_types(char* s)
+{
+	char* w = s;
+	for (const char* r = s; *r;) {
+		if (!strncmp(r, "float", 5) && strncmp(r + 5, "2(o_tc", 6)) {
+			memcpy(w, "half", 4);
+			w += 4, r += 5;
+		} else {
+			*w++ = *r++;
+		}
+	}
+	*w = 0;
+	return (int)(w - s);
+}
+
+static bool s_fog_full;                // a half-typed fog program did not compile: float throughout
+
 static Program* build(const FragKey* k)
 {
 	static char src[16384];
 	int len = 0;
+	bool half_fog = k->halffog && !s_fog_full;
 	APPEND(LUT_AT);
-	APPEND("float4 main(float4 o_col : COLOR, float4 o_tc0 : TEXCOORD0, float4 o_tc1 : TEXCOORD1,\n"
-	       "float4 o_tc2 : TEXCOORD2, float4 o_view : TEXCOORD4, float4 o_nq : TEXCOORD5, float2 o_z : TEXCOORD6,\n");
+	APPEND("%s main(%s o_col : COLOR, float4 o_tc0 : TEXCOORD0, float4 o_tc1 : TEXCOORD1,\n"
+	       "float4 o_tc2 : TEXCOORD2, float4 o_view : TEXCOORD4, float4 o_nq : TEXCOORD5, float2 o_z : TEXCOORD6,\n",
+	       half_fog ? "half4" : "float4", half_fog ? "half4" : "float4");
 	if (k->halffog)
 		APPEND("float4 o_scr : TEXCOORD7, uniform sampler2D zbuf,\n");
 	APPEND(
 	       "uniform sampler2D tex0, uniform sampler2D tex1, uniform sampler2D tex2, uniform sampler2D lut,\n"
 	       "uniform sampler2D ptcol, uniform float4 ptparam, uniform float4 ptc, uniform float4 k[6], uniform float4 fogc,\n"
 	       "uniform float4 aref, uniform float4 amb, uniform float4 L[48], uniform float4 d0) : COLOR\n{\n");
+	int body = len;
 	// The game's textures keep the PICA's row order, top row first, which the PICA samples at
 	// t = 1 and GL at t = 0: their t is turned over here (the same on every wrap mode as turning
 	// the rows over, and ETC1 stays exactly as packed). Render targets are GL's own rows.
@@ -1411,6 +1434,8 @@ static Program* build(const FragKey* k)
 		APPEND("{ float3 cr = clamp((%s) * %s, 0.0, 1.0); float ca = clamp((%s) * %s, 0.0, 1.0); prev = float4(cr, ca); }\n",
 		       e, SCALE[k->st[i].s_rgb & 3], ea, SCALE[k->st[i].s_a & 3]);
 	}
+	if (half_fog)
+		len = body + half_types(src + body);
 	if (k->halffog > 1) {
 		// the half-size fog's depth test against the scene's depth (the frame's own depth buffer as a
 		// texture): a sprite behind the map leaves the pixel alone, as GL's test would have
@@ -1457,6 +1482,11 @@ static Program* build(const FragKey* k)
 		vita_log("fragment program for %s (%d stages%s%s):\n%s", c3d_vertex_programs[k->vprog].name, k->nstages,
 		         k->pt_on ? ", proctex" : "", k->halffog ? ", half fog" : "", src);
 	GLuint fs = compile(GL_FRAGMENT_SHADER, src);
+	if (!fs && half_fog) {
+		vita_log("half-size fog in half precision did not compile: float throughout");
+		s_fog_full = true;
+		return build(k);
+	}
 	Program* p = &s_progs[s_nprogs++];
 	memset(p, 0, sizeof *p);
 	p->key = *k;
