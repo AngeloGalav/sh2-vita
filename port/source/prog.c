@@ -491,6 +491,9 @@ static void choice_title(const char* text)
 }
 
 int prog_demo_number(void) { return s_demo_no; }
+static int s_filter;
+void p_filter(int f) { s_filter = f; }
+int prog_filter(void) { return prog_running() ? s_filter : 0; }
 void p_demo_number(int n) { s_demo_no = n; }
 void p_bgm_page(int page) { bgm_set_page(page); }
 

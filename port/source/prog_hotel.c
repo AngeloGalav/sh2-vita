@@ -1074,7 +1074,9 @@ static int end_before_battle(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_set(531);                     // FLAGW_512 |= 0x80000
+		p_filter(PROG_FILTER_MARY);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_MARY_BEFORE_BATTLE))
+		p_filter(PROG_FILTER_NONE);
 		p_lock(p, false);
 	PROG_END(p)
 }

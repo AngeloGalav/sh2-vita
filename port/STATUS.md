@@ -479,7 +479,7 @@ Ordered by weight. Each line names where the work starts.
 ### 4. Renderer features the port does not have
 
 `VISUALS.md` orders these by what they show against their GPU cost. Water, specular (set to 0 in
-`chr.c`), blur, bloom and motion blur, rain and smoke particles, 3D trees,
+`chr.c`), rain and smoke particles, 3D trees,
 event lights such as the swinging hotel lamp outside cutscenes. EE_FIXES.md lists the EE options waiting
 on each. The lake (Effect2 class 42, 0x4d5210) and the cemetery lake (class 43, 0x4d3c20)
 surfaces are drawn (`water.c`); the indoor water (classes 27 to 41: the hotel, labyrinth, apartments,
@@ -487,6 +487,12 @@ Strange Area and the final boss room, textured via 0x4d0d70 / 0x4d1a40, with wav
 is not. The burning stairs' flames and smoke (Effect2 classes 46 to 49 and 52) and the
 lake's guiding light (class 56) are ported in `roomfx.c`; the lake's water classes 22, 23 and 42
 around the boat are not.
+
+The 2D filters on the Vita (`c3d_gl.c` `vita_fx_*`, `main.c` `filters_frame`, option Filters) are cut
+down: motion blur at half size (0x478de0), and one quarter-size soft layer standing in for modes 5, 6
+and 8 (0x4791e0, 0x477a60), so no separate near and far blur and no glow pass. Hooked: stage 2 scene 1,
+stage 5 scenes 6 and 7, stage 7 scene 10, the hospital's turn, Mary's corridor. Not hooked: 0x4a7d80's
+enemy states, 0x5994c0, 0x578e00, 0x5817d0, 0x583650, 0x587140, 0x5841b0. Not run on a console.
 
 ### 5. Smaller things
 

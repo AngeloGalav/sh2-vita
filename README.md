@@ -81,6 +81,7 @@ Under *Options*, *System*:
 | Texture Filter | Bilinear or trilinear |
 | Fog | Off or on |
 | Fog Detail | The fog's target at a half, a third or a quarter of the view each way |
+| Filters | The blur some scenes use, off or on |
 
 ## Status
 

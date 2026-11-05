@@ -199,6 +199,9 @@ void prog_abort(void);
 // DramaDemoNumber (0x1f7d3c4) as the running program set it this frame (p_demo_number), 0 for none;
 // EventMain (0x48ecb0) clears it every frame before the program runs. bgm.c reads it.
 int prog_demo_number(void);
+// The running program's motion blur (0x478740), which main.c times against the scene.
+enum { PROG_FILTER_NONE, PROG_FILTER_HOSPITAL_1, PROG_FILTER_HOSPITAL_2, PROG_FILTER_MARY };
+int prog_filter(void);
 int prog_choice_waiting(void);         // a choice is up: how many answers (0 none), for playtest.c
 // The choice up now for the touch screen: its answers, the one chosen (written by a tap) and the
 // question; 0 when none.

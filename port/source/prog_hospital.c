@@ -734,7 +734,9 @@ static int s22_laura_deceive_3(Prog* p)
 static int s22_hospital_back_1(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_filter(PROG_FILTER_HOSPITAL_1);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_HOSPITAL_BACK_1))
+		p_filter(PROG_FILTER_NONE);
 		p_set(213);                     // FLAGW_192 |= 0x200000 during the demo
 		p_set(215);                     // FLAGW_192 |= 0x800000
 		p_clear(521);
@@ -745,7 +747,9 @@ static int s22_hospital_back_1(Prog* p)
 static int s22_hospital_back_2(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_filter(PROG_FILTER_HOSPITAL_2);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_HOSPITAL_BACK_2))
+		p_filter(PROG_FILTER_NONE);
 		p_set(214);                     // FLAGW_192 |= 0x400000
 		p_place(-68146.0f, 0.0f, -299992.06f, -1.5707964f);
 		p_lock(p, false);

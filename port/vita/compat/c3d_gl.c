@@ -2121,6 +2121,94 @@ void vita_capture_draw(float x0, float y0, float x1, float y1)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
+// The PC's 2D filters (0x479840), cut down to what the Vita can pay for: each is a copy of the view into
+// a small target and one blended quad back. They run only while a scene asks for them, so play has no
+// cost. The surface's portrait rows are kept, as in vita_capture_view.
+static struct { C3D_RenderTarget rt; C3D_Tex tex; bool ready; } FXM, FXS;
+static GLuint s_fx_prog;
+static GLint s_fx_tex, s_fx_alpha;
+
+static void fx_target(C3D_RenderTarget* rt, C3D_Tex* tex, int w, int h)
+{
+	if (rt->fbo)
+		return;
+	tex->width = w, tex->height = h;
+	tex->param = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_MIN_FILTER(GPU_LINEAR);
+	c3d_tex_make_target(tex, w, h);
+	rt->tex = tex;
+	rt->width = rt->gl_w = w, rt->height = rt->gl_h = h;
+	rt->sx = rt->sy = 1.0f;
+	rt->screen = -1;
+	make_fbo(rt, (GPU_DEPTHBUF)-1);
+}
+
+static const float FX_POS[8] = { -1, -1, 1, -1, -1, 1, 1, 1 }, FX_UV[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
+
+static void fx_copy(C3D_RenderTarget* m, C3D_RenderTarget* to)
+{
+	G.target = NULL;
+	bind_target(to);
+	glViewport(0, 0, to->gl_w, to->gl_h);
+	quad_state();
+	glBindTexture(GL_TEXTURE_2D, m->tex->gl);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	G.target = NULL;
+	bind_target(m);
+	glViewport(0, 0, m->gl_w, m->gl_h);
+}
+
+static void fx_over(GLuint tex, float alpha)
+{
+	quad_state();
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glUseProgram(s_fx_prog);
+	glUniform1i(s_fx_tex, 0);
+	glUniform1f(s_fx_alpha, alpha);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+static C3D_RenderTarget* fx_view(void)
+{
+	half_fog_end();                      // the fog's own target is the one bound until then
+	C3D_RenderTarget* m = G.target;
+	return s_fx_prog && m && m->gl_w == s_view_w && m->gl_h == s_view_h ? m : NULL;
+}
+
+void vita_fx_motion_reset(void) { FXM.ready = false; }
+
+// 0x478de0 (mode 2): the last result over this frame, at the game's alpha * 2 of 255 (alpha << 25), and
+// the result kept for the next. The PC keeps it full size; here it is half each way.
+void vita_fx_motion(int alpha)
+{
+	C3D_RenderTarget* m = fx_view();
+	if (!m)
+		return;
+	fx_target(&FXM.rt, &FXM.tex, 272, 480);
+	if (FXM.ready)
+		fx_over(FXM.tex.gl, alpha * 2 / 255.0f);
+	fx_copy(m, &FXM.rt);
+	FXM.ready = true;
+}
+
+// Stand-in for 0x4791e0 + 0x477a60 (modes 5, 6, 8): the PC shrinks the view and lays it back in several
+// offset passes; here it is one copy at a quarter each way, its bilinear filter giving the softness.
+void vita_fx_soft(float alpha)
+{
+	C3D_RenderTarget* m = fx_view();
+	if (!m)
+		return;
+	fx_target(&FXS.rt, &FXS.tex, 136, 240);
+	fx_copy(m, &FXS.rt);
+	fx_over(FXS.tex.gl, alpha);
+}
+
 // GPU cost tests (SELECT + R while playing, vita_log.txt says which): 1 the fragment lighting off,
 // 2 the fog's draws left out, 3 the shadows' left out; the log's frames lines then tell which pass
 // the slow scenes wait on (s_gpu_test is declared with the fragment programs)
@@ -2258,6 +2346,10 @@ static const char PRESENT_VS[] =
 static const char PRESENT_FS[] =
 	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex) : COLOR { return tex2D(tex, o_uv); }\n";
 
+static const char FX_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float alpha) : COLOR\n"
+	"{ return float4(tex2D(tex, o_uv).rgb, alpha); }\n";
+
 static void present_init(void)
 {
 	s_present_prog = glCreateProgram();
@@ -2271,6 +2363,18 @@ static void present_init(void)
 	glBindAttribLocation(s_present_prog, 1, "uv");
 	glLinkProgram(s_present_prog);
 	s_present_tex = glGetUniformLocation(s_present_prog, "tex");
+	s_fx_prog = glCreateProgram();
+	if (!link(s_fx_prog, compile(GL_VERTEX_SHADER, PRESENT_VS), compile(GL_FRAGMENT_SHADER, FX_FS))) {
+		vita_log("filter program not built");
+		glDeleteProgram(s_fx_prog);
+		s_fx_prog = 0;
+		return;
+	}
+	glBindAttribLocation(s_fx_prog, 0, "pos");
+	glBindAttribLocation(s_fx_prog, 1, "uv");
+	glLinkProgram(s_fx_prog);
+	s_fx_tex = glGetUniformLocation(s_fx_prog, "tex");
+	s_fx_alpha = glGetUniformLocation(s_fx_prog, "alpha");
 }
 
 // One screen's texture into r. portrait: a PICA render target (u along the screen's height from

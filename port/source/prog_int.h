@@ -70,6 +70,7 @@ void p_lock(Prog* p, bool on);                      // JmsEventMode
 void p_picture_hide(void);                          // 0x4a24e0
 void p_fade(int type);
 void p_se(int id);
+void p_filter(int f);                                // the scene's 2D filter, PROG_FILTER_* (prog.h)
 void p_demo_number(int n);                          // DAT_01f7d3c4 = n, every frame the program wants it
 void p_bgm_page(int page);                          // FUN_005155e0
 void p_place(float x, float y, float z, float yaw); // CharaSetPos(jms, pos, yaw)

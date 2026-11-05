@@ -5203,6 +5203,57 @@ static void picture_frame(const PictureTarget* t)
 
 // The top screen of a frame of play into t (supersample.h), with the camera's projection (one eye's in a 3D
 // frame, stereo.h); dt is 0 for the second eye, so nothing advances twice. Returns the room's draws.
+#ifdef SH2_VITA
+// The scenes' 2D filters, what the PC's stage code and programs ask 0x479840 for. 0xa36004 (motion blur)
+// and 0xa36008 (the soft ones) are both the one Filters option here.
+static void filters_frame(void)
+{
+	extern void vita_fx_motion(int alpha);
+	extern void vita_fx_motion_reset(void);
+	extern void vita_fx_soft(float alpha);
+	if (!s_opt.filters || s_state != ST_GAME || s_paused || s_inv_open) {
+		vita_fx_motion_reset();
+		return;
+	}
+	int stage = ev_stage(), dn = demo_number(), motion = 0;
+	float t = demo_timer(), soft = 0.0f;
+	if (stage == 2 && dn == 1) {
+		// 0x5a2100, the mirror scene in the first toilet: mode 8 with two strengths that trade places,
+		// x = 1 + (timer - 1) * 0.15472 up to 96 and (97 - x) / 2. The PC blurs near and far apart;
+		// stand-in: one soft layer at their sum, doubled as 0x478de0 doubles its alpha.
+		float x = 1.0f + (t - 1.0f) * 0.15472312f;
+		x = x > 96.0f ? 96.0f : x;
+		soft = (x + (97.0f - x) * 0.5f) * 2.0f / 255.0f;
+	} else if (stage == 5 && (dn == 6 || dn == 7)) {
+		// 0x59f390: mode 6 while the view is at z below 50000 and y above -2000. Stand-in: its strength
+		// (0x945248 = 3, 0x19, 0xd8, 0xfc) isn't worked out, and the test uses the camera's eye.
+		const float* e = view_eye();
+		if (e[2] < 50000.0f && e[1] > -2000.0f)
+			soft = 0.4f;
+	} else if (stage == 7 && dn == 10 && t > 1.0f && t < 164.0f) {
+		motion = (int)(90.0f + (t - 1.0f) * (60.0f - 90.0f) / (164.0f - 1.0f));   // 0x59c130, 0x8e5f50..5c
+	}
+	switch (prog_filter()) {
+	case PROG_FILTER_HOSPITAL_1:         // 0x58b910: rises 2 a second, from its scene's start
+		motion = (int)(t / 30.0f * 2.0f);
+		break;
+	case PROG_FILTER_HOSPITAL_2:         // 0x58ba80
+		motion = 0x40;
+		break;
+	case PROG_FILTER_MARY:               // 0x574860 from frame 1797, as the three others of that scene
+		if (t >= 1797.0f)
+			motion = 0x40;
+		break;
+	}
+	if (soft > 0.0f)
+		vita_fx_soft(soft);
+	if (motion > 0)
+		vita_fx_motion(motion);
+	else
+		vita_fx_motion_reset();
+}
+#endif
+
 static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* mv, const C3D_Mtx* ortho, u32 clear,
                     float dt)
 {
@@ -5281,6 +5332,7 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 			lensflare_draw(proj, mv, s_fogf.scr_z, s_paused ? 0.0f : dt, t->tex != NULL);
 		perf_part("r_soft", tr);
 #ifdef SH2_VITA
+		filters_frame();
 after_world:
 #endif
 		tr = svcGetSystemTick();
