@@ -43,8 +43,16 @@ static float s_zoom;             // DAT_00950530
 // the top and bottom together. s_vy (map units) says where it stands: on James' arrow while zoomed out
 // (the top of the sheet, where its title is, when he is not on it) plus what a drag on the touch
 // screen moved it (s_vy_user), and with the pan while zoomed in, so every edge can still be reached.
+#ifdef SH2_VITA
+#define FULL_SCALE 1.0f          // the PC's 4:3 sheet whole in the middle (0x49d9d0), nothing cut off
+#else
 #define FULL_SCALE 1.25f
+#endif
+#ifdef SH2_VITA
+#define FULL_CROP 0.0f
+#else
 #define FULL_CROP 51.2f          // 512 * (1 - 240 / 300) / 2
+#endif
 static float s_vy, s_vy_user;
 static bool s_open_in = true;    // the Game Options' Map: Zoom In (the PC's default) or Zoom Out
 static float s_cx, s_cy;         // DAT_009504cc / 009504f4: the zoomed view's centre, map units
@@ -876,7 +884,7 @@ const char* map_legend(void)
 	else
 		snprintf(name, sizeof name, "%s", s_shown > 0 && s_shown < 20 ? place[s_shown] : "");
 	snprintf(s_legend, sizeof s_legend, "%-30s\n\n%s", name,
-	         s_zoom_state >= 2 ? "Circle Pad / D-pad: look around\nA: whole map   B: close"
+	         s_zoom_state >= 2 ? "Left stick / D-pad: look around\nA: whole map   B: close"
 	                           : "D-pad: other floors and maps\nA: zoom in   B: close");
 	return s_legend;
 }

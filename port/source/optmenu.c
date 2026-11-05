@@ -70,6 +70,9 @@ void opt_defaults(Options* o)
 	o->lens_flare = 1;           // 0x4f6ae0
 	o->bullet = 1;
 	o->ps2_flash = o->noise_ps2 = o->ps2_camera = o->cutscene_fov = 1;
+#ifdef SH2_VITA
+	o->camera = 1;               // the right stick turns it
+#endif
 	o->hold_stomp = o->swap_attack = 1;
 	o->msg_top = 1;              // messages are the top screen's (port/UI.md)
 	o->stereo = 1;               // 3D follows the slider
@@ -93,7 +96,7 @@ static const Key s_keys[] = {
 	K("ps2flashlight", ps2_flash, 0, 1), K("ps2noise", noise_ps2, 0, 1), K("ps2camera", ps2_camera, 0, 1),
 	K("cutscenefov", cutscene_fov, 0, 1), K("togglerun", toggle_run, 0, 1), K("holdstomp", hold_stomp, 0, 1),
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
-	K("framerate", framerate, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
+	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
 };
 
@@ -163,6 +166,11 @@ static const short LANGUAGE[5] = { 79, 81, 80, 82, 83 }; // English, French, Ger
 static const short NOISE[3] = { 176, -1, -1 };        // Off, (PC, PS2)
 static const char* const WALK_RUN_T[4] = { NULL, "Toggle", NULL, NULL };
 static const char* const NOISE_T[3] = { NULL, "PC", "PS2" };
+#ifdef SH2_VITA
+#define STICK_NAME "the left stick"
+#else
+#define STICK_NAME "the Circle Pad"
+#endif
 static const char* const SCREENS[2] = { "Bottom Screen", "Top Screen" };
 static const char* const PC_PS2[2] = { "PC", "PS2" };
 static const char* const PICTURE[2] = { "Soft", "Sharp" };
@@ -184,7 +192,7 @@ static const char* const CAMSPEED_L[2] = { "The PC's slower turns, which float a
 static const char* const WEAPON_L[2] = { "Hold {AIM} to keep the weapon up. Let go to lower it.",
                                          "Press {AIM} to raise the weapon, and again to lower it." };
 static const char* const WALKRUN_L[4] = { "James walks. Hold {RUN} to run.", "Press {RUN} to run, until James stops.",
-                                          "Push the Circle Pad all the way to run.", "James runs. Hold {RUN} to walk." };
+                                          "Push " STICK_NAME " all the way to run.", "James runs. Hold {RUN} to walk." };
 static const char* const VIEW_L[2] = { "Hold {LOOK} to look ahead of James.",
                                        "Press {LOOK} to look ahead of James, and again to stop." };
 static const char* const HEAVY_L[2] = { "Every press is heavy, as with a PC key: a downswing or a stomp.",
@@ -264,13 +272,25 @@ static const char* shadows_note(const Options* o) { return low(o) ? "Low quality
 static const char* fog_note(const Options* o) { return low(o) ? "Low quality draws half as many particles." : NULL; }
 static bool cleared(void) { return s_host.cleared; }
 
+#ifdef SH2_VITA
+#define RIGHT_STICK_TURNS "The right stick turns it"
+#else
+#define RIGHT_STICK_TURNS (layout() == CONTROLS_LAYOUT_NEW ? "The C-Stick turns it" : "The D-Pad or a drag turns it")
+#endif
+static const char* const VITA_RES[2] = { "960 x 544", "720 x 416" };
+static const char* const VITA_RES_L[2] = { "The display's own, the sharpest.", "Fewer pixels for a steadier frame rate." };
+static const char* const VITA_FILTER[2] = { "Bilinear", "Trilinear" };
+static const char* const VITA_FILTER_L[2] = { "Lighter. A line can show where detail changes.", "Smoothest, and more work for the console." };
+static const char* const VITA_FPS[2] = { "30", "60" };
+static const char* const VITA_FPS_L[2] = { "The steadiest motion.", "Smoother only where the console keeps up." };
+static const char* const VITA_FOG_L[2] = { "No drifting fog: much lighter, and far geometry shows.", "The game's drifting fog." };
 #define AT(field) .off = offsetof(Options, field)
 static const Setting SETTINGS[] = {
 	// Controls: the camera and the Control Type first, as they change the most
 	{ .tab = TAB_CONTROLS, .label = -1, .name = "Camera", AT(camera), .hi = 1, .texts = CAMERA, .fig = FIG_CAMERA,
 	  .what = "How the game frames James while you play.", .lines = CAMERA_L, .note = camera_note },
 	{ .tab = TAB_CONTROLS, .label = 84, .name = "Control Type", AT(control_type), .hi = 1, .names = CONTROL_TYPE,
-	  .fig = FIG_MOVEMENT, .what = "How the Circle Pad steers James.", .lines = CONTROL_L, .dim = behind,
+	  .fig = FIG_MOVEMENT, .what = "How " STICK_NAME " steers James.", .lines = CONTROL_L, .dim = behind,
 	  .note = scripted_note },
 	{ .tab = TAB_CONTROLS, .label = -1, .name = "Camera Speed", AT(ps2_camera), .hi = 1, .texts = PC_PS2,
 	  .what = "How quickly the PC camera turns and settles.", .lines = CAMSPEED_L, .dim = behind,
@@ -300,23 +320,27 @@ static const Setting SETTINGS[] = {
 	// Display
 	{ .tab = TAB_DISPLAY, .kind = K_PAGE, .label = 2, .name = "Brightness Level", .page = PG_BRIGHT,
 	  .what = "How bright the game's darkness looks." },
+#ifndef SH2_VITA
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Picture", AT(picture), .hi = 1, .texts = PICTURE, .fig = FIG_PICTURE,
 	  .what = "How smooth the picture looks.", .lines = PICTURE_L },
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "3D", AT(stereo), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "Depth on the top screen with the 3D slider.", .lines = STEREO_L },
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Messages", AT(msg_top), .hi = 1, .texts = SCREENS, .fig = FIG_SCREENS,
 	  .what = "Where messages and subtitles appear.", .lines = MESSAGES_L },
+#endif
 	{ .tab = TAB_DISPLAY, .label = 97, .name = "Noise Effect", .hi = 2, .names = NOISE, .texts = NOISE_T,
 	  .get = noise_get, .set = noise_set_v, .what = "Film grain over the picture.", .lines = NOISE_L,
 	  .note = noise_note },
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Flashlight", AT(ps2_flash), .hi = 1, .texts = PC_PS2, .fig = FIG_BEAM,
 	  .what = "How James' flashlight lights a room.", .lines = FLASH_L },
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Cutscene View", AT(cutscene_fov), .hi = 1, .texts = FRAMING,
-	  .fig = FIG_FRAMING, .what = "How scenes fill the wide top screen.", .lines = CUTFOV_L },
+	  .fig = FIG_FRAMING, .what = "How scenes fill the wide screen.", .lines = CUTFOV_L },
 	{ .tab = TAB_DISPLAY, .label = 175, .name = "Shadows", AT(shadows), .hi = 1, .names = OFF_ON,
 	  .what = "Shadows that characters cast from the lights.", .lines = SHADOWS_L, .dim = low, .note = shadows_note },
+#ifndef SH2_VITA
 	{ .tab = TAB_DISPLAY, .label = 178, .name = "Fog", AT(fog), .hi = 1, .names = FOG,
 	  .what = "How the drifting fog is drawn.", .lines = FOG_L, .note = fog_note },
+#endif
 	{ .tab = TAB_DISPLAY, .label = 192, .name = "Lens Flare", AT(lens_flare), .hi = 1, .names = OFF_ON,
 	  .what = "The glow round a lamp that faces the camera.", .lines = FLARE_L },
 	// Sound
@@ -331,6 +355,17 @@ static const Setting SETTINGS[] = {
 	// System: the language and the hardware profile (profile.c)
 	{ .tab = TAB_SYSTEM, .label = 76, .name = "Language", AT(lang), .lo = 1, .hi = 5, .names = LANGUAGE,
 	  .what = "The language of the game's text." },
+#ifdef SH2_VITA
+	// The port's own, as on the 3DS: what the console draws, not in the PC's options
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "Resolution", AT(res), .hi = 1, .texts = VITA_RES,
+	  .what = "How many pixels the world is drawn with.", .lines = VITA_RES_L },
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "FPS Cap", AT(framerate), .lo = 1, .hi = 2, .texts = VITA_FPS,
+	  .what = "The most frames a second the game draws.", .lines = VITA_FPS_L },
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "Texture Filter", AT(trilinear), .hi = 1, .texts = VITA_FILTER,
+	  .what = "How textures blend with distance.", .lines = VITA_FILTER_L },
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "Fog", AT(fog), .hi = 1, .texts = OFF_ON_TEXT,
+	  .what = "The drifting fog.", .lines = VITA_FOG_L },
+#else
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Quality", AT(quality), .hi = 2, .texts = QUALITY,
 	  .what = "How much the console draws.", .lines = QUALITY_L },
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Frame Rate", AT(framerate), .hi = 2, .texts = FRAMES,
@@ -339,6 +374,7 @@ static const Setting SETTINGS[] = {
 	  .what = "Which console the game tunes itself for.", .lines = HARDWARE_L },
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Layout", AT(ctrllayout), .hi = 2, .texts = HARDWARE,
 	  .what = "Which buttons the controls may use.", .lines = LAYOUT_L },
+#endif
 };
 #define N_SETTINGS ((int)(sizeof SETTINGS / sizeof *SETTINGS))
 static const char* const TABS[TAB_N] = { "Controls", "Game", "Display", "Sound", "System" };
@@ -387,7 +423,7 @@ static const char* expand(const char* src, char* out, size_t n)
 		else if (!strcmp(tok, "LOOK")) key_of(ACT_LOOK, val, sizeof val);
 		else if (!strcmp(tok, "CAMTURN"))   // tpcam.c: the C-Stick on the New 3DS layout, the D-Pad's free directions on the Old
 			snprintf(val, sizeof val, "%s, and %s puts it back.",
-			         layout() == CONTROLS_LAYOUT_NEW ? "The C-Stick turns it" : "The D-Pad or a drag turns it",
+			         RIGHT_STICK_TURNS,
 			         key_of(ACT_LOOK, key, sizeof key));
 		else if (!strcmp(tok, "AUTOQ")) snprintf(val, sizeof val, "%s", profile_new() ? "High" : "Low");
 		else if (!strcmp(tok, "AUTOFPS")) snprintf(val, sizeof val, "%d", profile_quality() == QUALITY_LOW ? 30 : 60);
@@ -448,6 +484,13 @@ static int s_touch_answer;          // the question's row on the touch screen: 0
 
 static void touch(void)
 {
+#ifdef SH2_VITA
+	// one screen: drawn on the game screen (draw_pc), its input is optmenu_update's own
+	s_touch_answer = s_yes ? 0 : 1;
+	touchui_menu_close(TOUI_OPTIONS);
+	touchui_box(NULL, NULL, 0);
+	return;
+#endif
 	static const TouiButton back[1] = { { "Back", KEY_B } };
 	touchui_box(NULL, NULL, 0);
 	if (s_state == ST_ASK) {
@@ -845,6 +888,71 @@ static void explain(const Setting* s, float t)
 
 // Over play the explainer has a darker ground than the paused game's half dim (main.c), so its
 // text reads over bright rooms.
+#ifdef SH2_VITA
+// One screen, in the PC's option screens' look (0x4630c0, 0x467e70): the title centred at y 0x1e, a
+// row every 0x1b with its label to the left of the middle and its value at x 0x10e, the rows at alpha
+// 0x60 and the chosen one again at full alpha 2 up and 2 left, what it does along the bottom from
+// y 0x18b (0x460c60's arrows round the value). The tabs are the port's, with the port's own settings
+// among the PC's, changed with L and R. The question as 0x4630c0: Yes and No under it.
+#define PC_ROWS 11
+static void draw_pc(void)
+{
+	const u32 full = 0xfefefeffu, soft = 0xfefefec0u, dark = 0x808080c0u, grey = 0xc8c8c8ffu;
+	if (s_state == ST_ASK) {
+		font_text(FONT_BIG, 256, 232, msg(89, "Change the settings?"), FONT_CENTER, full, full);
+		font_text(FONT_BIG, 226 - (s_yes ? 2 : 0), 266 - (s_yes ? 2 : 0), msg(90, "Yes"), FONT_RIGHT, s_yes ? full : soft, s_yes ? full : soft);
+		font_text(FONT_BIG, 286 - (s_yes ? 0 : 2), 266 - (s_yes ? 0 : 2), msg(91, "No"), FONT_LEFT, s_yes ? soft : full, s_yes ? soft : full);
+		return;
+	}
+	if (s_page == PG_BUTTONS) {
+		controls_menu_draw_pc();
+		return;
+	}
+	font_text(FONT_BIG, 256, 0x1e, TABS[s_tab], FONT_CENTER, full, full);
+	float tw = font_width(FONT_BIG, TABS[s_tab]) * 0.5f;
+	arrow(256 - tw - 18, 0x2d, -1, full);
+	arrow(256 + tw + 18, 0x2d, 1, full);
+	int first = s_sel >= PC_ROWS ? s_sel - PC_ROWS + 1 : 0;
+	for (int i = first; i < s_n && i < first + PC_ROWS; i++) {
+		const Setting* s = s_rows[i];
+		bool on = i == s_sel;
+		int d = on ? 2 : 0, y = 0x50 + 0x1b * (i - first);
+		u32 c = dimmed(s) ? dark : on ? full : soft;
+		font_text(FONT_BIG, 0xf0 - d, y - d, label(s), FONT_RIGHT, c, c);
+		if (s->kind == K_PAGE)
+			continue;
+		if (s->kind == K_BAR) {
+			// the PC's fifteen blocks (0x45bf10)
+			int v = get(s);
+			for (int b = 0; b < s->hi; b++) {
+				float x0 = sx(0x10e + b * 12.0f - d), y0 = sy(y + 6 - d), x1 = sx(0x10e + b * 12.0f + 9 - d), y1 = sy(y + 26 - d);
+				MapVert q[6] = { { x0, y0, 0, 0 }, { x1, y0, 0, 0 }, { x1, y1, 0, 0 }, { x0, y0, 0, 0 }, { x1, y1, 0, 0 }, { x0, y1, 0, 0 } };
+				s_draw(NULL, q, 6, b < v ? (on ? 0xd0d0d0ffu : 0xa0a0a0ffu) : 0x3a3a3affu);
+			}
+			continue;
+		}
+		char val[48];
+		const char* vs = value_name(s, get(s), val, sizeof val);
+		font_text(FONT_BIG, 0x10e - d, y - d, vs, FONT_LEFT, c, c);
+		if (on) {
+			arrow(0x106, y + 14 - d, -1, full);
+			arrow(0x10e + font_width(FONT_BIG, vs) + 8 - d, y + 14 - d, 1, full);
+		}
+	}
+	if (s_sel < s_n) {
+		const Setting* s = s_rows[s_sel];
+		char buf[200], lbuf[200];
+		font_text(FONT_SMALL, 256, 0x18b, expand(s->what, buf, sizeof buf), FONT_CENTER, grey, grey);
+		const char* line = s->lines && s->kind != K_PAGE ? s->lines[get(s) - s->lo] : NULL;
+		const char* note = s->note ? s->note(s_live) : NULL;
+		if (note)
+			font_text(FONT_SMALL, 256, 0x18b + 24, note, FONT_CENTER, grey, grey);
+		else if (line)
+			font_text(FONT_SMALL, 256, 0x18b + 24, expand(line, lbuf, sizeof lbuf), FONT_CENTER, grey, grey);
+	}
+}
+#endif
+
 static void scrim(void)
 {
 	MapVert v[6] = { { 0, 0, 0, 0 }, { 400, 0, 0, 0 }, { 400, 240, 0, 0 }, { 0, 0, 0, 0 }, { 400, 240, 0, 0 }, { 0, 240, 0, 0 } };
@@ -862,6 +970,10 @@ void optmenu_draw_top(MapDrawFn draw)
 	}
 	if (!optmenu_noise_focus())
 		scrim();
+#ifdef SH2_VITA
+	draw_pc();
+	return;
+#endif
 	fig_begin(1.0f);
 	if (s_page == PG_BUTTONS) {
 		// the chosen action and its buttons, "Press a button" while the page waits for one

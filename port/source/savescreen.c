@@ -84,6 +84,11 @@ static int s_touch_answer;       // 0 Yes, 1 No
 
 static void touch(void)
 {
+#ifdef SH2_VITA
+	touchui_menu_close(TOUI_SAVE);       // drawn on the game screen (savescreen_draw_top)
+	touchui_box(NULL, NULL, 0);
+	return;
+#endif
 	static const TouiButton save[2] = { { "Save", KEY_A }, { "Back", KEY_B } };
 	static const TouiButton load[2] = { { "Load", KEY_A }, { "Back", KEY_B } };
 	static const TouiButton answer[2] = { { "Select", KEY_A }, { "Back", KEY_B } };
@@ -289,6 +294,51 @@ void savescreen_draw_top(void)
 		const u32 black[4] = { faded(0x000000ff, in), faded(0x000000ff, in), faded(0x000000ff, in), faded(0x000000ff, in) };
 		font_quad_px(NULL, 0.0f, 0.0f, 400.0f, 240.0f, 0, 0, 0, 0, black);
 	}
+#ifdef SH2_VITA
+	{
+		// 0x4537b0's file list: five rows from y 0x97 in steps of 0x28, a header at (0x24, 0x6e), over
+		// the picture with a shade on its left. The rows' parts are the port's words for the PC's.
+		const u32 sh[4] = { faded(0x000000ff, 0.75f * in), 0x00000000, faded(0x000000ff, 0.75f * in), 0x00000000 };
+		font_quad_px(NULL, 0.0f, 0.0f, 300.0f, 240.0f, 0, 0, 0, 0, sh);
+		font_text(FONT_BIG, 0x24, 0x38, card(154, "SILENT HILL 2 Save Files"), FONT_LEFT, faded(white, in), faded(white, in));
+		int first = s_sel / PER_PAGE * PER_PAGE;
+		char hd[24];
+		snprintf(hd, sizeof hd, "%d - %d", first + 1, first + PER_PAGE);
+		font_text(FONT_SMALL, 0x24, 0x6e, hd, FONT_LEFT, faded(grey_t, in), faded(grey_b, in));
+		for (int i = first; i < first + PER_PAGE && i < SAVE_SLOTS; i++) {
+			const SaveSlotInfo* f = &s_info[i];
+			bool on = i == s_sel;
+			int d = on ? 2 : 0, y = 0x97 + 0x28 * (i - first);
+			u32 c = on ? (f->used ? yellow : white) : 0xa0a0a0ffu;
+			const char* title = !f->used ? (s_mode == SS_LOAD ? card(33, "No file data.") : card(36, "Save to new file.")) : place(f);
+			char line[64];
+			snprintf(line, sizeof line, "%d  %s", i + 1, title);
+			font_text(FONT_BIG, 0x24 - d, y - d, line, FONT_LEFT, faded(c, in), faded(c, in));
+			if (f->used && !f->clear) {
+				char tm[16];
+				play_time(f, tm, sizeof tm);
+				if (f->chapter == 1)
+					snprintf(line, sizeof line, "%s   Saves %d   Born From a Wish   %s", tm, f->saves, level(3 - f->action));
+				else
+					snprintf(line, sizeof line, "%s   Saves %d   %s / %s", tm, f->saves, level(3 - f->action), level(2 - f->riddle));
+				font_text(FONT_SMALL, 0x34, y + 22, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
+			} else if (f->used) {
+				snprintf(line, sizeof line, "Clears %d", f->clears);
+				font_text(FONT_SMALL, 0x34, y + 22, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
+			}
+		}
+		// 0x4537b0's question at (0x100, 0xeb) is in the rows' way here: under them, with Yes and No
+		const char* q = s_state == ST_OVERWRITE ? card(46, "Do you wish to overwrite?") :
+		                s_state == ST_DONE ? (s_ok ? card(40, "Save completed.") : card(41, "Save error occurred.")) : NULL;
+		if (q)
+			font_text(FONT_BIG, 0x24, 0x176, q, FONT_LEFT, yellow, yellow);
+		if (s_state == ST_OVERWRITE) {
+			font_text(FONT_BIG, 0x24 - (s_touch_answer == 0 ? 2 : 0), 0x198 - (s_touch_answer == 0 ? 2 : 0), "Yes", FONT_LEFT, s_touch_answer == 0 ? white : 0xa0a0a0ffu, s_touch_answer == 0 ? white : 0xa0a0a0ffu);
+			font_text(FONT_BIG, 0x80 - (s_touch_answer == 1 ? 2 : 0), 0x198 - (s_touch_answer == 1 ? 2 : 0), "No", FONT_LEFT, s_touch_answer == 1 ? white : 0xa0a0a0ffu, s_touch_answer == 1 ? white : 0xa0a0a0ffu);
+		}
+		return;
+	}
+#endif
 	// the shade under the text, on the left only: across from the edge, deeper at the bottom
 	const u32 left[4] = { faded(0x000000ff, 0.7f * in), 0x00000000, faded(0x000000ff, 0.7f * in), 0x00000000 };
 	font_quad_px(NULL, 0.0f, 0.0f, 230.0f, 240.0f, 0, 0, 0, 0, left);

@@ -1280,8 +1280,99 @@ bool touchui_overlay(void)
 {
 	// a box with prompts alone (a scene's Skip, the results' Continue) is not shown: the PC shows
 	// no prompts, and the buttons work without them
-	return s_target && !s_debug && !s_movie
-	       && (s_ch.on || top_menu() >= 0 || (s_box_on && s_box[0]) || s_map_on || s_panel[0]);
+	(void)top_menu;
+	return false;                        // everything is on the game screen (touchui_draw_pc)
+}
+
+// One screen: what the touch page listed, drawn with the game's text over the game screen, in the
+// PC menus' way of a chosen row at full alpha 2 up and 2 left (0x407310). The buttons' names go along
+// the bottom. The lists are the port's: the screens they belong to have no such list on the PC, or
+// it is not ported yet (port/STATUS.md).
+static void txt(int f, float x, float y, const char* s, int align, u32 c)
+{
+	font_text(f, x + 2, y + 2, s, align, 0x000000c0u, 0x000000c0u);
+	font_text(f, x, y, s, align, c, c);
+}
+
+static const char* pad_name(u32 key)
+{
+	return key & KEY_A ? "Cross" : key & KEY_B ? "Circle" : key & KEY_X ? "Triangle" : key & KEY_Y ? "Square" :
+	       key & KEY_L ? "L" : key & KEY_R ? "R" : key & KEY_START ? "START" : key & KEY_SELECT ? "SELECT" : "";
+}
+
+static void hints_pc(char label_[][16], const u32* key, int n)
+{
+	char s[160] = "";
+	size_t k = 0;
+	for (int i = 0; i < n && k < sizeof s; i++)
+		k += (size_t)snprintf(s + k, sizeof s - k, "%s%s %s", i ? "     " : "", pad_name(key[i]), label_[i]);
+	if (k)
+		txt(FONT_SMALL, 256, 0x1cc, s, FONT_CENTER, 0xc8c8c8ffu);
+}
+
+// The stage programs' panels name the 3DS's buttons: the Vita's take their place
+static void panel_pc(const char* in)
+{
+	static const struct { char from; const char* to; } B[4] = { { 'A', "Cross" }, { 'B', "Circle" }, { 'X', "Triangle" }, { 'Y', "Square" } };
+	static char out[sizeof s_panel + 64];
+	size_t n = 0;
+	for (const char* p = in; *p && n + 10 < sizeof out; p++) {
+		const char* to = NULL;
+		bool start = p == in || p[-1] == ' ' || p[-1] == '\n' || p[-1] == '/';
+		for (int i = 0; start && i < 4; i++)
+			if (*p == B[i].from && (p[1] == ':' || p[1] == '/'))
+				to = B[i].to;
+		if (to)
+			n += (size_t)snprintf(out + n, sizeof out - n, "%s", to);
+		else
+			out[n++] = *p;
+	}
+	out[n] = 0;
+	txt(FONT_SMALL, 0x20, 0x30, out, FONT_LEFT, 0xfefefeffu);
+}
+
+void touchui_draw_pc(void)
+{
+	if (s_debug || s_movie || !font_ready())
+		return;
+	const u32 full = 0xfefefeffu, soft = 0xfefefec0u, dark = 0x808080c0u;
+	int m = top_menu();
+	if (s_ch.on) {
+		for (int i = 0; i < 2; i++) {
+			bool on = s_ch.sel && *s_ch.sel == i;
+			float x = i ? 0x170 : 0x90;
+			txt(FONT_BIG, x - (on ? 2 : 0), 0x130 - (on ? 2 : 0), s_ch.name[i], FONT_CENTER, on ? full : soft);
+			FontFit f;
+			font_fit_px(s_ch.line[i], 140.0f, 3, false, &f);
+			for (int l = 0; l < f.n && l < FONT_FIT_LINES; l++)
+				txt(FONT_SMALL, x, 0x150 + 24 * l, f.line[l], FONT_CENTER, on ? 0xc8c8c8ffu : dark);
+		}
+		hints_pc(s_ch.blabel, s_ch.bkey, s_ch.nb);
+	} else if (m >= 0) {
+		const Menu* me = &s_menus[m];
+		bool file = m == TOUI_SAVE;      // savescreen.c's picture and the chosen file are below
+		int per = file ? 5 : 11, sel = me->sel ? *me->sel : 0;
+		int first = file ? (sel / per) * per : sel >= per ? sel - per + 1 : 0;
+		if (!file && me->title[0])
+			txt(FONT_BIG, 256, 0x1e, me->title, FONT_CENTER, full);
+		float x = file ? 0x20 : 256;
+		int f = file ? FONT_SMALL : FONT_BIG, al = file ? FONT_LEFT : FONT_CENTER;
+		for (int i = first; i < me->n && i < first + per; i++) {
+			bool on = i == sel;
+			int d = on ? 2 : 0;
+			u32 c = (me->dim >> i) & 1 ? dark : on ? full : soft;
+			txt(f, x - d, (file ? 0x50 + 0x26 * (i - first) : 0x50 + 0x1c * (i - first)) - d, me->rows[i], al, c);
+		}
+		hints_pc((char (*)[16])me->blabel, me->bkey, me->nb);
+	} else if (s_box_on && s_box[0]) {
+		txt(FONT_BIG, 256, 0x1e, s_box, FONT_CENTER, full);
+		if (s_box_nb > 0)
+			hints_pc(s_box_label, s_box_key, s_box_nb);
+	} else if (s_map_on) {
+		// nothing on it: the PC's map has its name in its picture, and no words for its buttons
+	} else if (s_panel[0]) {
+		panel_pc(s_panel);
+	}
 }
 #endif
 

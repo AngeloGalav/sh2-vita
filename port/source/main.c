@@ -49,6 +49,7 @@
 #include "stagemdl.h"
 #include "stagewalls.h"
 #include "touchui.h"
+#include "itemmenu.h"
 #include "controls.h"
 #include "move.h"
 #include "chrlight.h"
@@ -1023,8 +1024,52 @@ static void inventory_use(int item, int mark0, int mark1)
 	}
 }
 
+#ifdef SH2_VITA
+// The PC's item screen (itemmenu.c): what it asks of the rest of the game
+static void open_map(void);
+static void open_memos(void);
+static void options_open(void);
+static bool s_paused, s_pause_dirty, s_flash_on;
+static int s_inv_last;
+
+static void im_close(void)
+{
+	s_inv_open = false;
+	s_inv_dirty = true;
+	s_inv_last = itemmenu_current();
+}
+static void im_use(int it, int m0, int m1) { s_inv_last = it, inventory_use(it, m0, m1); }
+static void im_power(int it)
+{
+	if (it == 18) {                  // 0x471590: the flashlight's switch; the radio has no sound here yet
+		s_flash_on = !s_flash_on;
+		sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
+	}
+}
+static bool im_power_on(int it) { return it == 18 ? s_flash_on : true; }
+static void im_reload(int it) { combat_reload_item(it); }
+static void im_options(void)         // comes back to the pause menu, as its Options row does
+{
+	s_paused = true;
+	s_pause_dirty = true;
+	options_open();
+}
+static void im_memos(void)
+{
+	if (!prog_running())
+		open_memos();
+}
+static const ItemMenuHost s_im_host = { im_use, im_power, im_power_on, im_reload, im_close, im_options, im_memos, open_map };
+#endif
+
 static bool inventory_update(u32 down)
 {
+#ifdef SH2_VITA
+	if (s_inv_open) {
+		itemmenu_update(down, hidKeysHeld());
+		return true;
+	}
+#endif
 	if (!s_inv_open) {
 		if (down & KEY_Y) {
 			sfx_play(SFX_MENU_OK, 1.0f, 0.0f);
@@ -1033,6 +1078,10 @@ static bool inventory_update(u32 down)
 			s_inv_examined = 0;
 			s_inv_mark[0] = s_inv_mark[1] = 0;
 			s_inv_dirty = true;
+#ifdef SH2_VITA
+			itemmenu_init(PACK_DIR, prog_chapter());
+			itemmenu_open(&s_im_host, s_inv_last);
+#endif
 		}
 		return false;
 	}
@@ -1091,6 +1140,9 @@ static void inventory_draw(void)
 		touchui_menu_close(TOUI_ITEMS);
 		return;
 	}
+#ifdef SH2_VITA
+	return;                      // drawn on the game screen (inventory_draw_top)
+#endif
 	int items[64];
 	int n = inv_list(items, 64);
 	{
@@ -1137,6 +1189,10 @@ static void inventory_draw_top(void)
 	if (!s_inv_open || !font_ready())
 		return;
 	int it = inv_current();
+#ifdef SH2_VITA
+	itemmenu_draw();
+	return;
+#endif
 	if (!it) {
 		font_text(FONT_BIG, 256, 256, "No items", FONT_CENTER, 0x808080ff, 0x808080ff);
 		return;
@@ -4146,7 +4202,11 @@ static void options_apply(void)
 	s_ps2_flash = s_opt.ps2_flash;
 	s_hold_stomp = s_opt.hold_stomp, s_swap_attack = s_opt.swap_attack;
 	s_ps2_camera = s_opt.ps2_camera, s_cutscene_fov = s_opt.cutscene_fov;
+#ifdef SH2_VITA
+	s_msg_top = true;                // one screen
+#else
 	s_msg_top = s_opt.msg_top;
+#endif
 	s_opt.lang = (u8)ev_set_language(s_opt.lang);   // English when the pack lacks the language
 	ev_set_bullet_adjust(s_opt.bullet);
 	combat_set_options(s_hold_stomp, s_swap_attack);
@@ -4165,6 +4225,12 @@ static void options_apply(void)
 	// Soft draws the scene into a texture of its own at 2x one way at most and filters it, for the
 	// 3DS's 400 x 240; the Vita draws it at its own 960 x 544, each pixel as the GPU drew it
 	picture_set_soft(false);
+	extern void vita_res_save(int low);
+	if (s_opt.framerate != 2)
+		s_opt.framerate = 1;         // 30 unless 60 was chosen (the 3DS's Auto follows its Quality)
+	vita_res_save(s_opt.res);
+	extern void vita_set_trilinear(bool on);
+	vita_set_trilinear(s_opt.trilinear != 0);
 #else
 	picture_set_soft(s_opt.picture == 0);
 #endif
@@ -4496,7 +4562,12 @@ static bool pause_update(u32 down)
 		return true;
 	}
 	if (!s_paused) {
-		if ((down & KEY_START) && !s_msg_page && !s_save_prompt && !s_inv_open && !s_warp_pending &&
+#ifdef SH2_VITA
+		u32 pause_key = KEY_SELECT;
+#else
+		u32 pause_key = KEY_START;
+#endif
+		if ((down & pause_key) && !s_msg_page && !s_save_prompt && !s_inv_open && !s_warp_pending &&
 		    !screens_open()) {
 			pause_reopen(0);
 			sfx_play(SFX_MENU_OK, 1.0f, 0.0f);
@@ -4996,10 +5067,20 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 	                      (s_depth_variant == 1 ? 0xFFFFFF : 0) | SHADOW_STENCIL_CLEAR);
 	C3D_FrameDrawOn(t->scene);
 	C3D_SetViewport(0, 0, t->w, t->h);   // a scene texture is larger than the scene (picture.h)
+#ifdef SH2_VITA
+	extern bool vita_capture_ready(void);
+	extern void vita_capture_reset(void);
+	if (!s_inv_open)
+		vita_capture_reset();
+#endif
 	if (s_render_mode == 3) {
 		draw_texture_test(ortho);
 		calls = 1;
 		picture_frame(t);
+#ifdef SH2_VITA
+	} else if (s_inv_open && vita_capture_ready()) {
+		calls = 0;               // the item screen shows its still (0x46f180): the world waits
+#endif
 	} else if (playtest_fast() && !s_pt_shot) {
 		calls = 0;               // playtest "fast 1": nothing drawn, the emulator's GPU idles
 	} else {
@@ -5077,6 +5158,13 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		else if (combat_hit_time() < 0.35f && s_state == ST_GAME && s_cam.mode == CAM_PLAYER && !demo_active())
 			draw_hit(combat_hit_time());
 		float dim = (s_paused && !optmenu_brightness()) || s_inv_open ? (s_inv_open ? 0.6f : 0.5f) : 0.0f;
+#ifdef SH2_VITA
+		if (s_inv_open) {            // the frame as the menu opened: its still for the status panel
+			extern void vita_capture_view(void);
+			vita_capture_view();
+			dim = 0.0f;
+		}
+#endif
 		dim = dim > black ? dim : black;
 		if (dim > 0.0f)
 			draw_fade(ortho, dim);
@@ -5096,6 +5184,9 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		draw_top_text();
 		draw_test_name(dt);
 		savescreen_draw_top();       // a save point's files over the room
+#ifdef SH2_VITA
+		touchui_draw_pc();
+#endif
 		font_flush();
 		perf_part("r_ui", tr);
 	}
@@ -5413,6 +5504,9 @@ int main(void)
 			C3D_RenderTargetClear(top, C3D_CLEAR_ALL, 0x000000FF, 0);
 			C3D_FrameDrawOn(top);
 			results_draw_top();
+#ifdef SH2_VITA
+			touchui_draw_pc();
+#endif
 			font_flush();
 			touchui_frame();
 			C3D_FrameEnd(0);
@@ -5449,6 +5543,9 @@ int main(void)
 			}
 			optmenu_draw_top(ui_draw);   // the options from the title, on black
 			setup_draw_top();            // the first run, on black
+#ifdef SH2_VITA
+			touchui_draw_pc();
+#endif
 			font_flush();
 			touchui_frame();
 			C3D_FrameEnd(0);
@@ -5514,11 +5611,13 @@ int main(void)
 			s_flash_on = !s_flash_on;
 			sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
 		}
+#ifndef SH2_VITA
 		if (!viewer && (down & KEY_SELECT) && touchui_select()) {     // SELECT twice: the debug page
 			s_debug_hud = !s_debug_hud;
 			for (int r = 1; r < 18; r++)
 				printf("\x1b[%d;1H%40s", r, "");
 		}
+#endif
 		if (viewer && (down & KEY_ZL))
 			s_render_mode = (s_render_mode + 1) % 4;
 
@@ -5821,9 +5920,13 @@ int main(void)
 		room_tex_reap();                 // textures room_tex_refine and chr_refine swapped out last frame
 		chr_reap();
 		// the item screen's model goes into its own texture first (itemview_render switches targets)
+#ifdef SH2_VITA
+		s_inv_tex = NULL;                // itemmenu.c: the PC's sprites
+#else
 		s_inv_tex = s_inv_open && s_state == ST_GAME ?
 		            itemview_render(inv_current(), (float)(svcGetSystemTick() - s_inv_tick) / (float)SYSCLOCK_ARM11 * 0.9f) :
 		            NULL;
+#endif
 		u32 clear = s_cam.mode == CAM_PLAYER ? ((u32)s_env.clear_rgb[0] << 24 | (u32)s_env.clear_rgb[1] << 16 |
 		                                       (u32)s_env.clear_rgb[2] << 8 | 0xFF) : CLEAR_COLOR;
 		if (eyes == 1) {
@@ -5860,7 +5963,7 @@ int main(void)
 		// twice one eye's 6 to 9 ms, inside a 60 fps frame; the fogged roads drop to 30 as in 2D
 		int cap = quality()->frame_cap;
 #ifdef SH2_VITA
-		cap = 30;                    // the Vita holds an even 30, every frame two refreshes
+		cap = s_opt.framerate == 2 ? 60 : 30;   // an even 30 holds every frame two refreshes (Options, System)
 #endif
 		if ((frame % 60) == 59) {
 			u32 behind, all;

@@ -51,6 +51,7 @@ void touchui_box(const char* text, const TouiButton* buttons, int nbuttons);
 // The panel the stage programs and the map and memo screens print (empty: none), with the D-pad
 // and A / B as touch buttons.
 void touchui_panel(const char* text);
+void touchui_draw_pc(void);                  // the Vita: the lists above on the game screen, before font_flush
 // SELECT: true on the second press within half a second (main.c then toggles the debug page).
 bool touchui_select(void);
 void touchui_debug(bool on);                 // the debug page: the console on the screen

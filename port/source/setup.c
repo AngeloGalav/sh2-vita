@@ -30,7 +30,7 @@ static void texts(int step, bool new_layout, const char* names[2], const char* l
 	if (step == STEP_CAMERA) {
 		names[0] = "Original", names[1] = "Behind";
 		lines[0] = "The PC's own shots, framed for each room.";
-		lines[1] = new_layout ? "Follows James. The C-Stick turns it." : "Follows James. Drag the touch screen to turn it.";
+		lines[1] = new_layout ? "Follows James. The right stick turns it." : "Follows James. The D-Pad turns it.";
 	} else {
 		names[0] = msg(85, "Rotational Style"), names[1] = msg(86, "Directional Style");
 		lines[0] = "Left and right turn James. Up walks, down backs away.";
@@ -174,7 +174,7 @@ static void draw_controls(void)
 				continue;
 			k &= -k;                         // the first of its buttons
 			if (r->act < 0) {
-				fig_ring(x + 34.0f, y, "Circle Pad", FIGC_GREY);
+				fig_ring(x + 34.0f, y, "Stick", FIGC_GREY);
 			} else if (k & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT)) {
 				dpad_glyph(x + 34.0f, y, k, FIGC_DIM, FIGC_WHITE);
 			} else {

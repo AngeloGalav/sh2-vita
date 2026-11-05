@@ -53,18 +53,18 @@ Runs on a console: menus, rooms, characters, sound, a new game played through it
 Vita3K freezes at the first frame of any vitaGL program (even a one-shader test), so it can't be
 used to check the picture. What is open, roughly in order:
 
-1. **One screen.** The game screen fills the display (906 x 544, the 3DS's 5:3) and the 3DS touch
-   page is laid over its right side, on a dark translucent ground, only while it has something to
-   choose (`touchui_overlay`); the play page is not shown, as the PC has no HUD. Drawn on the game
-   screen as the PC draws them: the pause menu (`pausemenu.c`, 0x407310 / 0x407620) and the title's
-   menu, scenarios and levels (`titlemenu.c`, 0x496280, 0x4968c0, 0x496490, 0x497fc0; the Movie
-   Menu in the same style until the PC's is found). Next, from their PC functions: items (the
-   state machine is 0x471590; its drawing is still to find), options, save and load, map, memos.
+1. **One screen.** The game screen fills the display and there is no touch page: everything is drawn
+   on the game screen. From their PC functions: the pause menu (`pausemenu.c`, 0x407310 / 0x407620),
+   the title's menu, scenarios and levels (`titlemenu.c`, 0x496280, 0x4968c0, 0x496490, 0x497fc0; the
+   Movie Menu in the same style), the items (`main.c`, 0x472e80, 0x46a5c0), the options' look
+   (`optmenu.c`, 0x4630c0, 0x467e70, with the port's tabs) and the file list (`savescreen.c`,
+   0x4537b0). The rest (memo list, map titles, stage panels, the first run) comes from
+   `touchui_draw_pc`, in the same style but not from a PC function.
 2. Check on a console: textures (the PICA's rows run top-down, so every level is flipped on
    upload; ETC1 blocks are turned in place), the fog and lighting tables, render-to-texture.
-3. Mipmaps: only level 0 is uploaded (the suspect for the coloured noise on some textures: vitaGL's
-   upload of the levels above 0, not yet confirmed); the
-   uncompressed formats get theirs from `glGenerateMipmap`, ETC1 goes without.
+3. Textures: `SH2_VITA_TEX=1` packs DXT1 and DXT5 straight from the PC's pixels, each with its whole
+   chain (`vitatex.py encode_png`); menu art and stills at up to 1024 wide, the font from the
+   Enhanced Edition's sheet when present (`ui.py`).
 4. `C3D_SyncDisplayTransfer` and `C3D_SyncTextureCopy` do nothing yet: the game-over still
    (`gameover.c`) is black and the screenshot (`main.c`) is empty.
 5. Resolution: 960 x 544, the display's own, at a locked 30 fps (`main.c`, `C3D_FrameEnd`). The
@@ -74,7 +74,7 @@ used to check the picture. What is open, roughly in order:
    laid out in 400 x 240, is drawn across the whole width, 6.7% wider than on the 3DS.
    Textures at the PC's sizes: profile.c reads the 3DS's heaps, which the layer reports as the New
    3DS's 124 MB mode (`__wrap_main`); left at 0 they had every texture halved.
-6. Memory (textures held twice), DXT from the PC's own textures in the packer (vitatex.py starts from the 3DS's ETC1A4), a shader cache.
+6. Memory (textures held twice).
 7. No 3D (stereo.c's right eye is never shown), no surround (`ndspSetOutputMode` mono or stereo).
 
 Shaders are compiled through vitashark directly and handed to vitaGL as programs

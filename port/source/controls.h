@@ -43,6 +43,7 @@ u32 controls_default(ControlsLayout layout, ControlsAction act);
 // The buttons bound now (the player's or the default) in the active layout.
 u32 controls_keys(ControlsAction act);
 const char* controls_name(ControlsAction act);
+void controls_menu_draw_pc(void);        // the Vita's Buttons page on the game screen
 
 // Once per frame with the raw buttons (hidKeysDown / hidKeysHeld after touchui_input): game keys.
 void controls_game(u32 down, u32 held, u32* gdown, u32* gheld);

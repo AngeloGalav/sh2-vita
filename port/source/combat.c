@@ -2364,6 +2364,25 @@ bool combat_weapon_rounds(int* in_gun, int* spare_rounds)
 	return is_gun();
 }
 
+// The item screen's Reload (0x471590), on a gun or on its ammo: the gun's rounds up to its clip from
+// its ammo item. The moves' own reload stays on an empty gun's Action.
+void combat_reload_item(int item)
+{
+	for (int w = 0; w < (int)(sizeof WEAPONS / sizeof *WEAPONS); w++) {
+		const WeaponDef* d = &WEAPONS[w];
+		if (!d->clip || (d->item != item && d->ammo != item))
+			continue;
+		int need = d->clip - ev_item_count(d->item), have = ev_item_count(d->ammo);
+		int n = need < have ? need : have;
+		if (n > 0) {
+			ev_give_item(d->item, n);
+			ev_give_item(d->ammo, -n);
+			sfx_play(d->snd_reload, 1.0f, 0.0f);
+		}
+		return;
+	}
+}
+
 // One line for the help screen: weapon and rounds.
 const char* combat_weapon_line(void)
 {

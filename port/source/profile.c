@@ -217,8 +217,8 @@ void profile_set_choices(int hw, int quality, int layout, int fps)
 
 const char* profile_status(void)
 {
-	snprintf(P.status, sizeof P.status, "%s 3DS, profile %s, %s quality, %s layout, %d fps%s",
-	         P.console_new ? "New" : "Old", profile_new() ? "new" : "old", low() ? "low" : "high",
+	snprintf(P.status, sizeof P.status, "%s, profile %s, %s quality, %s layout, %d fps%s",
+	         P.console_new ? "Vita" : "Vita (low)", profile_new() ? "new" : "old", low() ? "low" : "high",
 	         controls_layout() == CONTROLS_LAYOUT_NEW ? "new" : "old", profile_frame_rate(), P.core1 ? ", core 1" : "");
 	return P.status;
 }

@@ -20,6 +20,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/io/stat.h>
+#include <psp2/io/fcntl.h>
 #include <psp2/kernel/clib.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -146,8 +147,8 @@ void c3d_fog_precision_toggle(void)
 
 static void half_fog_end(void);
 
-// The game view's surface, portrait as the PICA's. ux0:data/sh23ds/res416.txt draws it at 720 x 416,
-// a little over half the pixels, and the present stretches it (a test switch, read at start-up). 416
+// The game view's surface, portrait as the PICA's. ux0:data/sh23ds/res416.txt (Options, Resolution)
+// draws it at 720 x 416, a little over half the pixels, and the present stretches it. Read at start-up. 416
 // and not 408: a depth surface's rows are whole multiples of 32 samples, and the half-size fog reads
 // the depth as a texture of exactly that width.
 static int s_view_w = 544, s_view_h = 960;
@@ -256,9 +257,12 @@ float C3D_FrameRate(float fps)
 	return old;
 }
 
+static void res_apply(void);
+
 bool C3D_FrameBegin(u8 flags)
 {
 	(void)flags;
+	res_apply();
 	G.frame_start = sceKernelGetProcessTimeWide();
 	return true;
 }
@@ -1849,6 +1853,66 @@ static void upload_uniforms(Program* p)
 	}
 }
 
+// Options' Resolution: at once, and the file vita_gl_init reads before the options are, at a start
+static int s_res_want = -1;
+
+// At a frame's start: the game view's surface made again at the size chosen, under the same target and
+// texture the game holds, and the half-size fog's after it
+static void res_apply(void)
+{
+	if (s_res_want < 0)
+		return;
+	int w = s_res_want ? 416 : 544, h = s_res_want ? 720 : 960;
+	s_res_want = -1;
+	if (w == s_view_w)
+		return;
+	glFinish();
+	for (int i = 0; i < MAX_TARGETS; i++) {
+		C3D_RenderTarget* t = G.targets[i];
+		if (!t || t->width != 480 || t->height != 800)
+			continue;
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glDeleteFramebuffers(1, &t->fbo);
+		bool depth = t->depth_rb != 0;
+		if (depth)
+			glDeleteRenderbuffers(1, &t->depth_rb);
+		t->fbo = t->depth_rb = 0;
+		glDeleteTextures(1, &t->tex->gl);
+		t->tex->gl = 0;
+		t->gl_w = (u16)w, t->gl_h = (u16)h;
+		t->sx = (float)w / t->width, t->sy = (float)h / t->height;
+		c3d_tex_make_target(t->tex, w, h);
+		make_fbo(t, depth ? GPU_RB_DEPTH24_STENCIL8 : (GPU_DEPTHBUF)-1);
+	}
+	if (HF.rt.fbo) {
+		glDeleteFramebuffers(1, &HF.rt.fbo);
+		glDeleteTextures(1, &HF.tex.gl);
+		glDeleteTextures(1, &HF.ztex);
+		memset(&HF.rt, 0, sizeof HF.rt);
+		memset(&HF.tex, 0, sizeof HF.tex);
+		HF.ztex = 0, HF.zdata = NULL;
+	}
+	s_view_w = w, s_view_h = h;
+	G.target = NULL;
+}
+
+void vita_res_save(int low)
+{
+	static int saved = -1;
+	if (low == saved)
+		return;
+	if (saved >= 0)
+		s_res_want = low;            // a change in the Options: now (the file is for the next start)
+	saved = low;
+	if (low) {
+		FILE* f = fopen(VITA_DATA_DIR "/res416.txt", "w");
+		if (f)
+			fclose(f);
+	} else {
+		sceIoRemove(VITA_DATA_DIR "/res416.txt");
+	}
+}
+
 // false when there is nothing to draw with: no shader bound, or its program failed to build
 // ---------------------------------------------------------------- the fog at half size
 // The fog's sprites (fog.c) are most of the GPU's frame on the fogged roads: hundreds of large
@@ -1952,6 +2016,82 @@ static void half_fog_route(void)
 		half_fog_end();
 	else if (!HF.active && fog && HF.on && G.target && G.target->gl_w == s_view_w && G.target->gl_h == s_view_h)
 		half_fog_begin();
+}
+
+// The item screen's still (0x46f180 samples a texture of the frame, 0x46a150): the game view copied
+// once into a small target as the menu opens, then laid into the status panel. Both copies keep the
+// surface's portrait rows, as half_fog_end's does; blit says how they lie on the display.
+static struct { C3D_RenderTarget rt; C3D_Tex tex; bool ready; } CAP;
+
+bool vita_capture_ready(void) { return CAP.ready; }
+void vita_capture_reset(void) { CAP.ready = false; }
+
+static void quad_state(void)
+{
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_SCISSOR_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDisable(GL_BLEND);
+	glUseProgram(s_present_prog);
+	glUniform1i(s_present_tex, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+}
+
+void vita_capture_view(void)
+{
+	C3D_RenderTarget* m = G.target;
+	if (CAP.ready || !m || m->gl_w != s_view_w || m->gl_h != s_view_h)
+		return;
+	half_fog_end();
+	if (!CAP.rt.fbo) {
+		CAP.tex.width = 272, CAP.tex.height = 480;
+		CAP.tex.param = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_MIN_FILTER(GPU_LINEAR);
+		c3d_tex_make_target(&CAP.tex, 272, 480);
+		CAP.rt.tex = &CAP.tex;
+		CAP.rt.width = CAP.rt.gl_w = 272, CAP.rt.height = CAP.rt.gl_h = 480;
+		CAP.rt.sx = CAP.rt.sy = 1.0f;
+		CAP.rt.screen = -1;
+		make_fbo(&CAP.rt, (GPU_DEPTHBUF)-1);
+	}
+	G.target = NULL;
+	bind_target(&CAP.rt);
+	glViewport(0, 0, 272, 480);
+	quad_state();
+	glBindTexture(GL_TEXTURE_2D, m->tex->gl);
+	static const float pos[8] = { -1, -1, 1, -1, -1, 1, 1, 1 }, uv[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, pos);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, uv);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	G.target = NULL;
+	bind_target(m);
+	glViewport(0, 0, m->gl_w, m->gl_h);
+	CAP.ready = true;
+}
+
+// Into the game view, in the 400 x 240 layout: a display position (xs, ys) of 960 x 544 is the surface's
+// (1 - ys / 544, 1 - xs / 960) (blit), and the still's whole picture fills the rectangle
+void vita_capture_draw(float x0, float y0, float x1, float y1)
+{
+	if (!CAP.ready || !G.target)
+		return;
+	quad_state();
+	glBindTexture(GL_TEXTURE_2D, CAP.tex.gl);
+	float pos[8], uv[8];
+	static const float F[4][2] = { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } };
+	for (int i = 0; i < 4; i++) {
+		float fx = F[i][0], fy = F[i][1];
+		float xs = (x0 + (x1 - x0) * fx) / 400.0f, ys = (y0 + (y1 - y0) * fy) / 240.0f;
+		pos[i * 2] = 2.0f * (1.0f - ys) - 1.0f, pos[i * 2 + 1] = 2.0f * (1.0f - xs) - 1.0f;
+		uv[i * 2] = 1.0f - fy, uv[i * 2 + 1] = 1.0f - fx;
+	}
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, pos);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, uv);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 // GPU cost tests (SELECT + R while playing, vita_log.txt says which): 1 the fragment lighting off,

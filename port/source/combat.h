@@ -133,6 +133,7 @@ void combat_set_equipped(bool on);
 // even when empty (their count is the rounds loaded).
 bool combat_equip_item(int item);
 bool combat_owns_item(int item);
+void combat_reload_item(int item);       // the item screen's Reload: a gun or its ammo
 const char* combat_weapon_line(void);   // weapon and rounds, for the help screen
 int combat_weapon_item(void);            // the item of the weapon in hand, 0 for bare hands
 void combat_set_infinite_ammo(bool on);  // Cheats: firing takes no rounds

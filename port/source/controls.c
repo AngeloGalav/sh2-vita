@@ -3,6 +3,9 @@
 #include <string.h>
 #include "sfx.h"
 #include "touchui.h"
+#ifdef SH2_VITA
+#include "font.h"
+#endif
 
 #define BINDABLE (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_L | KEY_R | KEY_ZL | KEY_ZR | KEY_SELECT | KEY_DUP | \
                   KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT | KEY_CSTICK_UP | KEY_CSTICK_DOWN | KEY_CSTICK_LEFT | \
@@ -46,17 +49,20 @@ u32 controls_default(ControlsLayout layout, ControlsAction act)
 	// actions. The New 3DS adds the PC's strafe keys on ZL / ZR (both together turn him round,
 	// 0x54b290) and the target keys on the C-Stick.
 #ifdef SH2_VITA
-	// The Vita's own defaults, PlayStation style (Vita-only, the port's choice like the 3DS's):
-	// Cross acts, Square runs, Triangle the flashlight, Circle the items (and back in menus), R aims,
-	// L turns round; the D-Pad as on the 3DS, the right stick the C-Stick's targets, the rear pad's
-	// outer lower corners the strafe keys
+	// The Vita's own defaults (the port's choice, as the 3DS's were): the left stick moves James and
+	// the right stick the camera (targets while aiming). Cross acts, Square runs, Triangle the map,
+	// Circle the flashlight (and back in menus), START the items, SELECT the pause menu, R aims, L
+	// turns round; the D-Pad holds Look (it also recentres the camera), the next weapon, quick heal and the map, the rear pad's outer lower
+	// corners the strafe keys
 	switch (act) {
 	case ACT_RUN: return KEY_Y;
 	case ACT_ACTION: return KEY_A;
 	case ACT_AIM: return KEY_R;
 	case ACT_TURN180: return KEY_L;
-	case ACT_FLASHLIGHT: return KEY_X;
-	case ACT_ITEMS: return KEY_B;
+	case ACT_FLASHLIGHT: return KEY_B;
+	case ACT_ITEMS: return KEY_START;
+	case ACT_MAP: return KEY_X | KEY_DRIGHT;
+	case ACT_PAUSE: return KEY_SELECT;
 	default: break;
 	}
 #endif
@@ -241,7 +247,7 @@ int controls_help(char lines[][40], int max)
 
 const char* controls_menu_label(void)
 {
-	snprintf(C.label, sizeof C.label, "Buttons     %s 3DS layout", L() ? "New" : "Old");
+	snprintf(C.label, sizeof C.label, "Buttons");
 	return C.label;
 }
 
@@ -319,8 +325,37 @@ bool controls_menu_update(u32 down)
 	return true;
 }
 
+#ifdef SH2_VITA
+// One screen: the page as the options' rows (optmenu.c draw_pc), the action left of the middle and
+// its buttons right of it, in the small font for its sixteen rows
+void controls_menu_draw_pc(void)
+{
+	const u32 full = 0xfefefeffu, soft = 0xfefefec0u;
+	font_text(FONT_BIG, 256, 0x1e, "Buttons", FONT_CENTER, full, full);
+	for (int i = 0; i < N_MENU_ACTS + 2; i++) {
+		char k[32] = "";
+		const char* name = i < N_MENU_ACTS ? controls_name(MENU_ACTS[i]) : i == N_MENU_ACTS ? "Defaults" : "Back";
+		if (i < N_MENU_ACTS) {
+			if (C.capture && i == C.sel)
+				snprintf(k, sizeof k, "Press a button");
+			else
+				key_names(controls_keys(MENU_ACTS[i]), k, sizeof k);
+		}
+		u32 c = i == C.sel ? full : soft;
+		int y = 0x50 + 0x16 * i, d = i == C.sel ? 2 : 0;
+		font_text(FONT_SMALL, 0xf0 - d, y - d, name, FONT_RIGHT, c, c);
+		font_text(FONT_SMALL, 0x10e - d, y - d, k, FONT_LEFT, c, c);
+	}
+}
+#endif
+
 void controls_menu_draw(void)
 {
+#ifdef SH2_VITA
+	C.dirty = false;             // drawn on the game screen (controls_menu_draw_pc)
+	touchui_menu_close(C.slot_set ? C.slot : TOUI_PAUSE);
+	return;
+#endif
 	const char* rows[N_MENU_ACTS + 2];
 	for (int i = 0; i < N_MENU_ACTS; i++) {
 		char k[32];
@@ -335,7 +370,7 @@ void controls_menu_draw(void)
 	static const TouiButton keep[1] = { { "Keep", KEY_START } };
 	const TouiButton* b = C.capture ? keep : C.sel < N_MENU_ACTS ? prompts : select;
 	int nb = C.capture ? 1 : C.sel < N_MENU_ACTS ? 3 : 2;
-	touchui_menu(C.slot_set ? C.slot : TOUI_PAUSE, L() ? "Buttons (New 3DS)" : "Buttons (Old 3DS)", rows,
+	touchui_menu(C.slot_set ? C.slot : TOUI_PAUSE, "Buttons", rows,
 	             N_MENU_ACTS + 2, &C.sel, b, nb);
 	if (!C.dirty)
 		return;
