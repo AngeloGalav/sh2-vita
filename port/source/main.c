@@ -1032,11 +1032,23 @@ static void options_open(void);
 static bool s_paused, s_pause_dirty, s_flash_on;
 static int s_inv_last;
 
-static void im_close(void)
+static void ui_fade_in(float sec);
+static void ui_fade_out(float sec, void (*then)(void));
+static bool ui_fading_out(void);
+static void (*s_im_then)(void);
+static void im_closed(void)
 {
 	s_inv_open = false;
 	s_inv_dirty = true;
+	if (s_im_then)
+		s_im_then();
+	s_im_then = NULL;
+}
+static void im_leave(void (*then)(void))   // 0x475b80: out over half a second, 0x4ee620(1, 0.5)
+{
 	s_inv_last = itemmenu_current();
+	s_im_then = then;
+	ui_fade_out(0.5f, im_closed);
 }
 static void im_use(int it, int m0, int m1) { s_inv_last = it, inventory_use(it, m0, m1); }
 static void im_power(int it)
@@ -1059,14 +1071,15 @@ static void im_memos(void)
 	if (!prog_running())
 		open_memos();
 }
-static const ItemMenuHost s_im_host = { im_use, im_power, im_power_on, im_reload, im_close, im_options, im_memos, open_map };
+static const ItemMenuHost s_im_host = { im_use, im_power, im_power_on, im_reload, im_leave, im_options, im_memos, open_map };
 #endif
 
 static bool inventory_update(u32 down)
 {
 #ifdef SH2_VITA
 	if (s_inv_open) {
-		itemmenu_update(down, hidKeysHeld());
+		if (!ui_fading_out())
+			itemmenu_update(down, hidKeysHeld());
 		return true;
 	}
 #endif
@@ -1081,6 +1094,7 @@ static bool inventory_update(u32 down)
 #ifdef SH2_VITA
 			itemmenu_init(PACK_DIR, prog_chapter());
 			itemmenu_open(&s_im_host, s_inv_last);
+			ui_fade_in(0.5f);            // 0x475b80: black, then in over half a second, 0x4ee620(4, 0.5)
 #endif
 		}
 		return false;
@@ -3240,12 +3254,56 @@ static void* s_ui_vbuf[2];     // the second for the right eye of a 3D frame (st
 static int s_ui_used;
 static const C3D_Mtx* s_ui_ortho;
 
+#ifdef SH2_VITA
+// The screens' fades (0x4ee620), black over everything once the frame's text is out: in to nothing, or
+// out to black, then what closes the screen, then in again.
+static struct { float a, speed; void (*then)(void); u64 tick; } s_uif;
+
+static void ui_fade_in(float sec)
+{
+	s_uif.a = 1.0f, s_uif.speed = -1.0f / sec, s_uif.then = NULL;
+	s_uif.tick = svcGetSystemTick();
+}
+static void ui_fade_out(float sec, void (*then)(void))
+{
+	s_uif.speed = 1.0f / sec, s_uif.then = then;
+	s_uif.tick = svcGetSystemTick();
+}
+static bool ui_fading_out(void) { return s_uif.speed > 0.0f; }
+
+static void ui_fade_frame(void)
+{
+	u64 now = svcGetSystemTick();
+	float dt = (float)(now - s_uif.tick) / (float)SYSCLOCK_ARM11;
+	s_uif.tick = now;
+	s_uif.a += s_uif.speed * dt;
+	if (s_uif.speed > 0.0f && s_uif.a >= 1.0f) {
+		void (*fn)(void) = s_uif.then;
+		ui_fade_in(0.5f);
+		if (fn)
+			fn();
+	} else if (s_uif.a <= 0.0f) {
+		s_uif.a = 0.0f, s_uif.speed = 0.0f;
+	}
+	if (s_uif.a > 0.0f) {
+		u32 c = (u32)(fminf(s_uif.a, 1.0f) * 255.0f);
+		const u32 k[4] = { c, c, c, c };
+		font_quad_px(NULL, 0, 0, 400, 240, 0, 0, 0, 0, k);
+	}
+}
+#endif
+
 static void ui_draw(C3D_Tex* tex, const MapVert* v, int n, u32 rgba)
 {
 	typedef struct { float x, y, z, u, v; u8 c[4]; s8 n[4]; } V;
 	void** buf = &s_ui_vbuf[stereo_eye()];
-	if (!*buf)
+	if (!*buf) {
 		*buf = linearAlloc(UI_MAX_VERTS * sizeof(V));
+#ifdef SH2_VITA
+		extern void vita_buf_stream(const void* p, u32 size);
+		vita_buf_stream(*buf, UI_MAX_VERTS * sizeof(V));
+#endif
+	}
 	if (!*buf || !s_ui_ortho || s_ui_used + n > UI_MAX_VERTS)
 		return;
 	V* out = (V*)*buf + s_ui_used;
@@ -3346,8 +3404,13 @@ static void ui_draw_font(C3D_Tex* tex, const FontVert* v, int n)
 {
 	typedef struct { float x, y, z, u, v; u8 c[4]; s8 n[4]; } V;
 	void** buf = &s_ui_vbuf[stereo_eye()];
-	if (!*buf)
+	if (!*buf) {
 		*buf = linearAlloc(UI_MAX_VERTS * sizeof(V));
+#ifdef SH2_VITA
+		extern void vita_buf_stream(const void* p, u32 size);
+		vita_buf_stream(*buf, UI_MAX_VERTS * sizeof(V));
+#endif
+	}
 	if (!*buf || !s_ui_ortho || s_ui_used + n > UI_MAX_VERTS)
 		return;
 	V* out = (V*)*buf + s_ui_used;
@@ -3408,6 +3471,10 @@ static void open_map(void)
 		show_message(ev_system_message(3));        // "I don't have a map of this area."
 	if (r != MAP_NONE)
 		sfx_play(0x2b17, 1.0f, 0.0f);
+#ifdef SH2_VITA
+	if (map_is_open())
+		ui_fade_in(0.5f);
+#endif
 }
 
 static void memo_panel(const int* list, int n)
@@ -3449,6 +3516,9 @@ static void open_memos(void)
 	s_memo_view = s_memo_sel = 0;
 	s_memo_dirty = true;
 	host_picture("etc_p_memo");
+#ifdef SH2_VITA
+	ui_fade_in(0.5f);
+#endif
 }
 
 static void close_memos(void)
@@ -3551,6 +3621,18 @@ static bool screens_update(u32 down, u32 held, const circlePosition* cp, float d
 	}
 	if (message_update(down))        // "no map of this area" first, and the memo texts
 		return true;
+#ifdef SH2_VITA
+	static bool memo_was;
+	if (memo_was && !s_memo_open)
+		ui_fade_in(0.5f);
+	memo_was = s_memo_open;
+	if (ui_fading_out())
+		return true;
+	if (map_is_open() && !map_marking() && (down & (KEY_B | KEY_START))) {
+		ui_fade_out(0.5f, map_close);    // out over half a second and in on the world
+		return true;
+	}
+#endif
 	if (map_is_open()) {
 		if (map_update(down, held, cp, dt))
 			host_panel(map_legend());
@@ -4226,6 +4308,8 @@ static void options_apply(void)
 	// 3DS's 400 x 240; the Vita draws it at its own 960 x 544, each pixel as the GPU drew it
 	picture_set_soft(false);
 	extern void vita_res_save(int low);
+	extern void vita_fog_div(int div);
+	vita_fog_div(2 + s_opt.fog_size);
 	if (s_opt.framerate != 2)
 		s_opt.framerate = 1;         // 30 unless 60 was chosen (the 3DS's Auto follows its Quality)
 	vita_res_save(s_opt.res);
@@ -5077,13 +5161,14 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		draw_texture_test(ortho);
 		calls = 1;
 		picture_frame(t);
-#ifdef SH2_VITA
-	} else if (s_inv_open && vita_capture_ready()) {
-		calls = 0;               // the item screen shows its still (0x46f180): the world waits
-#endif
 	} else if (playtest_fast() && !s_pt_shot) {
 		calls = 0;               // playtest "fast 1": nothing drawn, the emulator's GPU idles
 	} else {
+		u64 tr;
+#ifdef SH2_VITA
+		if (s_inv_open && vita_capture_ready())
+			goto after_world;        // the item screen shows its still (0x46f180): the world waits
+#endif
 		use_world_program();
 		C3D_LightEnvBind(&s_lenv);
 		lighting_frame(mv, s_cam.mode == CAM_PLAYER);
@@ -5093,7 +5178,7 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		frustum_set(&s_clip_mtx, s_clip_far);
 		if (!stereo_eye())
 			shadow_frame(s_paused);      // the second eye draws the first one's volumes
-		u64 tr = svcGetSystemTick();
+		tr = svcGetSystemTick();
 		calls = draw_room();
 		gpucost_count(GC_MAP, calls);
 		perf_part("r_map", tr);
@@ -5135,6 +5220,9 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		if (s_cam.mode == CAM_PLAYER)    // a lamp facing the camera, on the screen's target on Soft
 			lensflare_draw(proj, mv, s_fogf.scr_z, s_paused ? 0.0f : dt, t->tex != NULL);
 		perf_part("r_soft", tr);
+#ifdef SH2_VITA
+after_world:
+#endif
 		tr = svcGetSystemTick();
 		static float black;              // the second eye keeps the first one's
 		if (!stereo_eye()) {
@@ -5176,6 +5264,13 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 			draw_picture(ortho);
 		draw_sprites();
 		map_draw();
+#ifdef SH2_VITA
+		if (map_is_open()) {             // the sheet is 4:3: what stands past it at a zoom stays in
+			const u32 bk[4] = { 0x000000ffu, 0x000000ffu, 0x000000ffu, 0x000000ffu };
+			font_quad_px(NULL, 0, 0, 40, 240, 0, 0, 0, 0, bk);
+			font_quad_px(NULL, 360, 0, 400, 240, 0, 0, 0, 0, bk);
+		}
+#endif
 		inventory_draw_top();
 		memos_draw_top();
 		optmenu_draw_top(ui_draw);
@@ -5188,6 +5283,9 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		touchui_draw_pc();
 #endif
 		font_flush();
+#ifdef SH2_VITA
+		ui_fade_frame();
+#endif
 		perf_part("r_ui", tr);
 	}
 	return calls;
@@ -5338,6 +5436,12 @@ int main(void)
 	}
 	bool test = s_logos_off || playtest_active() || s_autotest || s_spawn_map[0] || s_debug_demo[0] ||
 	            s_debug_movie[0] || s_debug_newgame;
+#ifdef SH2_VITA
+	if (!s_opt.vita_cam) {               // once: the right stick needs the behind camera (tpcam.c)
+		s_opt.vita_cam = 1;
+		s_opt.camera = 1;
+	}
+#endif
 	s_setup_due = s_setup_debug == 1 || (s_setup_debug < 0 && !s_opt.setup && !test);
 	s_controls_due = !s_setup_due && s_setup_debug < 0 && !s_opt.ctl_seen && !test;
 	if (s_textcheck) {
@@ -5508,6 +5612,9 @@ int main(void)
 			touchui_draw_pc();
 #endif
 			font_flush();
+#ifdef SH2_VITA
+			ui_fade_frame();
+#endif
 			touchui_frame();
 			C3D_FrameEnd(0);
 			continue;
@@ -5547,6 +5654,9 @@ int main(void)
 			touchui_draw_pc();
 #endif
 			font_flush();
+#ifdef SH2_VITA
+			ui_fade_frame();
+#endif
 			touchui_frame();
 			C3D_FrameEnd(0);
 			continue;            // the button that left the title is not seen by the game
@@ -5642,7 +5752,11 @@ int main(void)
 			// the behind camera turns with the C-Stick on the New 3DS, and on either console with a
 			// drag on the touch screen (touchui_free_drag); Look sets it behind James again
 			s_orbit[0] = s_orbit[1] = 0.0f;
+#ifdef SH2_VITA
+			if (s_tp_live) {
+#else
 			if (s_tp_live && controls_layout() == CONTROLS_LAYOUT_NEW) {
+#endif
 				s_orbit[0] = cs.dx / 150.0f, s_orbit[1] = cs.dy / 150.0f;
 				s_orbit[0] = s_orbit[0] > 1.0f ? 1.0f : s_orbit[0] < -1.0f ? -1.0f : s_orbit[0];
 				s_orbit[1] = s_orbit[1] > 1.0f ? 1.0f : s_orbit[1] < -1.0f ? -1.0f : s_orbit[1];

@@ -72,6 +72,7 @@ void opt_defaults(Options* o)
 	o->ps2_flash = o->noise_ps2 = o->ps2_camera = o->cutscene_fov = 1;
 #ifdef SH2_VITA
 	o->camera = 1;               // the right stick turns it
+	o->fog_size = 1;             // a third each way (c3d_gl.c half_fog_begin)
 #endif
 	o->hold_stomp = o->swap_attack = 1;
 	o->msg_top = 1;              // messages are the top screen's (port/UI.md)
@@ -96,7 +97,7 @@ static const Key s_keys[] = {
 	K("ps2flashlight", ps2_flash, 0, 1), K("ps2noise", noise_ps2, 0, 1), K("ps2camera", ps2_camera, 0, 1),
 	K("cutscenefov", cutscene_fov, 0, 1), K("togglerun", toggle_run, 0, 1), K("holdstomp", hold_stomp, 0, 1),
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
-	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
+	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("fogsize", fog_size, 0, 2), K("vitacam", vita_cam, 0, 1), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
 };
 
@@ -281,6 +282,8 @@ static const char* const VITA_RES[2] = { "960 x 544", "720 x 416" };
 static const char* const VITA_RES_L[2] = { "The display's own, the sharpest.", "Fewer pixels for a steadier frame rate." };
 static const char* const VITA_FILTER[2] = { "Bilinear", "Trilinear" };
 static const char* const VITA_FILTER_L[2] = { "Lighter. A line can show where detail changes.", "Smoothest, and more work for the console." };
+static const char* const VITA_FOGSIZE[3] = { "High", "Medium", "Low" };
+static const char* const VITA_FOGSIZE_L[3] = { "A half of the screen's size each way.", "A third each way.", "A quarter each way: the lightest." };
 static const char* const VITA_FPS[2] = { "30", "60" };
 static const char* const VITA_FPS_L[2] = { "The steadiest motion.", "Smoother only where the console keeps up." };
 static const char* const VITA_FOG_L[2] = { "No drifting fog: much lighter, and far geometry shows.", "The game's drifting fog." };
@@ -365,6 +368,8 @@ static const Setting SETTINGS[] = {
 	  .what = "How textures blend with distance.", .lines = VITA_FILTER_L },
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Fog", AT(fog), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "The drifting fog.", .lines = VITA_FOG_L },
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "Fog Detail", AT(fog_size), .hi = 2, .texts = VITA_FOGSIZE,
+	  .what = "How finely the fog is drawn.", .lines = VITA_FOGSIZE_L },
 #else
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Quality", AT(quality), .hi = 2, .texts = QUALITY,
 	  .what = "How much the console draws.", .lines = QUALITY_L },

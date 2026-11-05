@@ -137,10 +137,13 @@ static void places(int* slot)
 
 static void list_items(void)
 {
+	// 0x4729b0: at least nine places, the ones past the items empty, so the ring always has a middle
 	s_n = 0;
-	for (int i = 1; i < MAX_ITEMS; i++)              // 0x4729b0
+	for (int i = 1; i < MAX_ITEMS; i++)
 		if (ev_item_count(i) > 0 || combat_owns_item(i))
 			s_list[s_n++] = (u8)i;
+	while (s_n < 9)
+		s_list[s_n++] = 0;
 }
 
 int itemmenu_current(void) { return s_cur; }
@@ -149,12 +152,10 @@ void itemmenu_open(const ItemMenuHost* host, int last_item)
 {
 	s_host = *host;
 	list_items();
-	s_start = 0;
-	for (int i = 0; i < s_n; i++)
+	s_start = s_n - 5;                   // 0x4729b0: the first item in the middle, or the last one chosen
+	for (int i = 0; last_item && i < s_n; i++)
 		if (s_list[i] == last_item)
 			s_start = i >= 5 ? i - 5 : i + s_n - 5;
-	if (s_start < 0 || s_start >= s_n)
-		s_start = 0;
 	int slot[MAX_ITEMS];
 	places(slot);
 	for (int i = 0; i < MAX_ITEMS; i++) {
@@ -311,15 +312,15 @@ bool itemmenu_update(u32 down, u32 held)
 {
 	list_items();
 	if (s_start >= s_n)
-		s_start = 0;
+		s_start %= s_n;
 	step();
 	int it = s_cur, cmd[3], ctext;
 	switch (s_state) {
 	case ST_ITEMS:
 		if (down & KEY_B || down & KEY_START) {
 			sfx_play(SFX_MENU_CANCEL, 1.0f, 0.0f);
-			if (s_host.close)
-				s_host.close();
+			if (s_host.leave)
+				s_host.leave(NULL);
 			return false;
 		}
 		if (any(down, K_DOWN)) {
@@ -356,11 +357,8 @@ bool itemmenu_update(u32 down, u32 held)
 			go(s_state + 1);
 		else if (down & KEY_A) {
 			sfx_play(SFX_MENU_OK, 1.0f, 0.0f);
-			void (*fn)(void) = s_state == ST_OPTION ? s_host.options : s_state == ST_MEMO ? s_host.memos : s_host.map;
-			if (s_host.close)
-				s_host.close();
-			if (fn)
-				fn();
+			if (s_host.leave)
+				s_host.leave(s_state == ST_OPTION ? s_host.options : s_state == ST_MEMO ? s_host.memos : s_host.map);
 			return false;
 		}
 		break;
@@ -533,7 +531,7 @@ static void status(void)
 		float beat = 0.5f + 0.5f * sinf(s_tint_t * (6.2831853f * (1.4f + (1.0f - f) * 1.4286f) / 4.0f));
 		u32 c = 0xb0000000u | (u32)(beat * (1.0f - f) * 160.0f);
 		const u32 k[4] = { c, c, c, c };
-		font_quad_px(NULL, X(-230), Y(-175), X(-90), Y(-70), 0, 0, 0, 0, k);
+		font_quad_px(NULL, X(-230), Y(-175), X(-90), Y(-70), 0, 0, 0, 0, k);   // over the still
 	}
 	int count = (int)(10.0f - f * 10.0f);
 	srand((unsigned)s_seed++);

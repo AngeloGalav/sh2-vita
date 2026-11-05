@@ -1285,29 +1285,13 @@ bool touchui_overlay(void)
 }
 
 // One screen: what the touch page listed, drawn with the game's text over the game screen, in the
-// PC menus' way of a chosen row at full alpha 2 up and 2 left (0x407310). The buttons' names go along
-// the bottom. The lists are the port's: the screens they belong to have no such list on the PC, or
+// PC menus' way of a chosen row at full alpha 2 up and 2 left (0x407310), with no words for the buttons,
+// as on the PC. The lists are the port's: the screens they belong to have no such list on the PC, or
 // it is not ported yet (port/STATUS.md).
 static void txt(int f, float x, float y, const char* s, int align, u32 c)
 {
 	font_text(f, x + 2, y + 2, s, align, 0x000000c0u, 0x000000c0u);
 	font_text(f, x, y, s, align, c, c);
-}
-
-static const char* pad_name(u32 key)
-{
-	return key & KEY_A ? "Cross" : key & KEY_B ? "Circle" : key & KEY_X ? "Triangle" : key & KEY_Y ? "Square" :
-	       key & KEY_L ? "L" : key & KEY_R ? "R" : key & KEY_START ? "START" : key & KEY_SELECT ? "SELECT" : "";
-}
-
-static void hints_pc(char label_[][16], const u32* key, int n)
-{
-	char s[160] = "";
-	size_t k = 0;
-	for (int i = 0; i < n && k < sizeof s; i++)
-		k += (size_t)snprintf(s + k, sizeof s - k, "%s%s %s", i ? "     " : "", pad_name(key[i]), label_[i]);
-	if (k)
-		txt(FONT_SMALL, 256, 0x1cc, s, FONT_CENTER, 0xc8c8c8ffu);
 }
 
 // The stage programs' panels name the 3DS's buttons: the Vita's take their place
@@ -1347,13 +1331,12 @@ void touchui_draw_pc(void)
 			for (int l = 0; l < f.n && l < FONT_FIT_LINES; l++)
 				txt(FONT_SMALL, x, 0x150 + 24 * l, f.line[l], FONT_CENTER, on ? 0xc8c8c8ffu : dark);
 		}
-		hints_pc(s_ch.blabel, s_ch.bkey, s_ch.nb);
 	} else if (m >= 0) {
 		const Menu* me = &s_menus[m];
 		bool file = m == TOUI_SAVE;      // savescreen.c's picture and the chosen file are below
 		int per = file ? 5 : 11, sel = me->sel ? *me->sel : 0;
 		int first = file ? (sel / per) * per : sel >= per ? sel - per + 1 : 0;
-		if (!file && me->title[0])
+		if (!file && m != TOUI_MEMOS && me->title[0])
 			txt(FONT_BIG, 256, 0x1e, me->title, FONT_CENTER, full);
 		float x = file ? 0x20 : 256;
 		int f = file ? FONT_SMALL : FONT_BIG, al = file ? FONT_LEFT : FONT_CENTER;
@@ -1363,11 +1346,8 @@ void touchui_draw_pc(void)
 			u32 c = (me->dim >> i) & 1 ? dark : on ? full : soft;
 			txt(f, x - d, (file ? 0x50 + 0x26 * (i - first) : 0x50 + 0x1c * (i - first)) - d, me->rows[i], al, c);
 		}
-		hints_pc((char (*)[16])me->blabel, me->bkey, me->nb);
 	} else if (s_box_on && s_box[0]) {
 		txt(FONT_BIG, 256, 0x1e, s_box, FONT_CENTER, full);
-		if (s_box_nb > 0)
-			hints_pc(s_box_label, s_box_key, s_box_nb);
 	} else if (s_map_on) {
 		// nothing on it: the PC's map has its name in its picture, and no words for its buttons
 	} else if (s_panel[0]) {

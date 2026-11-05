@@ -9,7 +9,7 @@ typedef struct {
 	void (*power)(int item);                        // the flashlight's or radio's switch
 	bool (*power_on)(int item);
 	void (*reload)(int item);
-	void (*close)(void);
+	void (*leave)(void (*then)(void));              // fade out, close the screen, then this (or nothing)
 	void (*options)(void);
 	void (*memos)(void);
 	void (*map)(void);

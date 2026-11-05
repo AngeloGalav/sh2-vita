@@ -134,10 +134,9 @@ void c3d_half_fog_toggle(void)
 	vita_log("fog at half size %s", NAME[st]);
 }
 
-// The half-size fog's colour work in float (the fog then covered as it should) or half, written by
-// hand in half_types. With half the far geometry showed through the fog on a console, cause not yet
-// known. SELECT + triangle (ctru.c) changes it at once, to compare in one spot.
-static bool s_fog_float = true;
+// The small fog target's colour work in half, for the SGX's rate, or float: SELECT + triangle (ctru.c)
+// changes it at once, to compare in one spot. With no depth test the whole program goes in half.
+static bool s_fog_float;
 
 void c3d_fog_precision_toggle(void)
 {
@@ -258,6 +257,7 @@ float C3D_FrameRate(float fps)
 }
 
 static void res_apply(void);
+static void hf_free(void);
 
 bool C3D_FrameBegin(u8 flags)
 {
@@ -861,6 +861,17 @@ static void vbo_frame(void)
 			i++;
 }
 
+// main.c's 2D vertices are rewritten through the frame with no flush: never a cached copy, however many
+// there are (a page of text went past VBO_MIN and drew the first frame's text, cut and overwritten)
+static const u8* s_stream;
+static u32 s_stream_size;
+
+void vita_buf_stream(const void* p, u32 size)
+{
+	s_stream = p;
+	s_stream_size = size;
+}
+
 // nverts: the vertices this draw reaches (its highest index + 1)
 static void apply_attribs(int ninputs, u32 nverts)
 {
@@ -871,7 +882,7 @@ static void apply_attribs(int ninputs, u32 nverts)
 		// when changed). The small ones (2D, text, sprites) stay client arrays, cheap to copy: some
 		// are rewritten every frame with no flush (main.c ui_draw), which a cached copy would miss.
 		u32 bytes = nverts * G.buf.b[k].stride;
-		bool cached = bytes >= VBO_MIN;
+		bool cached = bytes >= VBO_MIN && !(base >= s_stream && base < s_stream + s_stream_size);
 		if (cached)
 			vbo_bind(base, bytes);
 		else
@@ -1295,7 +1306,7 @@ static GLuint compile(GLenum type, const char* s)
 	// The half-size fog's depth test keeps full precision: it divides clip z by w, and w (the
 	// distance, tens of thousands of units for the far sprites) is past half floats' 65504, which
 	// made the test fail and every sprite vanish
-	bool frag = type != GL_VERTEX_SHADER, depth_test = strstr(s, "zbuf") != NULL;
+	bool frag = type != GL_VERTEX_SHADER, depth_test = strstr(s, "zbuf") != NULL || strstr(s, "FOGFLOAT") != NULL;
 	SceGxmProgram* gxp = shark_compile_shader_extended(s, &size, frag ? SHARK_FRAGMENT_SHADER : SHARK_VERTEX_SHADER,
 		SHARK_OPT_FAST, 1, frag && !depth_test ? 1 : 0, 1);
 	if (!gxp) {
@@ -1374,11 +1385,13 @@ static Program* build(const FragKey* k)
 	static char src[16384];
 	int len = 0;
 	bool half_fog = k->halffog && !k->fog_float;
+	if (k->halffog && k->fog_float)
+		APPEND("// FOGFLOAT\n");
 	APPEND(LUT_AT);
 	APPEND("%s main(%s o_col : COLOR, float4 o_tc0 : TEXCOORD0, float4 o_tc1 : TEXCOORD1,\n"
 	       "float4 o_tc2 : TEXCOORD2, float4 o_view : TEXCOORD4, float4 o_nq : TEXCOORD5, float2 o_z : TEXCOORD6,\n",
 	       half_fog ? "half4" : "float4", half_fog ? "half4" : "float4");
-	if (k->halffog)
+	if (k->halffog > 1)
 		APPEND("float4 o_scr : TEXCOORD7, uniform sampler2D zbuf,\n");
 	APPEND(
 	       "uniform sampler2D tex0, uniform sampler2D tex1, uniform sampler2D tex2, uniform sampler2D lut,\n"
@@ -1884,14 +1897,8 @@ static void res_apply(void)
 		c3d_tex_make_target(t->tex, w, h);
 		make_fbo(t, depth ? GPU_RB_DEPTH24_STENCIL8 : (GPU_DEPTHBUF)-1);
 	}
-	if (HF.rt.fbo) {
-		glDeleteFramebuffers(1, &HF.rt.fbo);
-		glDeleteTextures(1, &HF.tex.gl);
-		glDeleteTextures(1, &HF.ztex);
-		memset(&HF.rt, 0, sizeof HF.rt);
-		memset(&HF.tex, 0, sizeof HF.tex);
-		HF.ztex = 0, HF.zdata = NULL;
-	}
+	if (HF.rt.fbo)
+		hf_free();
 	s_view_w = w, s_view_h = h;
 	G.target = NULL;
 }
@@ -1961,10 +1968,26 @@ static void half_fog_end(void)
 	}
 }
 
+static int s_fog_div = 3;
+
+void vita_fog_div(int div) { s_fog_div = div < 2 ? 2 : div > 4 ? 4 : div; }
+
+static void hf_free(void)
+{
+	glDeleteFramebuffers(1, &HF.rt.fbo);
+	glDeleteTextures(1, &HF.tex.gl);
+	glDeleteTextures(1, &HF.ztex);
+	memset(&HF.rt, 0, sizeof HF.rt);
+	memset(&HF.tex, 0, sizeof HF.tex);
+	HF.ztex = 0, HF.zdata = NULL;
+}
+
 static void half_fog_begin(void)
 {
 	C3D_RenderTarget* m = G.target;
-	int w = m->gl_w / 2, h = m->gl_h / 2;
+	int w = m->gl_w / s_fog_div, h = m->gl_h / s_fog_div;
+	if (HF.rt.fbo && (HF.rt.gl_w != w || HF.rt.gl_h != h))
+		hf_free();
 	if (!HF.rt.fbo) {
 		memset(&HF.tex, 0, sizeof HF.tex);
 		HF.tex.width = (u16)w, HF.tex.height = (u16)h;
@@ -2044,10 +2067,10 @@ static void quad_state(void)
 
 void vita_capture_view(void)
 {
+	half_fog_end();                      // the fog's own target is the one bound until then
 	C3D_RenderTarget* m = G.target;
 	if (CAP.ready || !m || m->gl_w != s_view_w || m->gl_h != s_view_h)
 		return;
-	half_fog_end();
 	if (!CAP.rt.fbo) {
 		CAP.tex.width = 272, CAP.tex.height = 480;
 		CAP.tex.param = GPU_TEXTURE_MAG_FILTER(GPU_LINEAR) | GPU_TEXTURE_MIN_FILTER(GPU_LINEAR);

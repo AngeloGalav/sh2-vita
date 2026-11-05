@@ -54,6 +54,8 @@ typedef struct {
 	u8 framerate;        // Advanced Options "Frame Rate"
 	u8 res;              // the Vita: 0 the display's 960 x 544, 1 720 x 416
 	u8 trilinear;        // the Vita: 0 bilinear within a level, 1 trilinear between levels
+	u8 fog_size;         // the Vita: the fog's target, a half, a third or a quarter of the view each way
+	u8 vita_cam;         // the Vita: the camera has been moved to Behind once
 	u8 ctrllayout;       // Control Options "Layout"
 	u8 camera;           // Control Options "Camera": 0 the PC's, 1 the port's behind camera (tpcam.c)
 	// Cheats (the port's): Infinite Stamina on by default, the rest off
