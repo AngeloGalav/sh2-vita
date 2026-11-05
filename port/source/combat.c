@@ -300,6 +300,7 @@ static bool s_atk_heavy;                // the swing is the heavy one (a downed 
 static int s_snd_frame = -1;            // the frame of the clip the swing sound waits for
 static float s_spray = SPRAY_FULL;      // seconds of spray left in the can (0x1fbacf0)
 static bool s_spray_again;              // the spray button stayed down: 509 follows
+static float s_body_yaw;                 // his facing, for the damage motion (0x534700)
 static float s_body_pos[3];             // James' feet this frame, for positional sounds
 static bool s_run_held;                 // run held this frame (the pipe's swing on hard)
 static bool s_hit_any, s_fired, s_reloaded;
@@ -544,6 +545,121 @@ static void die_range(const Anim* a)
 	J_DIE.start = (u16)s, J_DIE.end = (u16)hi;
 }
 
+// 0x534700: the damage motion for a blow, by attack id 42..71, whether the blow kills (0x1fbad17) and
+// whether it comes from behind (0x1fbad1b, the blow's direction within a quarter turn of his facing).
+// Ids are 20000 + these. They are in the stage's list (Stage_Data +0x2c), frames from 1024 of its
+// jms_stg_*.anm (0x491e60); 0x52fa50 finds none where a stage has no such clip, and the port then keeps
+// J_HURT or J_DIE.
+static const u8 DAMAGE_MOTION[30][4] = {
+	{ 8, 9, 10, 11 }, { 37, 37, 7, 7 }, { 12, 13, 14, 15 }, { 12, 13, 14, 15 }, { 12, 13, 14, 15 },
+	{ 16, 17, 18, 19 }, { 12, 13, 14, 15 }, { 16, 17, 18, 19 }, { 16, 17, 18, 19 }, { 20, 20, 20, 20 },
+	{ 25, 26, 27, 28 }, { 29, 29, 10, 11 }, { 30, 30, 31, 31 }, { 21, 22, 23, 24 }, { 21, 22, 23, 24 },
+	{ 37, 37, 7, 7 }, { 33, 34, 35, 36 }, { 25, 26, 27, 28 }, { 38, 38, 7, 7 }, { 39, 39, 40, 40 },
+	{ 33, 34, 35, 36 }, { 42, 46, 7, 7 }, { 43, 47, 45, 49 }, { 56, 56, 7, 7 }, { 54, 54, 55, 55 },
+	{ 8, 9, 10, 11 }, { 50, 50, 7, 7 }, { 52, 52, 7, 7 }, { 37, 37, 7, 7 }, { 37, 37, 7, 7 },
+};
+
+#define STG_FRAME 1024            // where a stage's frames start (0x491e60)
+typedef struct { u16 id, speed, first, last, flags; } StageClip;
+static StageClip s_stg_clip[32];
+static int s_stg_clips;
+static int s_stg_stage = -1;
+static char* s_stgmot;            // chr/jms/stgmot.txt, read once
+static JAnim s_damage_clip;
+
+static void stage_motion_load(int stage)
+{
+	s_stg_clips = 0;
+	if (!s_stgmot) {
+		char path[128];
+		snprintf(path, sizeof path, "%s/chr/jms/stgmot.txt", s_pack);
+		FILE* f = fopen(path, "rb");
+		if (!f)
+			return;
+		fseek(f, 0, SEEK_END);
+		long n = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		s_stgmot = malloc((size_t)n + 1);
+		if (s_stgmot) {
+			n = (long)fread(s_stgmot, 1, (size_t)n, f);
+			s_stgmot[n] = 0;
+		}
+		fclose(f);
+		if (!s_stgmot)
+			return;
+	}
+	char head[16];
+	snprintf(head, sizeof head, "s %d ", stage);
+	const char* p = s_stgmot;
+	while (p && strncmp(p, head, strlen(head))) {
+		p = strchr(p, '\n');
+		p = p ? p + 1 : NULL;
+	}
+	if (!p)
+		return;
+	char name[64];
+	if (sscanf(p, "s %*d %63s", name) != 1)
+		return;
+	p = strchr(p, '\n');
+	while (p && p[1] && p[1] != 's' && s_stg_clips < 32) {
+		StageClip* c = &s_stg_clip[s_stg_clips];
+		int v[5];
+		if (sscanf(p + 1, "%d %d %d %d %d", &v[0], &v[1], &v[2], &v[3], &v[4]) != 5)
+			break;
+		c->id = (u16)v[0], c->speed = (u16)v[1], c->first = (u16)v[2], c->last = (u16)v[3], c->flags = (u16)v[4];
+		s_stg_clips++;
+		p = strchr(p + 1, '\n');
+	}
+	// the stage's frames after the weapon's, as the PC loads them at frame 1024
+	if (!s_anim_ok || s_anim.frames < STG_FRAME)
+		return;
+	char path[128];
+	snprintf(path, sizeof path, "%s/chr/jms/%s.s3a", s_pack, name);
+	Anim extra;
+	if (!anim_load(&extra, path))
+		return;
+	if (extra.bones == s_anim.bones) {
+		gpu_sync();
+		AnmKey* k = realloc(s_anim.keys, (size_t)s_anim.bones * (STG_FRAME + extra.frames) * sizeof(AnmKey));
+		if (k) {
+			memcpy(k + (size_t)s_anim.bones * STG_FRAME, extra.keys, (size_t)s_anim.bones * extra.frames * sizeof(AnmKey));
+			s_anim.keys = k;
+			s_anim.frames = STG_FRAME + extra.frames;
+		}
+	}
+	anim_free(&extra);
+}
+
+// Stage changes and weapon changes both come here: a weapon's file holds only its first 1024.
+static void stage_motion_sync(bool reload)
+{
+	int stage = ev_stage();
+	if (s_maria || (!reload && stage == s_stg_stage))
+		return;
+	s_stg_stage = stage;
+	if (s_anim_ok && s_anim.frames > STG_FRAME)
+		s_anim.frames = STG_FRAME;
+	stage_motion_load(stage);
+}
+
+static const JAnim* damage_motion(int attack_id, bool dead, float from_x, float from_z)
+{
+	if (s_maria || attack_id < 42 || attack_id > 71)   // Maria's list is 0x549a10's, not ported
+		return NULL;
+	float a = atan2f(s_body_pos[0] - from_x, s_body_pos[2] - from_z) - s_body_yaw;
+	a = remainderf(a, 2.0f * PI);
+	int behind = a > -PI / 2.0f && a <= PI / 2.0f;
+	int id = 20000 + DAMAGE_MOTION[attack_id - 42][(dead ? 2 : 0) + behind];
+	for (int i = 0; i < s_stg_clips; i++) {
+		const StageClip* c = &s_stg_clip[i];
+		if (c->id == id && c->last < s_anim.frames) {
+			s_damage_clip = (JAnim){ c->first, c->last, (u8)(c->flags & 1), (s16)c->speed };
+			return &s_damage_clip;
+		}
+	}
+	return NULL;
+}
+
 static bool load_weapon(int w)
 {
 	s_target = NULL;                 // 0x534610 with every change of weapon
@@ -556,6 +672,7 @@ static bool load_weapon(int w)
 	if (!s_anim_ok)
 		return false;
 	die_range(&s_anim);
+	stage_motion_sync(true);
 	if (d->mdl) {
 		snprintf(dir, sizeof dir, "%s/chr/%s", s_pack, pdef()->wdir);
 		s_wmodel_ok = chr_load(&s_wmodel, dir, d->mdl, err, sizeof err);
@@ -656,6 +773,7 @@ float combat_ground_speed(int gait) { return pdef()->speed[gait < 0 ? 0 : gait >
 static void player_sync(void)
 {
 	static bool no_maria;     // her files were missing once: stay James
+	stage_motion_sync(false);
 	bool maria = prog_chapter() == 1 && !no_maria;
 	if (maria != s_maria) {
 		char dir[96], err[128];
@@ -901,7 +1019,6 @@ void combat_set_god(bool on) { s_god = on; }
 
 void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 {
-	(void)from_x, (void)from_z;
 	if (s_god)
 		return;
 	if (s_mode >= M_DYING || s_mode == M_HELD || s_invuln > 0.0f)
@@ -914,7 +1031,8 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 		s_mode = M_DYING;
 		s_die_t = 0.0f;
 		s_die_held = false;
-		play(&J_DIE);
+		const JAnim* fall = damage_motion(attack_id, true, from_x, from_z);
+		play(fall ? fall : &J_DIE);
 		return;
 	}
 	if (attack_id == 42 && s_mode >= M_RAISE && s_mode <= M_RELOAD) {
@@ -932,7 +1050,8 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 	s_mode = M_HURT;
 	s_invuln = 1.0f;     // a port stand-in: no such timer found in 0x5350d0 (STATUS section 3)
 	sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);   // injured (four or five takes)
-	play(&J_HURT);
+	const JAnim* hurt = damage_motion(attack_id, false, from_x, from_z);
+	play(hurt ? hurt : &J_HURT);
 }
 
 // What James can see (0x52f2c0 sets his areas, 0x5420f0 tests them): a "look" sphere ahead of him
@@ -1794,6 +1913,7 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		s_flash -= dt;
 	step(dt);
 	s_body_pos[0] = *b->x, s_body_pos[1] = *b->y, s_body_pos[2] = *b->z;
+	s_body_yaw = *b->yaw;
 	s_run_held = (held & KEY_B) != 0;
 	// 0x52e110 keeps ten frames of the keys: Action held through all of them gives 0x533ff0 a
 	// pressure again (0x1fbab0f), so holding it attacks again, light, as each attack ends. On

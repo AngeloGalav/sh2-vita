@@ -449,12 +449,10 @@ Ordered by weight. Each line names where the work starts.
   defaults to Switch. Quick heal (D-Pad left) has no PC key, and an Action press during the raise is
   kept for the moment the weapon is ready (`s_raise_press`). The first run ends on a Controls page
   (`setup.c`), shown once to players who had made the choices before it.
-- James' death (`combat.c` `die_range`): the PC's choice of damage motion for the killing blow is in
-  the encrypted 0x56e456 (after 0x534700); the port plays the knockdown (anime 112, which ends
-  standing again) from the set's fall to its last frame on the floor and holds it there, as the PC
-  holds the damage motion once 0x1fbad17 is set (0x559100). Blows that hurt always play anime 121,
-  where the PC chooses among 121 to 130 (122 and 123 last about 0.6 s, 121 holds him 1.2 s) inside
-  the encrypted 0x534700; the v1.0 exe would show the choice. After a blow James can't be hurt
+- James' damage and death (`combat.c` `damage_motion`): 0x534700's table picks the clip by attack, by
+  a killing blow and by a blow from behind, from the stage's own `jms_stg_*.anm`. `die_range` and anime
+  121 remain only for attacks or stages with no such clip, and for Maria (0x549a10 is not ported), and
+  the attacker-kind 0x204 case of 0x534700 uses the blow's direction. Not run on a console. After a blow James can't be hurt
   again for a second (`s_invuln`), a timer with no PC address: 0x5350d0 shows none, and the PC's
   damage motion (0x1fbad18) may be the whole of it. A swing does not play back off a wall
   (0x5350d0 with +0x124 2 or 3), only off an enemy.

@@ -271,6 +271,7 @@ class Packer:
 
     def characters_main(self, d, o):
         self.runs((3, 'chr.py', d, o, 'jms', 'hll_jms.mdl', *JAMES_ANIMS),
+                  (1, 'jmsstage.py', d, o, self.exe),
                   (1, 'chr.py', d, o, 'scu', 'scu.mdl', 'scu.anm'),
                   (1, 'chr.py', d, o, 'mkn', 'mkn.mdl', 'mkn.anm'),
                   (1, 'chr.py', d, o, 'wp', 'wp_kakuzai.mdl'),
