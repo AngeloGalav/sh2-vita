@@ -4,6 +4,7 @@
 // 0x471590 the input. The menu's own units are x -256..256 and y -240..240, the middle of the screen
 // at 0, 0; each frame steps as one of the PC's (30 a second).
 #include "itemmenu.h"
+#include "radio.h"
 #include "combat.h"
 #include "events.h"
 #include "font.h"
@@ -384,6 +385,14 @@ bool itemmenu_update(u32 down, u32 held)
 			s_row--, sfx_play(SFX_MENU_MOVE, 1.0f, 0.0f);
 		if (any(down, K_DOWN) && s_row + 1 < s_rows)
 			s_row++, sfx_play(SFX_MENU_MOVE, 1.0f, 0.0f);
+		if (s_rows && cmd[s_row] == CMD_VOLUME && any(down, K_LEFT | K_RIGHT)) {
+			// 0x471590: a step of 0x1f7d408, sound 0x2719 at the new level
+			int v = radio_volume() + (any(down, K_RIGHT) ? 1 : -1);
+			if (v >= 0 && v <= 15) {
+				radio_set_volume(v);
+				sfx_play(0x2719, 0.05f * (v + 4), 0.0f);
+			}
+		}
 		if ((down & KEY_A) && s_rows) {
 			int was = s_state;
 			act(subject, cmd[s_row]);
@@ -625,6 +634,12 @@ void itemmenu_draw(void)
 		int x = cmd[i] == CMD_POWER || cmd[i] == CMD_VOLUME ? 0x15e : 0x168;
 		u32 c = lit ? full : dim;
 		font_text(FONT_BIG, x, ctext + (nc == 3 ? 0x19 : 0x19) * i, ev_item_message(cmd[i]), FONT_LEFT, c, c);
+		if (cmd[i] == CMD_VOLUME) {
+			// stand-in for 0x46ee90's blocks: the level as a number after the words
+			char lv[8];
+			snprintf(lv, sizeof lv, "%d", radio_volume());
+			font_text(FONT_BIG, x - 0x10, ctext + 0x19 * i, lv, FONT_RIGHT, c, c);
+		}
 	}
 	if (!subject)
 		return;

@@ -180,6 +180,11 @@ when solved or a layer per box. SeBgmChange runs only on a stage load or warp (0
 3), so a program's page holds until then. "Scene running" is 0x934d94 bit 0x40 with the demo number
 (0x49fe20); `demo.c` keeps a cue table for the flags programs set mid-scene.
 
+### The radio
+
+`radio.c` ports 0x48cbc0: four looping layers of static (internal 5360..5363, 0x8a93b4), which have no
+game id, so `sound.py` adds them to the bank as 19990..19993. A pack from before that plays no radio.
+
 ### Not ported
 
 - Situation pages 2 and 3 (an enemy within 6000 units, James' health under 0.2), so a stage's

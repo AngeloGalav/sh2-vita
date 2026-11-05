@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "radio.h"
 #include "bgm.h"
 #include "stagemdl.h"
 #include "boat.h"
@@ -744,6 +745,7 @@ static int s42_video_replay(Prog* p)
 	PROG_BEGIN(p)
 		p_bgm_page(0);                  // silence; page 0x25 before tomatta (state 6, demo.c)
 	PROG_STEP(p, 0x17, p_demo(p, DEMO_VIDEO))
+		radio_set_mode(3);              // the PC sets it late in the tape as well (state 0x16)
 		p_bgm_page(0x25);               // state 0xd when the tape was skipped
 		p_set(475);                     // FLAGW_448 |= 0x8000000
 		p_set(625);                     // FLAGW_608 |= 0x20000

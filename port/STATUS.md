@@ -305,7 +305,7 @@ Ordered by weight. Each line names where the work starts.
   port's. Letting go ends it.
 - Item screen on the PS Vita (`itemmenu.c`, 0x475230): the bars' brightness per row is a guess, and the status
   panel's noise is flat red where the PC's strips sample the still. Examine shows the text, not the PC's picture
-  (0x46a850, 0x46c300). Adjust volume does nothing, as the radio's sound is not ported. The memo list and stage
+  (0x46a850, 0x46c300). Adjust volume shows the level as a number (stand-in for 0x46ee90's blocks). The memo list and stage
   panels are drawn by `touchui_draw_pc`, with no PC function behind them yet.
 - Fog on the PS Vita (`port/vita/compat/c3d_gl.c`): the sprites are drawn at half size and without
   the PC's depth test, so a sprite also lays over what stands in front of it. Chosen on a console: it
@@ -493,6 +493,10 @@ down: motion blur at half size (0x478de0), and one quarter-size soft layer stand
 and 8 (0x4791e0, 0x477a60), so no separate near and far blur and no glow pass. Hooked: stage 2 scene 1,
 stage 5 scenes 6 and 7, stage 7 scene 10, the hospital's turn, Mary's corridor. Not hooked: 0x4a7d80's
 enemy states, 0x5994c0, 0x578e00, 0x5817d0, 0x583650, 0x587140, 0x5841b0. Not run on a console.
+
+The radio (`radio.c`, 0x48cbc0): the switch and level are not kept in the save (0x1f7d407, 0x1f7d408), `RadioNoise`'s
+story states (0x48c9d0) are not ported, and a body's 0.8 in its death throes (0x4a6ce0) is left out.
+Not run on a console.
 
 ### 5. Smaller things
 

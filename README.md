@@ -87,7 +87,7 @@ Under *Options*, *System*:
 
 Open at the moment:
 
-- **Item screen:** close to the original, but the layout is about 13% wider than 4:3, Examine shows text rather than the item's picture and Adjust volume does nothing
+- **Item screen:** close to the original, but the layout is about 13% wider than 4:3, Examine shows text rather than the item's picture and Adjust volume shows a number in place of the blocks
 - **Options:** the look follows the original's screens, the tabs and some settings are the port's own
 - **Other menus:** the memo list, stage panels and first run use the same style without being ported from the game's own screens, and the Movie Menu takes the options' look
 - **Title:** the menu's words are the game's pictures, which exist only in English

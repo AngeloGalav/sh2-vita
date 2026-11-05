@@ -18,6 +18,7 @@
 #include <malloc.h>
 #include "audio.h"
 #include "sfx.h"
+#include "radio.h"
 #include "bgm.h"
 #include "chr.h"
 #include "demo.h"
@@ -1060,12 +1061,13 @@ static void im_use(int it, int m0, int m1)
 }
 static void im_power(int it)
 {
-	if (it == 18) {                  // 0x471590: the flashlight's switch; the radio has no sound here yet
+	if (it == 18) {                  // 0x471590: the flashlight's switch
 		s_flash_on = !s_flash_on;
 		sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
-	}
+	} else if (it == 19)
+		radio_toggle();
 }
-static bool im_power_on(int it) { return it == 18 ? s_flash_on : true; }
+static bool im_power_on(int it) { return it == 18 ? s_flash_on : it == 19 ? radio_on() : true; }
 static void im_reload(int it) { combat_reload_item(it); }
 static void im_options(void)         // comes back to the pause menu, as its Options row does
 {
@@ -4163,6 +4165,7 @@ static const ProgHost s_prog_host = {
 static void new_game(void)
 {
 	prog_abort();
+	radio_reset(10);                 // 0x49e980
 	boat_reset();
 	ev_reset();
 	combat_reset();
@@ -4190,6 +4193,7 @@ static void new_game(void)
 // th09). Its stages are 53..58; the door records carry the stage number, so it stays in them.
 static void new_game_wish(void)
 {
+	radio_reset(4);                  // 0x5a21f0
 	prog_abort();
 	ev_reset();
 	combat_reset();
@@ -4283,6 +4287,7 @@ static int s_title_sub;          // the title's level screens (defined with them
 // Returns false to exit the app.
 static bool continue_game(void)
 {
+	radio_reset(10);                 // stand-in: the switch and level aren't in the port's save
 	static SaveFile sv;
 	if (!read_save(&sv))
 		return false;
@@ -5702,6 +5707,21 @@ int main(void)
 			gdown |= KEY_L;                  // the game key of the next weapon (controls.h)
 		s_gdown = gdown;
 		s_anim_dt = dt;
+		{
+			// 0x401fc0 runs 0x48cbc0 every frame: the radio's level by what gEventIndex shows
+			static int last_stage = -1;
+			RadioScene rs = RADIO_SILENT;
+			if (s_state == ST_GAME && s_loaded) {
+				if (ev_stage() != last_stage)
+					radio_stage_loaded(last_stage = ev_stage());
+				// 5 the map (0x49de50), 6 the items and memos (0x475b80), 7 options (0x469ad0), 9 save (0x453fc0)
+				rs = movie_active() || savescreen_active() || optmenu_active() ? RADIO_SILENT
+				   : s_paused ? RADIO_PAUSE
+				   : map_is_open() || s_inv_open || s_memo_open ? RADIO_ITEMS : RADIO_PLAY;
+			} else
+				last_stage = -1;
+			radio_update(rs, dt);
+		}
 		touchui_debug(s_state == ST_VIEWER || s_debug_hud);
 		if (s_state != ST_TITLE) {
 			touchui_menu_close(TOUI_TITLE);

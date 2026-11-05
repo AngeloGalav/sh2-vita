@@ -486,6 +486,31 @@ int sfx_play_at(int id, float volume, const float pos[3])
 	return v - s_voices;
 }
 
+void sfx_mix(int id, float gain, float pan)
+{
+	for (int i = 0; i < NVOICES; i++)
+		if (s_voices[i].active && s_voices[i].id == id) {
+			voice_mix(&s_voices[i], gain * 0.5f, pan);   // voice_mix's 3DS lift doubles it
+			return;
+		}
+	Voice* v = start(id, gain);
+	if (!v)
+		return;
+	voice_mix(v, gain * 0.5f, pan);
+	if (!v->waiting)
+		ndspChnWaveBufAdd(FIRST_CH + (v - s_voices), &v->wb);
+}
+
+float sfx_distance_at(const float pos[3])
+{
+	return s_have_listener ? distance_factor(pos, s_player) * distance_factor(s_eye, s_player) : 1.0f;
+}
+
+float sfx_pan_at(const float pos[3])
+{
+	return s_have_listener ? position_pan(pos) : 0.0f;
+}
+
 void sfx_stop(int id)
 {
 	for (int i = 0; i < NVOICES; i++)

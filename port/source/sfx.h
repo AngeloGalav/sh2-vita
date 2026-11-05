@@ -31,6 +31,13 @@ void sfx_set_gain(float g);             // the options' effects volume, 0..1 (so
 // pan from where the source is on screen. Looping sounds keep following the listener.
 int sfx_play_at(int id, float volume, const float pos[3]);
 
+// A looping sound kept at a gain set from outside, started if it isn't playing (the radio's channels):
+// gain 0..1 straight to the voice, pan -1..1.
+void sfx_mix(int id, float gain, float pan);
+// 0x515230 without the call's own volume, the source's and camera's fade around the player, 0..1.
+float sfx_distance_at(const float pos[3]);
+float sfx_pan_at(const float pos[3]);    // 0x515ab0, as the voices use it
+
 void sfx_stop(int id);
 void sfx_stop_all(void);
 bool sfx_playing(int id);

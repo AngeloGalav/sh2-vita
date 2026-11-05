@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "radio.h"
 #include <stddef.h>
 
 // Stage programs of the town and the opening (stages 2..5 and 14), ported from the PC
@@ -297,6 +298,7 @@ static int s05_sanders_back(Prog* p)
 static int s05_first_monster_start(Prog* p)
 {
 	PROG_BEGIN(p)
+		radio_set_mode(2);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_FIRST_MONSTER))
 		p_item_get_now(0xd);
 		p_item_get_now(0x13);
@@ -310,6 +312,7 @@ static int s05_first_monster_start(Prog* p)
 static int s05_first_monster_corpse(Prog* p)
 {
 	PROG_BEGIN(p)
+		radio_set_mode(0);
 		p_clear(518);
 		p_set(41);                      // FLAGW_32 |= 0x200
 	PROG_STEP(p, 0x17, p_demo(p, DEMO_FIRST_MONSTER_CORPSE))

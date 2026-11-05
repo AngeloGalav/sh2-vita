@@ -66,6 +66,8 @@ EE_MAP = os.path.expanduser('~/Developer/refsrc/sh2ee/AudioScripts/SFX/SFX-Map.c
 # resampled to this rate at most (also keeps se.bnk and the port's 4 MB sample cache in bounds).
 SE_MAX_RATE = 32000
 
+RADIO_CHANNELS = 0x8a93b4
+RADIO_SE = 19990
 SE_PAIRS = 0x8a4ac0          # {game id, internal id} x 666
 SE_PAIR_COUNT = 0x29a
 SE_OFFSETS = 0x8a45a8        # u32 sddata.bin offset per internal id (5000..5698)
@@ -302,6 +304,12 @@ def build_bank(exe, data, out):
         if off not in wav_index:
             raise ValueError('SE %d (internal %d) points at %#x, not a RIFF start' % (gid, internal, off))
         ids[gid] = wav_index[off]
+
+    # The radio's channels (0x8a93b4, internal 5360..5363, loaded by 0x5182d0) have no game id: the
+    # bank gives them RADIO_SE (port/source/radio.h).
+    for i in range(4):
+        off = exe.u32(SE_OFFSETS + 4 * exe.u32(RADIO_CHANNELS + 4 * i))
+        ids[RADIO_SE + i] = wav_index[off]
 
     afs = ee.file(os.path.join(data, 'sound', 'adx', 'voice', 'voice.afs'))
     if os.path.exists(afs):
