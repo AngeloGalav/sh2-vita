@@ -300,6 +300,10 @@ Ordered by weight. Each line names where the work starts.
 
 ### 3. PC logic not ported or approximated
 
+- Fog on the PS Vita (`port/vita/compat/c3d_gl.c`): the sprites are drawn at half size and without
+  the PC's depth test, so a sprite also lays over what stands in front of it. Chosen on a console: it
+  covers the far half-loaded geometry that showed through with the test, and costs less. The test
+  stays behind SELECT + L.
 - Controls (`move.c`, `combat.c`, `main.c`): the arms' aim pitch and the shotgun's three aim heights
   (0x535a90); the swing lunges (0x558830 per-frame speeds) and the combo window (0x544ac0);
   0x1fba908/0x1fba904 bit 0x40 freeing the gait mid-attack (the port keeps it for the whole attack);

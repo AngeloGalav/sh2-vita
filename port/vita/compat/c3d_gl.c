@@ -107,7 +107,7 @@ static struct {
 	unsigned passes, draws;      // per second, for the log
 	const u32* zdata;            // the depth's memory, for the log's samples
 	u16 zw, zh;
-} HF = { .on = true, .fog_prog = -2 };
+} HF = { .on = true, .no_test = true, .fog_prog = -2 };
 
 // ux0:data/sh23ds/halffog0.txt starts with it off (a test switch)
 static void half_fog_init(void)
@@ -120,8 +120,10 @@ static void half_fog_init(void)
 	}
 }
 
-// SELECT + L: off, on, on without the depth test (a test: the fog then shows over everything, so
-// a fog that is missing either way is the laying over, one missing only with the test is the test)
+// SELECT + L: off, on with the depth test, on without it (the start), the depth shown.
+// Not the PC's: its sprites test the scene's depth. Without the test each sprite also lays over
+// what stands in front of it, which on a console covers the far half-loaded geometry that with the
+// test showed through the fog, and costs less (stand-in, port/STATUS.md).
 void c3d_half_fog_toggle(void)
 {
 	int st = !HF.on ? 0 : HF.show_depth ? 3 : HF.no_test ? 2 : 1;
@@ -1851,9 +1853,9 @@ static void upload_uniforms(Program* p)
 // ---------------------------------------------------------------- the fog at half size
 // The fog's sprites (fog.c) are most of the GPU's frame on the fogged roads: hundreds of large
 // blended sprites over the scene, 10 to 12 screens of them. Drawn into a target of half the size
-// each way they cost a quarter. The scene's depth is made a texture (vglTexImageDepthBuffer) and
-// each sprite pixel tests itself against it (build: halffog), since the small target has no depth
-// of its own; the target starts transparent and gathers the sprites as the screen would, the
+// each way they cost a quarter. The small target has no depth of its own: by default the sprites
+// are not tested at all (c3d_half_fog_toggle), and with the test on the scene's depth is made a
+// texture (vglTexImageDepthBuffer) and each sprite pixel tests itself against it (build: halffog). The target starts transparent and gathers the sprites as the screen would, the
 // colour by the game's blend and the alpha as coverage (ONE, ONE_MINUS_SRC_ALPHA), so laying it
 // over the scene with ONE, ONE_MINUS_SRC_ALPHA (half_fog_end) gives the sprites' own result, at
 // half the resolution. SELECT + L (ctru.c) turns it off and on to compare.
@@ -1911,16 +1913,19 @@ static void half_fog_begin(void)
 		make_fbo(&HF.rt, (GPU_DEPTHBUF)-1);
 		glGenTextures(1, &HF.ztex);
 	}
-	// the scene's depth as a texture: m is bound for reading and drawing
-	glActiveTexture(GL_TEXTURE6);
-	glBindTexture(GL_TEXTURE_2D, HF.ztex);
-	vglTexImageDepthBuffer(GL_TEXTURE_2D);
-	HF.zdata = sceGxmTextureGetData(vglGetGxmTexture(GL_TEXTURE_2D));   // vitaGL keeps no data pointer for it
-	HF.zw = m->gl_w, HF.zh = m->gl_h;
 	HF.passes++;
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glActiveTexture(GL_TEXTURE0);
+	HF.zdata = NULL;
+	if (!HF.no_test) {
+		// the scene's depth as a texture: m is bound for reading and drawing
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_2D, HF.ztex);
+		vglTexImageDepthBuffer(GL_TEXTURE_2D);
+		HF.zdata = sceGxmTextureGetData(vglGetGxmTexture(GL_TEXTURE_2D));   // vitaGL keeps no data pointer for it
+		HF.zw = m->gl_w, HF.zh = m->gl_h;
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glActiveTexture(GL_TEXTURE0);
+	}
 	HF.main = m;
 	G.target = NULL;
 	bind_target(&HF.rt);
