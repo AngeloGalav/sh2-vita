@@ -131,6 +131,17 @@ void c3d_half_fog_toggle(void)
 	vita_log("fog at half size %s", NAME[st]);
 }
 
+// The half-size fog's colour work in float (the fog then covered as it should) or half, written by
+// hand in half_types. With half the far geometry showed through the fog on a console, cause not yet
+// known. SELECT + triangle (ctru.c) changes it at once, to compare in one spot.
+static bool s_fog_float = true;
+
+void c3d_fog_precision_toggle(void)
+{
+	s_fog_float = !s_fog_float;
+	vita_log("half-size fog's colour in %s", s_fog_float ? "float" : "half");
+}
+
 static void half_fog_end(void);
 
 // The game view's surface, portrait as the PICA's. ux0:data/sh23ds/res416.txt draws it at 720 x 416,
@@ -1104,6 +1115,7 @@ typedef struct {
 	u8 rt_mask;                      // texture units holding a render target (GL's rows; not flipped)
 	u8 border_mask;                  // texture units clamped to their border (GL has no such wrap)
 	u8 halffog;                      // the fog drawn at half size (half_fog_begin): 1 + the depth test, 0 off
+	u8 fog_float;                    // its colour work in float (s_fog_float)
 } FragKey;
 
 typedef struct {
@@ -1351,13 +1363,11 @@ static int half_types(char* s)
 	return (int)(w - s);
 }
 
-static bool s_fog_full;                // a half-typed fog program did not compile: float throughout
-
 static Program* build(const FragKey* k)
 {
 	static char src[16384];
 	int len = 0;
-	bool half_fog = k->halffog && !s_fog_full;
+	bool half_fog = k->halffog && !k->fog_float;
 	APPEND(LUT_AT);
 	APPEND("%s main(%s o_col : COLOR, float4 o_tc0 : TEXCOORD0, float4 o_tc1 : TEXCOORD1,\n"
 	       "float4 o_tc2 : TEXCOORD2, float4 o_view : TEXCOORD4, float4 o_nq : TEXCOORD5, float2 o_z : TEXCOORD6,\n",
@@ -1534,8 +1544,10 @@ static Program* build(const FragKey* k)
 	GLuint fs = compile(GL_FRAGMENT_SHADER, src);
 	if (!fs && half_fog) {
 		vita_log("half-size fog in half precision did not compile: float throughout");
-		s_fog_full = true;
-		return build(k);
+		s_fog_float = true;
+		FragKey fk = *k;
+		fk.fog_float = 1;
+		return build(&fk);
 	}
 	Program* p = &s_progs[s_nprogs++];
 	memset(p, 0, sizeof *p);
@@ -1690,7 +1702,7 @@ static Program* current_program(void)
 	if (s_gpu_test == 1)
 		k.lights = 0, k.d0_on = 0;
 	if (HF.active)
-		k.halffog = (u8)(F.depth_on && !HF.no_test ? 2 + (F.depth_func & 7) : 1);
+		k.halffog = (u8)(F.depth_on && !HF.no_test ? 2 + (F.depth_func & 7) : 1), k.fog_float = s_fog_float;
 	k.fog = G.fog_mode == GPU_FOG && G.fog_lut;
 	k.fog_flip = k.fog && G.fog_flip;
 	k.alpha_func = G.alpha_test && !alpha_test_moot() ? (u8)(G.alpha_func + 1) : 0;

@@ -442,14 +442,16 @@ void hidScanInput(void)
 		}
 	}
 
-	// the test combinations (c3d_gl.c, c3d_tex.c); square under SELECT does not reach the game
+	// the test combinations (c3d_gl.c, c3d_tex.c); triangle and square under SELECT do not reach the game
 	static u32 raw_held;
 	u32 raw_down = k & ~raw_held;
 	raw_held = k;
 	if (k & KEY_SELECT) {
+		if (raw_down & KEY_X)
+			c3d_fog_precision_toggle();
 		if (raw_down & KEY_Y)
 			c3d_etc1_mips_toggle();
-		k &= ~KEY_Y;
+		k &= ~(KEY_X | KEY_Y);
 	}
 	s_down = k & ~s_held;
 	s_up = s_held & ~k;

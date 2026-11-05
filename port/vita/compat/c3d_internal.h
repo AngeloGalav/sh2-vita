@@ -16,6 +16,7 @@ typedef struct { u32 tex_n, tex_kb, buf_n, buf_kb, draw_n, flush_n, flush_kb, di
 extern C3dStats c3d_stats;
 void c3d_gpu_test_next(void);
 void c3d_etc1_mips_toggle(void);         // SELECT + square (ctru.c): ETC1's smaller levels or level 0 alone
+void c3d_fog_precision_toggle(void);     // SELECT + triangle (ctru.c): the half-size fog's colour in float or half
 void c3d_half_fog_toggle(void);           // SELECT + L (ctru.c): the fog at half size on or off            // SELECT + R (ctru.c): the next GPU cost test
 
 // c3d_shaders.c: the game's vertex programs in Cg
