@@ -353,7 +353,10 @@ static void input_init(void)
 	sceAppUtilInit(&init, &boot);
 	int enter = SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS;
 	sceAppUtilSystemParamGetInt(SCE_SYSTEM_PARAM_ID_ENTER_BUTTON, &enter);
-	s_cross_confirms = enter == SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS;
+	// The buttons are fixed whatever the console's setting: Cross acts and confirms, Circle is the
+	// flashlight and goes back (controls.c), so a Circle-confirm console plays the same
+	(void)enter;
+	s_cross_confirms = true;
 	s_input_ready = true;
 }
 
@@ -442,24 +445,31 @@ void hidScanInput(void)
 		}
 	}
 
-	// the test combinations (c3d_gl.c, c3d_tex.c); triangle and square under SELECT do not reach the game
+	// The test combinations under SELECT (c3d_gl.c, c3d_tex.c) stay away from the game, and SELECT
+	// itself, the pause menu's button, reaches it for one frame when let go with none of them pressed
 	static u32 raw_held;
-	u32 raw_down = k & ~raw_held;
+	static bool combo;
+	u32 raw_down = k & ~raw_held, raw_up = raw_held & ~k;
 	raw_held = k;
 	if (k & KEY_SELECT) {
 		if (raw_down & KEY_X)
 			c3d_fog_precision_toggle();
 		if (raw_down & KEY_Y)
 			c3d_etc1_mips_toggle();
-		k &= ~(KEY_X | KEY_Y);
+		if (raw_down & KEY_R)
+			c3d_gpu_test_next();
+		if (raw_down & KEY_L)
+			c3d_half_fog_toggle();
+		combo |= (raw_down & (KEY_X | KEY_Y | KEY_R | KEY_L)) != 0;
+		k &= ~(KEY_SELECT | KEY_X | KEY_Y | KEY_R | KEY_L);
+	} else if (raw_up & KEY_SELECT) {
+		if (!combo)
+			k |= KEY_SELECT;
+		combo = false;
 	}
 	s_down = k & ~s_held;
 	s_up = s_held & ~k;
 	s_held = k;
-	if ((s_held & KEY_SELECT) && (s_down & KEY_R))
-		c3d_gpu_test_next();
-	if ((s_held & KEY_SELECT) && (s_down & KEY_L))
-		c3d_half_fog_toggle();
 }
 
 u32 hidKeysDown(void) { return s_down; }
@@ -590,7 +600,16 @@ Result FSFILE_Close(Handle h)
 static u8 s_fb_top[240 * 400 * 3];
 static u8 s_fb_bottom[240 * 320 * 3];
 
-void gfxInitDefault(void) { vita_gl_init(); }
+// vita-elf-create needs room for its SCE data at the end of the first segment and crashes when the
+// code ends a few KB short of the next segment's boundary: this moves it past (remove if it fails the
+// other way, when the code has grown)
+static const volatile char s_segment_pad[16384] = { 1 };
+
+void gfxInitDefault(void)
+{
+	(void)s_segment_pad[0];
+	vita_gl_init();
+}
 void gfxExit(void) { }
 void gfxSet3D(bool enable) { (void)enable; }
 

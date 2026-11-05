@@ -11,6 +11,26 @@ page of the Options' Controls tab (`controls.c`, drawn in the Options screen's m
 `controls_menu_slot(TOUI_OPTIONS)`), separately for each layout; the bindings are kept in
 `controls.txt` next to `options.txt`.
 
+## PS Vita defaults
+
+| Action | Button |
+| --- | --- |
+| Move | Left stick |
+| Camera (the Behind camera; targets while aiming) | Right stick |
+| Action | Cross |
+| Run (hold) | Square |
+| Aim (hold) / quick turn | R / L |
+| Map | Triangle or D-Pad right |
+| Flashlight | Circle |
+| Items | START |
+| Pause | SELECT, on release |
+| Look (also recentres the Behind camera) / next weapon / quick heal | D-Pad up / down / left |
+| Strafe left / right | Rear pad's lower corners |
+
+The right stick turns the camera only with Camera on Behind: the PC camera's shots are fixed. Bindings
+saved in `controls.txt` win over these. Test combinations, held with SELECT: L fog, R GPU cost test,
+Triangle the fog's precision, Square ETC1 levels.
+
 ## Default layouts
 
 | Action | New 3DS | Old 3DS |
