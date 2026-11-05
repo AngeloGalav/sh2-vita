@@ -218,6 +218,10 @@ void tpcam_update(const TpCamInput* in, float dt, C3D_Mtx* view, float* fovy)
 		// when he goes away from it (pushing towards the camera or sideways leaves it be, so a
 		// camera-relative stick does not chase its own tail)
 		T.idle += dt;
+#ifdef SH2_VITA
+		// the right stick alone turns it (and Look brings it behind him)
+		if (false)
+#endif
 		if (T.idle >= FOLLOW_WAIT && in->stick_on && fabsf(in->stick_dir) < 1.2f && in->speed > 300.0f) {
 			float k = 1.5f * fminf(in->speed / 1500.0f, 1.0f);
 			T.yaw = wrap(T.yaw + wrap(in->yaw - T.yaw) * ease(k, dt));
