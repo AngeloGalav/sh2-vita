@@ -895,6 +895,12 @@ bool movie_play(const char* name)
 			}
 	consoleClear();
 	touchui_movie(true);
+#ifdef SH2_VITA
+	// The picture is chosen by the audio clock, which steps every 21 ms (ndsp.c's grain). At the game's
+	// 30 fps beat a 29.97 fps movie then finds no new frame on one beat and two on the next, and drops
+	// one: about 19 new frames a second in vita_log.txt. Checking at every refresh keeps them all.
+	float fps_was = C3D_FrameRate(60.0f);
+#endif
 	bool alive = fade_in();
 	u32 frame = 0;
 	while (alive && (alive = aptMainLoop())) {
@@ -919,6 +925,9 @@ bool movie_play(const char* name)
 	movie_stop();
 	if (alive)
 		alive = fade_out();
+#ifdef SH2_VITA
+	C3D_FrameRate(fps_was);
+#endif
 	touchui_movie(false);
 	for (int ch = 0; ch < 24; ch++)
 		if (paused[ch])
