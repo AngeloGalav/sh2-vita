@@ -23,6 +23,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from convert import encode_textures  # noqa: E402
+from ui import VITA, vita_size  # noqa: E402
 import ee  # noqa: E402
 from ui import decode_tex  # noqa: E402
 
@@ -116,7 +117,7 @@ def write_overlays(data, pack, exe_path):
         # the Image Enhancement Pack is brought back to the original's size
         ee.like_original(load_still(src).convert('RGBA'), src).save(os.path.join(pack, png))
         jobs.append((png, f'sheet/{s}.t3x', True))
-    encode_textures(jobs, pack, fmt='rgba4', mipmaps=False)
+    encode_textures(jobs, pack, fmt='rgba8' if VITA else 'rgba4', mipmaps=False)
     for png, _, _ in jobs:
         os.remove(os.path.join(pack, png))
     print('wrote overlay.dat and', len(jobs), 'sprite sheets')
@@ -149,7 +150,7 @@ def main():
                 print(f'  skip {d}/{fn}: {e}')
                 continue
             png = f'pic/{d}/{fn[:-4]}.png'
-            img.resize((512, 256), Image.LANCZOS).save(os.path.join(pack, png))
+            img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, png))
             jobs.append((png, f'pic/{d}/{fn[:-4]}.t3x', False))
     encode_textures(jobs, pack, fmt='rgb565', mipmaps=False)
     for png, _, _ in jobs:

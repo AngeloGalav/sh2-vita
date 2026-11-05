@@ -6,7 +6,7 @@
 // drawn on the top screen. Positions are in the PC's text space (0x47f400): x 0..512 left to right
 // and y 16..496 top to bottom, the middle of the screen at (256, 256); the 4:3 picture is drawn as
 // 320x240 in the middle of the top screen, like the stills. The atlas holds the glyphs already
-// shrunk to that size, so they go on whole pixels one texel per pixel.
+// at that size (the Vita: at its 960 x 544), so they go on whole pixels one texel per pixel.
 //
 // Text is the pack's message text (a byte c is the PC code c - 0x20, the Windows-1252 character c,
 // '\n' starts a line, FONT_FULL_WIDTH and four hex digits are a full-width code (0xe0 and up) or the

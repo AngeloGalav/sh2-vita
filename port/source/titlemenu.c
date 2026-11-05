@@ -450,6 +450,8 @@ bool titlemenu_draw_top(MapDrawFn draw, float bright)
 			u32 cc = (u32)(c * bright) & 0xff, aa = (u32)(a > 255.0f ? 255.0f : a) & 0xff;
 			float y0 = 120.0f - 103.0f * 240.0f / 448.0f, y1 = 120.0f - 19.0f * 240.0f / 448.0f;
 			float x0 = 200.0f - 257.0f * 0.625f, x1 = 200.0f + 255.0f * 0.625f, t1 = 96.0f / 128.0f;
+			if (s_glow.width == s_glow.height)     // the Vita's: a canvas of the whole picture (ui.py)
+				x0 = 40.0f, x1 = 360.0f, y0 = 0.0f, y1 = 240.0f, t1 = 1.0f;
 			MapVert g[6] = { { x0, y0, 0, 0 }, { x1, y0, 1, 0 }, { x1, y1, 1, t1 },
 			                 { x0, y0, 0, 0 }, { x1, y1, 1, t1 }, { x0, y1, 0, t1 } };
 			draw(&s_glow, g, 6, cc << 24 | cc << 16 | cc << 8 | aa);

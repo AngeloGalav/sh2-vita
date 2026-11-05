@@ -50,6 +50,11 @@ def decode_tex(path):
         bgra = np.frombuffer(d, np.uint8, w * h * 4, 0x50).reshape(h, w, 4)
         return Image.fromarray(np.ascontiguousarray(bgra[:, :, [2, 1, 0, 3]]), 'RGBA')
     kind = sh2map.MAP_TEX_KIND[fmt]
+    # The Image Enhancement Pack's larger files keep the original's length in the header (262144 at
+    # 2732x2048): what the size asks for, when the file holds it
+    need = (w + 3) // 4 * ((h + 3) // 4) * (8 if kind == 1 else 16)
+    if length < need <= len(d) - 0x50:
+        length = need
     return Image.fromarray(sh2map.decode_dxt(d[0x50:0x50 + length], w, h, kind))
 
 
@@ -120,9 +125,54 @@ def font_glyph(exe, f, code):
 # The 3DS draws the PC's 512x448 text space as 320x210 pixels (see port/source/font.h), so the
 # glyphs are stored at that size and drawn one texel per pixel.
 FONT_SX, FONT_SY = 0.625, 0.46875
+FONT_ATLAS = 512
+VITA = bool(os.environ.get('SH2_VITA_TEX'))
+if VITA:
+    # The Vita's 960x544 draws the same text space 2.4 and 2.27 times larger: the glyphs are stored
+    # at that size and drawn one texel per pixel (font.c GLYPH_SX, GLYPH_SY)
+    FONT_SX, FONT_SY = 1.5, 1.0625
+    FONT_ATLAS = 1024
 
 
-def write_font(pack, exe_path):
+def vita_size(img, most=512):
+    """A picture's size on the Vita: up to 1024 wide and most tall on powers of two, not the 3DS's
+    512x256; 4:3 pictures are squeezed only as the texture's shape needs, the draw undoes it."""
+    w, h = img.size
+    return min(1024, 1 << (w.bit_length() - 1)), min(most, 1 << (h.bit_length() - 1))
+
+
+def ee_font(data):
+    """The Enhanced Edition's font sheet as alpha, when the game has it (sh2e/font/font000.png,
+    read as its Patches/Fonts.cpp does: 100 columns of 44x64 cells by code, the second font in the
+    lower half; each cell holds its font at twice the PC's size). None without it."""
+    root = ee.mod_root(os.path.dirname(os.path.abspath(data)))
+    p = os.path.join(root, 'font', 'font000.png') if root else None
+    if not p or not ee.enabled() or not os.path.exists(p):
+        return None
+    return np.asarray(Image.open(p).convert('RGBA'))[:, :, 3]
+
+
+FONT_CELL = 44, 64, 100        # the sheet's cell and columns
+# Where a cell's glyph box starts, at twice the PC's pixels: one PC pixel left of where its ink lines
+# up with the PC's glyph (measured over the Latin letters), since the sheet's ink is a little wider.
+# font.c leaves out the PC's one pixel in for it (GLYPH_PEN).
+FONT_INSET = 3, 2
+
+
+def sheet_glyph(sheet, f, code, w, fh):
+    """The sheet's glyph for font f: the PC's w x fh box and a PC pixel more on each side."""
+    cw, ch, cols = FONT_CELL
+    y = f * sheet.shape[0] // 2 + code // cols * ch + FONT_INSET[1]
+    x = code % cols * cw + FONT_INSET[0]
+    return sheet[y:y + fh * 2, x:x + min((w + 2) * 2, cw - FONT_INSET[0])]
+
+
+def glyph_sharp(a):
+    """An enlarged PC glyph's edge narrowed, which would otherwise stay soft."""
+    return np.clip((a.astype(np.float32) - 48) * 255.0 / 159.0, 0, 255).astype(np.uint8)
+
+
+def write_font(pack, exe_path, data=None):
     """pack/ui/font.t3x: both fonts' glyphs, shrunk to the 3DS size, packed into one LA4 atlas
     (white, the glyph as alpha). pack/ui/font.bin: "FNT1", u16 font count, then per font u16 cell
     width, cell height and glyph count and per glyph u16 code, u16 x, u16 y (the atlas rectangle's
@@ -131,7 +181,9 @@ def write_font(pack, exe_path):
     full-width codes (0x47f400)."""
     from pcexe import Exe
     exe = Exe(exe_path)
-    atlas = np.zeros((512, 512), np.uint8)
+    atlas = np.zeros((FONT_ATLAS, FONT_ATLAS), np.uint8)
+    sheet = ee_font(data) if VITA and data else None
+    print('font: the Enhanced Edition\'s sheet' if sheet is not None else 'font: the exe\'s glyphs')
     out = [b'FNT1', struct.pack('<H', 2)]
     x = y = 0
     pad = 1
@@ -145,11 +197,18 @@ def write_font(pack, exe_path):
             if code == 0 or not w or not px.any():
                 recs.append(struct.pack('<HHHBBBB', code, 0, 0, 0, 0, adv, 0))
                 continue
-            sw = max(1, int(round(w * FONT_SX)))
-            small = np.asarray(Image.fromarray(px[:, :w]).resize((sw, sh), Image.LANCZOS))
-            if x + sw + pad > 512:
+            if sheet is not None:
+                hi = sheet_glyph(sheet, f, code, w, fh)
+                sw = max(1, int(round(hi.shape[1] / 2 * FONT_SX)))
+                small = np.asarray(Image.fromarray(hi).resize((sw, sh), Image.LANCZOS))
+            else:
+                sw = max(1, int(round(w * FONT_SX)))
+                small = np.asarray(Image.fromarray(px[:, :w]).resize((sw, sh), Image.LANCZOS))
+                if VITA:
+                    small = glyph_sharp(small)
+            if x + sw + pad > FONT_ATLAS:
                 x, y = 0, y + sh + pad
-            if y + sh + pad > 512:
+            if y + sh + pad > FONT_ATLAS:
                 raise ValueError('font atlas full')
             atlas[y:y + sh, x:x + sw] = small
             recs.append(struct.pack('<HHHBBBB', code, x, y, sw, sh, adv, 0))
@@ -163,7 +222,7 @@ def write_font(pack, exe_path):
     os.makedirs(os.path.join(pack, 'ui'), exist_ok=True)
     with open(os.path.join(pack, 'ui', 'font.bin'), 'wb') as fp:
         fp.write(b''.join(out))
-    rgba = np.zeros((height, 512, 4), np.uint8)
+    rgba = np.zeros((height, FONT_ATLAS, 4), np.uint8)
     rgba[:, :, :3] = 255
     rgba[:, :, 3] = atlas[:height]
     Image.fromarray(rgba, 'RGBA').save(os.path.join(pack, 'ui', 'font.png'))
@@ -172,7 +231,33 @@ def write_font(pack, exe_path):
         os.remove(os.path.join(pack, t3x))
     encode_textures([('ui/font.png', t3x, True)], pack, fmt='la4', mipmaps=False)
     os.remove(os.path.join(pack, 'ui', 'font.png'))
-    print(f'wrote {t3x} (512x{height}) and ui/font.bin')
+    print(f'wrote {t3x} ({FONT_ATLAS}x{height}) and ui/font.bin')
+
+
+def write_item_menu(data, pack, exe_path):
+    """The item screen's sprites on the Vita (0x475db0, 0x475d20): the PC's sheets of item pictures
+    as ui/itemmenu.t3x (data/pic/etc/itemmenu2.tex) and ui/itemmenux.t3x (Born From a Wish,
+    data/pic/add/itemmenux.tex), and ui/itemmenu.dat with their tables from the exe, in the original
+    sheets' texels: 79 item ids (0x7f65c0), 79 scales (0x7f6160) and 79 u0, v, u1 (0x7f63e0), then 12 ids
+    (0x7f6748) and 12 u0, v, u1 (0x7f6700) for Born From a Wish."""
+    from pcexe import Exe
+    exe = Exe(exe_path)
+    jobs = []
+    for rel, name, size in (('etc/itemmenu2', 'itemmenu', 1024), ('add/itemmenux', 'itemmenux', 512)):
+        img = load_tex(os.path.join(data, 'pic', rel + '.tex')).convert('RGBA').resize((size, size), Image.LANCZOS)
+        img.save(os.path.join(pack, 'ui', name + '.png'))
+        jobs.append(('ui/%s.png' % name, 'ui/%s.t3x' % name, True))
+    for _, t3x, _ in jobs:
+        if os.path.exists(os.path.join(pack, t3x)):
+            os.remove(os.path.join(pack, t3x))
+    encode_textures(jobs, pack, fmt='rgba8', mipmaps=False)
+    for png, _, _ in jobs:
+        os.remove(os.path.join(pack, png))
+    blob = exe.read(0x7f65c0, 79 * 4) + exe.read(0x7f6160, 79 * 4) + exe.read(0x7f63e0, 79 * 6)
+    blob += exe.read(0x7f6748, 12 * 4) + exe.read(0x7f6700, 12 * 6)
+    with open(os.path.join(pack, 'ui', 'itemmenu.dat'), 'wb') as f:
+        f.write(blob)
+    print('wrote ui/itemmenu.t3x, ui/itemmenux.t3x and ui/itemmenu.dat')
 
 
 def write_save_screen(data, pack):
@@ -185,7 +270,7 @@ def write_save_screen(data, pack):
         # nearly all one hue (James' red), and RGB565 left 17 of its 137 reds, in blotches
         img = load_tex(os.path.join(data, 'menu', 'mc', name + '.tbn2')).convert('RGB')
         png = 'ui/%s.png' % name
-        img.resize((512, 256), Image.LANCZOS).save(os.path.join(pack, png))
+        img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, png))
         t3x = 'ui/%s.t3x' % name
         if os.path.exists(os.path.join(pack, t3x)):
             os.remove(os.path.join(pack, t3x))
@@ -280,8 +365,8 @@ def write_screens(data, pack, out_voice=True):
     os.makedirs(os.path.join(pack, 'ui'), exist_ok=True)
     jobs = []
     img = load_tex(os.path.join(data, 'pic', 'etc', 'start00.tex')).convert('RGB')
-    img.resize((512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
-    jobs.append(('ui/start00.png', 'ui/start00.t3x', False, 'rgb565'))
+    img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
+    jobs.append(('ui/start00.png', 'ui/start00.t3x', False, 'rgb8' if VITA else 'rgb565'))
     img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA').crop((0, 0, 256, 256))
     img.save(os.path.join(pack, 'ui', 'gameover.png'))
     jobs.append(('ui/gameover.png', 'ui/gameover.t3x', True, 'la4'))
@@ -297,13 +382,21 @@ def write_screens(data, pack, out_voice=True):
         img = img.resize((512, 96), Image.LANCZOS)
     glow = Image.new('RGBA', (512, 128), (255, 255, 255, 0))
     glow.paste(img, (0, 0))
+    bg_path = ee.file(os.path.join(data, 'pic', 'etc', 'start00.tex'), note=False)
+    if VITA and ee.is_ee(bg_path) and bg_path not in ee._rejected:
+        # The Enhanced Edition's start00, which the Vita takes whole, has its logo elsewhere: its own
+        # start01's logo (rows 29..354 of 2048) on a canvas of the whole picture, where the two line up
+        # (measured against start00's letters); titlemenu.c lays a square glow over the whole picture
+        sheet = decode_tex(ee.file(os.path.join(data, 'pic', 'etc', 'start01.tex'), note=False)).convert('RGBA')
+        glow = Image.new('RGBA', (1024, 1024), (255, 255, 255, 0))
+        glow.paste(sheet.crop((82, 29, 1973, 354)).resize((711, 239), Image.LANCZOS), (157, 293))
     glow.save(os.path.join(pack, 'ui', 'titleglow.png'))
     jobs.append(('ui/titleglow.png', 'ui/titleglow.t3x', True, 'la4'))
     # the start-up screens (menu events 4 and 5, 0x405e90): the Konami logo and the splash screen
     for name, out in (('konami2048x2048', 'boot0'), ('splash_logo', 'boot1')):
         img = load_tex(os.path.join(data, 'pic', 'etc', name + '.tex')).convert('RGB')
-        img.resize((512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', out + '.png'))
-        jobs.append(('ui/%s.png' % out, 'ui/%s.t3x' % out, False, 'rgb565'))
+        img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', out + '.png'))
+        jobs.append(('ui/%s.png' % out, 'ui/%s.t3x' % out, False, 'rgb8' if VITA else 'rgb565'))
     for png, t3x, alpha, fmt in jobs:
         if os.path.exists(os.path.join(pack, t3x)):
             os.remove(os.path.join(pack, t3x))
@@ -367,7 +460,9 @@ def main():
         from events import DEFAULT_EXE
         exe_path = DEFAULT_EXE
     data, pack = args[0], args[1]
-    write_font(pack, exe_path)
+    write_font(pack, exe_path, data)
+    if VITA:
+        write_item_menu(data, pack, exe_path)
     write_save_screen(data, pack)
     write_options(data, pack)
     write_pause(pack, exe_path)

@@ -8,6 +8,20 @@
 #define MAX_CODE 0x200
 #define MAX_GLYPHS 1024      // per frame: a full results screen is about 450
 
+// An atlas texel in the 400 x 240 layout's units, and the pixel it snaps to. The 3DS's atlas holds
+// the glyphs one texel per pixel of that layout; the Vita's (ui.py) one texel per pixel of 960 x 544.
+#ifdef SH2_VITA
+#define GLYPH_SX (400.0f / 960.0f)
+#define GLYPH_SY (240.0f / 544.0f)
+#define GLYPH_PEN 0.0f       // the atlas' box starts where the PC's starts one pixel in (ui.py FONT_INSET)
+#else
+#define GLYPH_SX 1.0f
+#define GLYPH_SY 1.0f
+#define GLYPH_PEN 1.0f
+#endif
+static inline float snap_x(float v) { return floorf(v / GLYPH_SX + 0.5f) * GLYPH_SX; }
+static inline float snap_y(float v) { return floorf(v / GLYPH_SY + 0.5f) * GLYPH_SY; }
+
 typedef struct {
 	u16 x, y; u8 w, h, adv;      // atlas rectangle (3DS pixels), advance (PC units)
 	u8 ix0, iy0, ix1, iy1;       // the ink inside the rectangle (font_ink_px), ix1 = 0: none
@@ -75,7 +89,7 @@ bool font_init(const char* pack_dir, FontDrawFn draw)
 	if (!t)
 		return false;
 	Tex3DS_TextureFree(t);
-	C3D_TexSetFilter(&s_tex, GPU_NEAREST, GPU_NEAREST);
+	C3D_TexSetFilter(&s_tex, GLYPH_SX < 1.0f ? GPU_LINEAR : GPU_NEAREST, GLYPH_SX < 1.0f ? GPU_LINEAR : GPU_NEAREST);
 	C3D_TexSetWrap(&s_tex, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
 	ink_boxes();
 	s_ready = true;
@@ -186,9 +200,9 @@ static void put_glyph(const Glyph* g, float x, float y, u32 top, u32 bottom)
 		return;
 	// The PC draws the cell at (x, y) with the glyph one pixel in (0x480ea0). The atlas holds the
 	// glyph at its 3DS size, so it goes on whole pixels one texel per pixel.
-	float x0 = floorf(200.0f + (x + 1.0f - 256.0f) * 0.625f + 0.5f);
-	float y0 = floorf(120.0f + (y + 1.0f - 256.0f) * 0.46875f + 0.5f);
-	float x1 = x0 + g->w, y1 = y0 + g->h;
+	float x0 = snap_x(200.0f + (x + GLYPH_PEN - 256.0f) * 0.625f);
+	float y0 = snap_y(120.0f + (y + 1.0f - 256.0f) * 0.46875f);
+	float x1 = x0 + g->w * GLYPH_SX, y1 = y0 + g->h * GLYPH_SY;
 	float u0 = g->x / (float)s_tex.width, v0 = g->y / (float)s_tex.height;
 	float u1 = (g->x + g->w) / (float)s_tex.width, v1 = (g->y + g->h) / (float)s_tex.height;
 	FontVert a = { x0, y0, u0, v0, top }, b = { x1, y0, u1, v0, top };
@@ -262,9 +276,9 @@ bool font_ink_px(int font, const char* s, float* x0, float* y0, float* x1, float
 	for (int i = 0; i < n; i++) {
 		const Glyph* g = glyph(font, line[i]);
 		if (g && g->ix1) {
-			float gx = floorf(pen + 0.625f + 0.5f);     // as font_layout_px places it
-			bx0 = fminf(bx0, gx + g->ix0), bx1 = fmaxf(bx1, gx + g->ix1);
-			by0 = fminf(by0, (float)g->iy0), by1 = fmaxf(by1, (float)g->iy1);
+			float gx = snap_x(pen + GLYPH_PEN * 0.625f); // as font_layout_px places it
+			bx0 = fminf(bx0, gx + g->ix0 * GLYPH_SX), bx1 = fmaxf(bx1, gx + g->ix1 * GLYPH_SX);
+			by0 = fminf(by0, g->iy0 * GLYPH_SY), by1 = fmaxf(by1, g->iy1 * GLYPH_SY);
 		}
 		pen += advance(font, line[i]) * 0.625f;
 	}
@@ -291,8 +305,8 @@ int font_layout_px(int font, float x, float y, const char* s, int align, u32 top
 		for (int i = 0; i < k; i++) {
 			const Glyph* g = glyph(font, line[i]);
 			if (g && g->w && n + 6 <= max) {
-				float x0 = floorf(pen + 0.625f + 0.5f), y0 = floorf(y + 0.5f);
-				float x1 = x0 + g->w, y1 = y0 + g->h;
+				float x0 = snap_x(pen + GLYPH_PEN * 0.625f), y0 = snap_y(y);
+				float x1 = x0 + g->w * GLYPH_SX, y1 = y0 + g->h * GLYPH_SY;
 				float u0 = g->x / (float)s_tex.width, v0 = g->y / (float)s_tex.height;
 				float u1 = (g->x + g->w) / (float)s_tex.width, v1 = (g->y + g->h) / (float)s_tex.height;
 				FontVert a = { x0, y0, u0, v0, top }, b = { x1, y0, u1, v0, top };
