@@ -317,8 +317,8 @@ enum {
 // 8-frame crossfade from the pose shown (as James' clips, move.c), or mode 2, a cut: while the
 // enemy is younger than 10 anime steps (+0xb), or with the +0x10 bit 0x8000 set, which the Lying
 // Figure's crawl (0x4c4620, enSCUCtrlCrawl) and the mannequin's drop (0x4c1cd0, 0x4c20f0) set round
-// anime 0x1c. The other kinds' 0x8000 cases (the death entries of 0x4b5190, 0x4b9460, 0x4c00a0)
-// are not ported: those clips blend too.
+// anime 0x1c, and Pyramid Head's lift (0x4c00a0, anime 7). Two other 0x8000 cases are not ported:
+// Mary's 0x4b5190 and the 0x4b9460 grab, whose clips blend.
 static void anim_set(Enemy* e, int a)
 {
 	// 0x4a9920 always starts the anime over; the port keeps one that is playing (callers ask again
@@ -331,7 +331,8 @@ static void anim_set(Enemy* e, int a)
 		e->frame = anim_tab(e)[a].start;
 		e->anim_new = true;
 		e->anim_cut = e->anim_age < 10.0f / 30.0f ||
-		              (a == 0x1c && (e->kind == EN_KIND_SCU || e->kind == EN_KIND_MKN));
+		              (a == 0x1c && (e->kind == EN_KIND_SCU || e->kind == EN_KIND_MKN)) ||
+		              (a == 7 && e->kind == EN_KIND_RED);
 	}
 	e->rate = 1.0f;
 	e->loops = 0;

@@ -359,8 +359,8 @@ Ordered by weight. Each line names where the work starts.
   enemies fighting each other, the Abstract Daddy's confuse state, the oni's Hyper Spray reaction,
   creepers climbing from a wall onto the ceiling or slopes, Eddie's deepest cover (0x4aa800; the freezer's
   carcasses are not in the collision), Mary's moths steering one by one and leaving by the exits
-  (0x4ab780). Holds assume the PC ran them at 30 fps. The anime cuts other kinds set with bit 0x8000
-  (death entries of 0x4b5190, 0x4b9460, 0x4c00a0) blend instead.
+  (0x4ab780). Holds assume the PC ran them at 30 fps. Two anime cuts set with bit 0x8000 (0x4b5190,
+  0x4b9460) blend instead.
 - The Lying Figure's acid is bile green (`mist.c`); the PC's is the poison texture's tan through grey
   0x80 (0x4a3d00), a yellowish haze.
 - Stomping a body James killed, again and again until he walks 1000 units away (`enemy.c`
