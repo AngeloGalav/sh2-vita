@@ -1,185 +1,146 @@
-<p align="center">
-  <img src="site/assets/banner.jpg" width="720" alt="Silent Hill 2 running on a Nintendo 3DS: James at the lake overlook on the top screen and the town map on the touch screen">
-</p>
-
-<h1 align="center">sh23ds: Silent Hill 2 for Nintendo 3DS</h1>
+<h1 align="center">sh2-vita: Silent Hill 2 for PlayStation Vita</h1>
 
 <p align="center">
-  A native port of the PC Director's Cut for the New 3DS and the original 3DS.<br>
+  A native PS Vita port of the PC Director's Cut, with menus that follow the original.<br>
   Bring your own copy of the game.
 </p>
 
 <p align="center">
-  <a href="https://github.com/ankushKun/sh23ds/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ankushKun/sh23ds?style=flat-square&color=8fa3b3"></a>
-  <img alt="Platform: New 3DS and 3DS" src="https://img.shields.io/badge/platform-New%203DS%20%7C%203DS-c4453a?style=flat-square">
+  <img alt="Platform: PS Vita" src="https://img.shields.io/badge/platform-PS%20Vita-2f5da8?style=flat-square">
   <a href="LICENSE"><img alt="License: GPLv3" src="https://img.shields.io/badge/license-GPLv3-5b7083?style=flat-square"></a>
-  <br>
-  <a href="https://github.com/sponsors/ankushKun"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-EA4AAA?logo=githubsponsors&logoColor=white&style=flat-square"></a>
-  <a href="https://ko-fi.com/ankushkun"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Ko--fi-FF5E5B?logo=kofi&logoColor=white&style=flat-square"></a>
-  <a href="https://buymeacoffee.com/ankushkun"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?logo=buymeacoffee&logoColor=black&style=flat-square"></a>
 </p>
 
-<p align="center">
-  <a href="https://ankush.one/sh23ds/"><b>Website</b></a> ·
-  <a href="#install">Install</a> ·
-  <a href="https://ankush.one/sh23ds/#pack">Packer</a> ·
-  <a href="https://github.com/ankushKun/sh23ds/releases/latest">Download</a> ·
-  <a href="port/STATUS.md">Status</a> ·
-  <a href="#contributing">Contributing</a>
-</p>
+sh2-vita plays Silent Hill 2 from the PC version's own data, as native code on the Vita's CPU and GPU. It is based heavily on [sh23ds](https://github.com/ankushKun/sh23ds), the New 3DS port by ankushKun: the game logic, camera, lighting and events are that project's work, rebuilt from the PC executable. Here they run on a citro3d and libctru compatibility layer over [vitaGL](https://github.com/Rinnegatamante/vitaGL), with the Vita's own rendering, menus and controls on top.
 
-<br>
-
-sh23ds is a new engine, written in C for the 3DS, that plays Silent Hill 2 from the PC version's own data. The game logic, camera, lighting and events are rebuilt from the PC executable and run as native code, so nothing is emulated. The [Enhanced Edition](https://enhanced.townofsilenthill.com/SH2/)'s fixes are built in.
-
-**sh23ds contains no game data.** You need your own copy of the PC game, which the packer converts on your computer.
+**sh2-vita contains no game data.** You need your own copy of the PC game, which you convert on your computer.
 
 > [!NOTE]
-> This is a development build. The whole game plays from the prologue to every ending, including Born From a Wish, but expect rough edges and please [report](https://github.com/ankushKun/sh23ds/issues) what you find.
+> This is a work in progress, tested on a console only in parts. A full playthrough on the Vita hasn't been done. See [what is open](#status).
 
-<p align="center">
-  <img src="site/assets/shots/town-top.jpg" width="32%" alt="Fog in a back alley of the town">
-  <img src="site/assets/shots/maria-top.jpg" width="32%" alt="James in the restroom where the game begins">
-  <img src="site/assets/shots/wish-top.jpg" width="32%" alt="Maria in Born From a Wish">
-</p>
+## What it does
+
+- Runs at the display's 960 x 544, at a steady 30 fps in most of the game
+- Single-screen menus: title, pause, items, options, save and load, map, drawn after the original game's
+- Textures in DXT straight from the PC's pixels, with their mipmaps
+- The fog drawn on a smaller target, with a choice of detail in the options
+- The Enhanced Edition's high resolution font, art and maps, when your game folder has them
 
 ## Install
 
 You need:
 
-- a New 3DS, New 2DS XL, or any original 3DS or 2DS, running [Luma3DS](https://3ds.hacks.guide/)
-- the PC release of *Silent Hill 2: Director's Cut* (the packer checks for the retail `sh2pc.exe`)
-- about 1.8 GB free on the SD card
+- a PS Vita with custom firmware (HENkaku or Ensō), and enough room on `ux0:` for about 2.6 GB of game data
+- `ur0:data/libshacccg.suprx`, the system's shader compiler, which the game compiles its shaders with
+- the PC release of *Silent Hill 2: Director's Cut*, optionally with the [Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) installed
+- on your computer: Docker, Python 3 with numpy and Pillow, ffmpeg and a C++ compiler
 
-Then:
+There are no prebuilt releases yet, so build the package yourself:
 
-1. Convert your game: open the [packer page](https://ankush.one/sh23ds/#pack) in a desktop browser, choose your `Silent Hill 2` folder and save the zip. Nothing is uploaded. If you'd rather use Docker:
+1. Build the game with `./port/vita/build.sh`, which writes `port/vita/sh2vita.vpk`, and install it with VitaShell.
+2. Convert your game:
    ```sh
-   docker run --rm -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/sd:/out" ghcr.io/ankushkun/sh23ds-packer
+   tools/texenc/build.sh native
+   SH2_VITA_TEX=1 SH2_TEXENC=native tools/make_pack.sh "/path/to/Silent Hill 2" pack-vita/3ds/sh23ds --strip-extras
+   python3 tools/sh2conv/vitatex.py pack-vita/3ds/sh23ds
    ```
-   Either way you get a `3ds` folder. [More packer options](tools/packer/README.md).
-2. Copy the `3ds` folder to the root of the SD card. The game data ends up in `sdmc:/3ds/sh23ds/`.
-3. Dump the DSP firmware once with [DSP1](https://github.com/zoogie/DSP1/releases), or the game has no sound.
-4. Install `sh23ds.cia` from the [latest release](https://github.com/ankushKun/sh23ds/releases/latest) with FBI, or scan the QR code on the [website](https://ankush.one/sh23ds/#install) with FBI's *Remote Install*.
+3. Copy the contents of `pack-vita/3ds/sh23ds/` to `ux0:data/sh23ds/`.
 
-<details>
-<summary>What the SD card looks like afterwards</summary>
+The first time each shader is needed it is compiled and kept on the card, so the first run has some short pauses.
 
-```text
-sdmc:/3ds/
-├── dspfirm.cdc     from DSP1
-├── sh23ds.3dsx     only if you use the Homebrew Launcher instead of the CIA
-└── sh23ds/         the game data from the packer
-```
-
-The CIA is the better choice on a New 3DS: it asks for the 804 MHz clock and the 124 MB memory mode, which a `.3dsx` only gets if the Homebrew Launcher was started with them.
-
-</details>
-
-If sh23ds starts and can't find its data, it says so: whether the folder is missing, in the wrong place or only half copied, with the steps and a QR code of the [install guide](https://ankush.one/sh23ds/#install).
-
-## Features
-
-- The whole game: every area, puzzle, enemy, boss and ending, New Game+ and Born From a Wish
-- The PC camera, room lighting, fog and flashlight, ported from the executable
-- All 128 in-engine cutscenes, and the movies re-encoded for the console
-- The PC's music, sound effects and voices, mixed the same way
-- The [Enhanced Edition fixes](port/EE_FIXES.md), such as the PS2 flashlight and the corrected fog and lighting
-- Stereoscopic 3D on the top screen with the 3D slider
-- Made for the New 3DS's faster CPU and extra memory, with a lighter 30 fps profile for the original 3DS ([details](port/OLD3DS.md))
+The browser packer and the packer image in this repository do not make this pack.
 
 ## Controls
 
-The same on both consoles:
-
 | | Button |
 | --- | --- |
-| Move | Circle Pad |
-| Check, open, pick up (attack while aiming) | A |
-| Run (hold) | B |
-| Aim (hold) | L |
-| Quick turn | R |
-| Flashlight / items | X / Y |
-| Look around (hold) | D-Pad up |
+| Move James | Left stick |
+| Search camera, back when let go | Right stick |
+| Check, open, pick up (attack while aiming) | Cross |
+| Run (hold) | Square |
+| Aim (hold) | R |
+| Quick turn | L |
+| Map | Triangle or D-Pad right |
+| Flashlight | Circle |
+| Items | START |
+| Pause | SELECT |
+| Search view | D-Pad up |
 | Next weapon | D-Pad down |
 | Quick heal | D-Pad left |
-| Map | D-Pad right, or the touch screen |
-| Pause | START |
+| Strafe left / right | Rear touch pad's lower corners |
 
-Hold L to aim, then A attacks. The New 3DS adds strafing on ZL and ZR and changing target with the
-C-Stick.
-Every action can be rebound in *Options*, *Controls*, *Buttons*. The full layouts are in
-[CONTROLS.md](port/CONTROLS.md).
+In menus, Cross confirms and Circle goes back, whatever the console's own setting. Actions can be rebound in *Options*, *Controls*, *Buttons*. More in [CONTROLS.md](port/CONTROLS.md).
 
-## Building from source
+## Options for this port
 
-The toolchains run in Docker, so that is all you need.
+Under *Options*, *System*:
 
-```sh
-git clone https://github.com/ankushKun/sh23ds.git && cd sh23ds
-./port/build.sh      # port/sh23ds.3dsx
-./port/package.sh    # port/sh23ds.cia
-```
+| Option | Choices |
+| --- | --- |
+| Resolution | 960 x 544, or 720 x 416 for a steadier frame rate |
+| FPS Cap | 30 or 60 |
+| Texture Filter | Bilinear or trilinear |
+| Fog | Off or on |
+| Fog Detail | The fog's target at a half, a third or a quarter of the view each way |
 
-## Contributing
+## Status
 
-The port is built by reading the PC executable in Ghidra and translating its functions to C, with the original address in a comment. Start with [AGENTS.md](AGENTS.md): it covers the setup, where everything is, and how to port and review against the original.
+Open at the moment:
+
+- **Item screen:** close to the original, but the layout is about 13% wider than 4:3, Examine shows text rather than the item's picture and Adjust volume does nothing
+- **Options:** the look follows the original's screens, the tabs and some settings are the port's own
+- **Other menus:** the memo list, stage panels and first run use the same style without being ported from the game's own screens, and the Movie Menu takes the options' look
+- **Title:** the menu's words are the game's pictures, which exist only in English
+- **Sound:** crackling can be heard
+- **Not wired:** subtitles on the movies, the game-over still and New Game+'s yellow NEW GAME
+
+More in [port/vita/README.md](port/vita/README.md) and [port/STATUS.md](port/STATUS.md).
+
+## Building and working on it
+
+The toolchain runs in Docker. `./port/vita/build.sh` fetches vitaGL at a pinned commit and builds the package.
+
+The game is ported by reading the PC executable in Ghidra and translating its functions to C, with the original address in a comment. Start with [AGENTS.md](AGENTS.md): it says where everything is and how the original game is used.
 
 | Doc | What's in it |
 | --- | --- |
-| [STATUS.md](port/STATUS.md) | What works and what's left, heaviest first |
-| [DEBUGGING.md](port/DEBUGGING.md), [TESTING.md](port/TESTING.md) | The debug file, emulator runs and the test suites |
-| [RESEARCH.md](docs/RESEARCH.md) | How the executable was mapped, and key addresses |
+| [port/vita/README.md](port/vita/README.md) | How the Vita layer works |
+| [port/STATUS.md](port/STATUS.md) | What works and what differs from the PC |
+| [port/PERFORMANCE.md](port/PERFORMANCE.md) | Frame budget and streaming, from the 3DS work |
+| [docs/RESEARCH.md](docs/RESEARCH.md) | How the executable was mapped, and key addresses |
 
-> [!CAUTION]
-> Never commit anything that comes from the game: exe bytes, assets, converted data, Ghidra databases or decompiler output. `tools/install_hooks.sh` adds a pre-commit check.
-
-Bug reports are welcome in [Issues](https://github.com/ankushKun/sh23ds/issues). Please include your console model, your Luma3DS version and what you were doing.
+To test on a console, these combinations work while holding SELECT: L changes the fog's mode, R the GPU cost test, Triangle the fog's precision and Square the ETC1 levels. `vita_log.txt` and `perf.txt` are written next to the game data.
 
 ## FAQ
 
 <details>
 <summary><b>Where do I get the game files?</b></summary>
 <br>
-From your own copy of the PC game. This project doesn't host, link to or share game files, and issues asking for them will be closed.
+From your own copy of the PC game. This project doesn't host, link to or share game files.
 </details>
 
 <details>
-<summary><b>Does it run on an original 3DS or 2DS?</b></summary>
+<summary><b>Can I use the Enhanced Edition?</b></summary>
 <br>
-Yes. The game detects the console and switches to a lighter profile: fewer fog sprites and streamed town tiles, no character shadows and a 30 fps cap. It fits in the normal 64 MB of memory. <a href="port/OLD3DS.md">OLD3DS.md</a> has the details, including what has been tested so far.
-</details>
-
-<details>
-<summary><b>Can I use the v1.0 PC release, or the Enhanced Edition?</b></summary>
-<br>
-Not v1.0: the converters read tables from the Director's Cut exe, so the packer only accepts that build. The Enhanced Edition's packs work, and the packer uses them when it finds your <code>sh2e</code> folder. Put the original Director's Cut exe back first, since the Enhanced Executable replaces it.
+Yes: with its files in your game folder, the converters use its art, maps, font and text. The executable has to be the Director's Cut; the converters read their tables from it.
 </details>
 
 <details>
 <summary><b>Is this the 2024 remake, or an emulator?</b></summary>
 <br>
-It's neither. This is the 2001 game, rebuilt from the PC Director's Cut and running as native code on the 3DS's own CPU and GPU. The PC game's data is converted once, on your computer.
+Neither. This is the 2001 game, rebuilt from the PC Director's Cut and running as native code. The game's data is converted once, on your computer.
 </details>
 
-## Credits
+## Thanks
 
-- [Silent Hill 2: Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) by Elisha Riedlinger and contributors, whose fixes and research into the PC executable this port builds on
+- [Silent Hill 2: Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) by Elisha Riedlinger and contributors, for its fixes, its research into the PC game and its high resolution packs
+- [vitaGL](https://github.com/Rinnegatamante/vitaGL) and vitaShaRK by Rinnegatamante, and the [VitaSDK](https://vitasdk.org/) team
+- [sh23ds](https://github.com/ankushKun/sh23ds) by ankushKun
 - The Silent Hill Database for its file format notes, and the PS2 beta's debug information, which names much of the PC code
-- [devkitPro](https://devkitpro.org/), libctru and citro3d
 - [pl_mpeg](https://github.com/phoboslab/pl_mpeg) by Dominic Szablewski, which plays the movies
-- [pycgfx](https://github.com/skyfloogle/pycgfx) by skyfloogle and the notes in [CBC for YANBF](https://github.com/daaaaavia/CBC-for-YANBF), for the 3D HOME Menu banner
-- [Ghidra](https://ghidra-sre.org/) and [Azahar](https://azahar-emu.org/)
-- [Libre Caslon Display](https://github.com/impallari/Libre-Caslon-Display), [Crimson Pro](https://github.com/Fonthausen/CrimsonPro) and [VT323](https://fonts.google.com/specimen/VT323) (SIL Open Font License), on the website and the setup screen
+- [Ghidra](https://ghidra-sre.org/)
 
 ## License
 
-sh23ds is released under the [GNU General Public License v3.0](LICENSE). Bundled third-party code keeps its own license.
+sh2-vita is released under the [GNU General Public License v3.0](LICENSE). Bundled third-party code keeps its own license.
 
-This is a fan project, not affiliated with or endorsed by Konami or Nintendo. *Silent Hill* is a trademark of Konami Digital Entertainment and Nintendo 3DS is a trademark of Nintendo. Playing requires a legally obtained copy of the PC game.
-
-<br>
-
-<p align="center">
-  Made by <a href="https://ankush.one">ankushKun</a> · <a href="https://github.com/ankushKun">GitHub</a> · <a href="https://x.com/ankushKun_">X</a>
-</p>
+This is a fan project, not affiliated with or endorsed by Konami or Sony. *Silent Hill* is a trademark of Konami Digital Entertainment and PlayStation Vita is a trademark of Sony Interactive Entertainment.
