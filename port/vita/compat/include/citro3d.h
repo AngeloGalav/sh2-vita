@@ -190,7 +190,7 @@ struct C3D_Tex {
 	union { u32 lodParam; struct { u16 lodBias; u8 maxLevel, minLevel; }; };
 	u32 gl;                        // the GL texture
 	bool on_vram, dirty, params_dirty, render_target;
-	bool etc1_mips;                // the ETC1 filter last applied (c3d_tex.c, SELECT + square)
+	u8 filter_gen;                 // the filter settings last applied (c3d_tex.c, the SELECT combinations)
 	int reg;                       // its data's entry in c3d_tex.c's registry + 1, 0 none
 	u32 seen;                      // that entry's write count when last uploaded
 };

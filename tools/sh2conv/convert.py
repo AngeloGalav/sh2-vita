@@ -140,7 +140,7 @@ def encode_textures(jobs, pack_root, fmt=None, mipmaps=True, what=None):
         import t3x
         t3x.encode_jobs(jobs, pack_root, fmt, mipmaps, what)
         return
-    if os.environ.get('SH2_TEXENC') == 'native':
+    if os.environ.get('SH2_TEXENC') == 'native' or os.environ.get('SH2_VITA_TEX'):
         # the browser packer's encoder built for this machine (tools/texenc/build.sh native), one
         # process per core: no tex3ds and no container
         import t3x

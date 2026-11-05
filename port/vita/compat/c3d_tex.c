@@ -282,9 +282,25 @@ static GLint gl_wrap(u32 v)
 // levels stay in memory and each texture takes the new filter when next drawn (c3d_tex_gl).
 static bool s_etc1_mips = true;
 
+// Bilinear within the nearest level, where the game asks for trilinear (C3D_TexSetFilterMipmap): half
+// the texel reads where two levels blend, for a GPU that is the frame's limit. Options, System, Texture
+// Filter. Each texture takes a change when next drawn (c3d_tex_gl).
+static bool s_trilinear;
+static u8 s_filter_gen;
+
+void vita_set_trilinear(bool on)
+{
+	if (on == s_trilinear)
+		return;
+	s_trilinear = on;
+	s_filter_gen++;
+	vita_log("textures: %s", s_trilinear ? "trilinear" : "bilinear");
+}
+
 void c3d_etc1_mips_toggle(void)
 {
 	s_etc1_mips = !s_etc1_mips;
+	s_filter_gen++;
 	vita_log("ETC1 textures: %s", s_etc1_mips ? "with their smaller levels" : "level 0 only");
 }
 
@@ -293,10 +309,10 @@ static bool is_vita_etc1(const C3D_Tex* t) { return (t->fmt & (GPU_VITA_FORM | 1
 static void apply_params(C3D_Tex* t)
 {
 	u32 p = t->param;
-	bool mag = (p >> 1) & 1, min = (p >> 2) & 1, mip = (p >> 24) & 1;
+	bool mag = (p >> 1) & 1, min = (p >> 2) & 1, mip = ((p >> 24) & 1) && s_trilinear;
 	GLint minf = min ? GL_LINEAR : GL_NEAREST;
 	// upload(): mipmaps for all but ETC1 that has not been through vitatex.py
-	t->etc1_mips = s_etc1_mips;
+	t->filter_gen = s_filter_gen;
 	if (t->maxLevel > 0 && ((t->fmt & 15) != GPU_ETC1 || (is_vita_etc1(t) && s_etc1_mips)))
 		minf = min ? (mip ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_NEAREST)
 		           : (mip ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST);
@@ -323,13 +339,15 @@ void SwizzleTexData128Bpp(uint8_t* dst, uint8_t* src, uint32_t x, uint32_t y, ui
                           uint32_t stride, uint32_t tileSize);
 void SwizzleTexDataETC1(uint8_t* dst, uint8_t* src, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                         uint32_t stride, uint32_t tileSize);
+void SwizzleTexData64Bpp(uint8_t* dst, uint8_t* src, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                         uint32_t stride, uint32_t tileSize);
 
 // A texture already in the Vita's form (vitatex.py): no untiling, DXT5 and ETC1 with the pack's own levels
 static void upload_vita_form(C3D_Tex* t)
 {
 	GPU_TEXCOLOR base = (GPU_TEXCOLOR)(t->fmt & 15);
 	const u8* d = t->data;
-	bool dxt = base == GPU_ETC1A4;
+	bool dxt = base == GPU_ETC1A4, dxt1 = t->fmt == GPU_VITA_DXT1;
 	if (dxt || base == GPU_ETC1) {
 		// The whole chain written here with the CPU, in one block of GPU memory. glCompressedTexImage2D
 		// sends DXT through the GPU's transfer queue without checking the result and reallocates the
@@ -340,18 +358,18 @@ static void upload_vita_form(C3D_Tex* t)
 			total += ((u32)(t->width >> k) / 4) * ((t->height >> k) / 4) * block;
 		u8* mem = gpu_alloc_mapped_aligned_for_gpu(16, total);
 		if (!mem) {
-			vita_log("texture %ux%u %s: no GPU memory for %u bytes", t->width, t->height, dxt ? "DXT5" : "ETC1", (unsigned)total);
+			vita_log("texture %ux%u %s: no GPU memory for %u bytes", t->width, t->height, dxt ? "DXT5" : dxt1 ? "DXT1" : "ETC1", (unsigned)total);
 			return;
 		}
 		u64 t0 = sceKernelGetProcessTimeWide();
 		u8* o = mem;
 		for (int k = 0; k <= t->maxLevel; k++) {
 			u32 bw = (t->width >> k) / 4, bh = (t->height >> k) / 4;
-			(dxt ? SwizzleTexData128Bpp : SwizzleTexDataETC1)(o, (u8*)d, 0, 0, bw, bh, bw, bw < bh ? bw : bh);
+			(dxt ? SwizzleTexData128Bpp : dxt1 ? SwizzleTexData64Bpp : SwizzleTexDataETC1)(o, (u8*)d, 0, 0, bw, bh, bw, bw < bh ? bw : bh);
 			d += bw * bh * block, o += bw * bh * block;
 		}
 		c3d_stats.untile_us += sceKernelGetProcessTimeWide() - t0;
-		vglSetupTexture(GL_TEXTURE_2D, mem, dxt ? SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR : SCE_GXM_TEXTURE_FORMAT_ETC1_1BGR,
+		vglSetupTexture(GL_TEXTURE_2D, mem, dxt ? SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR : dxt1 ? SCE_GXM_TEXTURE_FORMAT_UBC1_1BGR : SCE_GXM_TEXTURE_FORMAT_ETC1_1BGR,
 		                SCE_GXM_TEXTURE_SWIZZLED_ARBITRARY,
 		                t->width, t->height, t->maxLevel + 1);
 		return;
@@ -504,7 +522,7 @@ u32 c3d_tex_gl(C3D_Tex* tex)
 		}
 		return tex->gl;
 	}
-	if (is_vita_etc1(tex) && tex->etc1_mips != s_etc1_mips)
+	if (tex->filter_gen != s_filter_gen)
 		tex->params_dirty = true;
 	bool written = reg_ok(tex) && s_reg[tex->reg - 1].writes != tex->seen;
 	if (tex->dirty || !tex->gl || written) {

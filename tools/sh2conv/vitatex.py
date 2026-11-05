@@ -20,6 +20,12 @@ levels hold saturated stray texels where level 0 is black (red 148, 48, 49 over 
 hair), which the console showed as coloured specks. DXT5 is written by this file; ETC1 needs
 tools/texenc/build.sh native, and without it those levels stay as they are.
 
+With SH2_VITA_TEX=1 the packer does not go through ETC1 at all: t3x.encode calls encode_png, which
+writes DXT1 (no alpha, format byte VITA_DXT1) or DXT5 from the PC's own decoded pixels, with every
+level made here. The transparent texels first take the colour of their neighbours (dilate): the
+PC's are black, and bilinear filtering otherwise rims every leaf with dark texels that the alpha
+test (GREATER 0, main.c) lets through.
+
 A pack can mix converted and unconverted files: the Vita build reads both. Converted files are
 skipped, so running it twice changes nothing. The 3DS build cannot read the converted files.
 """
@@ -32,6 +38,7 @@ import numpy as np
 HEAD = 17
 VITA = 0x80
 ETC1, ETC1A4 = 0x0c, 0x0d
+VITA_DXT1 = 0xc0 | ETC1                                       # compat_gpu.h GPU_VITA_DXT1
 BPP = {0x00: 32, 0x01: 24, 0x02: 16, 0x03: 16, 0x04: 16, 0x05: 16, 0x06: 16, 0x07: 8, 0x08: 8,
        0x0c: 4, 0x0d: 8}
 RAW_SWAP = {0x00: [3, 2, 1, 0], 0x01: [2, 1, 0], 0x05: [1, 0], 0x06: [1, 0]}   # c3d_tex.c untile
@@ -227,6 +234,56 @@ def bc3_encode(rgba):
     return out
 
 
+def bc1_encode(rgba):
+    """(n, 16, 4) RGBA bytes to n DXT1 blocks of 8 bytes, always in four-colour mode."""
+    n = len(rgba)
+    c0, c1, ci = bc1_colour(rgba[:, :, :3].astype(np.float32))
+    out = np.zeros((n, 8), np.uint8)
+    out[:, 0], out[:, 1] = c0 & 255, c0 >> 8
+    out[:, 2], out[:, 3] = c1 & 255, c1 >> 8
+    cbits = np.zeros(n, np.uint64)
+    for t in range(16):
+        cbits |= ci[:, t].astype(np.uint64) << np.uint64(2 * t)
+    for k in range(4):
+        out[:, 4 + k] = ((cbits >> np.uint64(8 * k)) & np.uint64(255)).astype(np.uint8)
+    return out
+
+
+def dilate(px, passes=8):
+    """(h, w, 4) float: transparent texels take the mean colour of their opaque neighbours, spreading
+    outwards, so filtering at an edge of the alpha never reaches their black. The alpha is kept."""
+    w = (px[..., 3] > 0).astype(np.float32)
+    if w.min() > 0 or w.max() == 0:
+        return px
+    rgb = px[..., :3] * w[..., None]
+    for _ in range(passes):
+        ns = sum(np.roll(rgb * w[..., None], d, a) for d, a in ((1, 0), (-1, 0), (1, 1), (-1, 1)))
+        nw = sum(np.roll(w, d, a) for d, a in ((1, 0), (-1, 0), (1, 1), (-1, 1)))
+        new = (w == 0) & (nw > 0)
+        if not new.any():
+            break
+        rgb[new] = ns[new] / nw[new][:, None]
+        w[new] = 1
+    out = px.copy()
+    out[..., :3] = rgb
+    return out
+
+
+def encode_png(im, alpha, mipmaps):
+    """A PIL RGBA image on its power-of-two canvas (t3x.load) as DXT5 when alpha, else DXT1: every
+    level, in order, rows as they are in the image. Returns (format byte, data)."""
+    px = dilate(np.asarray(im, np.float32))
+    enc = bc3_encode if alpha else bc1_encode
+    data = []
+    while True:
+        data.append(enc(to_blocks(np.clip(np.rint(px), 0, 255).astype(np.uint8))).tobytes())
+        h, w = px.shape[:2]
+        if not mipmaps or w <= 8 or h <= 8:
+            break
+        px = dilate(box_down(px))
+    return (VITA | ETC1A4 if alpha else VITA_DXT1), b''.join(data)
+
+
 def level(fmt, src, w, h):
     """One level in the Vita's form."""
     if fmt == ETC1:
@@ -332,7 +389,8 @@ def rebuild_mips(path):
 
 def process(path):
     res = convert(path)
-    rebuild_mips(path)
+    if res == 'converted':                                     # encode_png's levels are final
+        rebuild_mips(path)
     return res
 
 

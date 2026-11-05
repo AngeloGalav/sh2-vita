@@ -89,17 +89,7 @@ def header(fmt, w, h, ow, oh, mipmaps):
             struct.pack('<HH4H', sw, sh, *fixed))
 
 
-def encode(png, out, fmt_name, mipmaps=True):
-    fmt = FORMATS[fmt_name.lower()]
-    im, w, h = load(png)
-    ow, oh = im.size
-    levels = [im]
-    if mipmaps and ow > 8 and oh > 8:
-        lw, lh = ow, oh
-        while lw > 8 and lh > 8:
-            lw, lh = lw // 2, lh // 2
-            levels.append(im.resize((lw, lh), Image.LANCZOS))
-    data = b''.join(_encode_level(fmt, lv.tobytes(), lv.size[0], lv.size[1]) for lv in levels)
+def write(out, head, data):
     n = len(data)
     comp = bytes([0, n & 0xff, n >> 8 & 0xff, n >> 16 & 0xff])
     if n >= 0x1000000:
@@ -107,7 +97,26 @@ def encode(png, out, fmt_name, mipmaps=True):
     body = comp + data
     body += b'\0' * (-len(body) % 4)
     with open(out, 'wb') as f:
-        f.write(header(fmt, w, h, ow, oh, mipmaps) + body)
+        f.write(head + body)
+
+
+def encode(png, out, fmt_name, mipmaps=True):
+    fmt = FORMATS[fmt_name.lower()]
+    im, w, h = load(png)
+    ow, oh = im.size
+    if os.environ.get('SH2_VITA_TEX') and fmt in (0x0c, 0x0d):    # DXT straight from the pixels (vitatex.py)
+        import vitatex
+        vfmt, data = vitatex.encode_png(im, fmt == 0x0d, mipmaps)
+        write(out, header(vfmt, w, h, ow, oh, mipmaps), data)
+        return
+    levels = [im]
+    if mipmaps and ow > 8 and oh > 8:
+        lw, lh = ow, oh
+        while lw > 8 and lh > 8:
+            lw, lh = lw // 2, lh // 2
+            levels.append(im.resize((lw, lh), Image.LANCZOS))
+    data = b''.join(_encode_level(fmt, lv.tobytes(), lv.size[0], lv.size[1]) for lv in levels)
+    write(out, header(fmt, w, h, ow, oh, mipmaps), data)
 
 
 def encode_jobs(jobs, pack_root, fmt=None, mipmaps=True, what=None):
