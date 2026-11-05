@@ -7,6 +7,11 @@
 
 // The PC's strings by language (0x407310 picks the table, English 0x7abd84): the title, the five
 // rows, the quit question, Yes and No, from the pack's pause.msg; English when the pack has none.
+#ifdef SH2_VITA
+#define PAUSE_ROWS 5             // the PC's five: Map and Memo are on the item screen
+#else
+#define PAUSE_ROWS 7
+#endif
 static const char* const ENGLISH[9] = { "PAUSED", "Resume", "Save Game", "Load Game", "Options", "Quit",
 	"Exit to Main Menu?", "Yes", "No" };
 enum { S_TITLE, S_ROW, S_ASK = 6, S_YES, S_NO };
@@ -59,7 +64,7 @@ void pausemenu_open_at(bool can_save, int row)
 	s_on = true;
 	s_can_save = can_save;
 	s_ask = false;
-	s_sel = row >= 0 && row < 7 ? row : 0;
+	s_sel = row >= 0 && row < PAUSE_ROWS ? row : 0;
 	touch();
 }
 
@@ -99,7 +104,7 @@ int pausemenu_update(u32 down)
 		}
 		return PM_NONE;
 	}
-	if (s_touch_sel != s_sel && s_touch_sel >= 0 && s_touch_sel < 7)
+	if (s_touch_sel != s_sel && s_touch_sel >= 0 && s_touch_sel < PAUSE_ROWS)
 		s_sel = s_touch_sel;
 	if (down & (KEY_START | KEY_SELECT | KEY_B)) {
 		sfx_play(SFX_MENU_CANCEL, 1.0f, 0.0f);
@@ -108,7 +113,7 @@ int pausemenu_update(u32 down)
 	if (down & (KEY_DUP | KEY_DDOWN)) {
 		// 0x401fc0 event 0x10: the rows round, Save Game passed over where it cannot be used (the
 		// PC's five, then the port's Map and Memos)
-		int d = down & KEY_DDOWN ? 1 : -1, n = 7;
+		int d = down & KEY_DDOWN ? 1 : -1, n = PAUSE_ROWS;
 		s_sel = (s_sel + d + n) % n;
 		if (s_sel == 1 && !s_can_save)
 			s_sel = (s_sel + d + n) % n;
@@ -159,7 +164,7 @@ static void text(float x, float y, const char* s, int align, u32 rgb, u32 a)
 // (0x47f2b0 sets the centring flag 0x100), PAUSED at y 164 at full alpha, the rows from y 230 in
 // steps of 30 at alpha 0x60 (Save Game 0x55 grey where 0x44c7d0 says it can't be used), then the
 // chosen row again at full alpha 2 up and 2 left. The port's Map and Memos follow the PC's five at
-// the same step (the 3DS touch screen's rows; Memos has no other way in). 0x407620 state 10: the
+// the same step on the 3DS, whose touch screen has them. 0x407620 state 10: the
 // question at (256, 232), then No left-aligned at (286, 266) and Yes right-aligned (flag 0x200,
 // 0x47f2d0) at (226, 266), the chosen one again at full alpha 2 up and 2 left.
 static void draw_vita(void)
@@ -177,7 +182,7 @@ static void draw_vita(void)
 	}
 	text(256, 164, str(S_TITLE), FONT_CENTER, grey, 0xff);
 	const char* rows[7] = { str(S_ROW), str(S_ROW + 1), str(S_ROW + 2), str(S_ROW + 3), str(S_ROW + 4), "Map", "Memos" };
-	for (int i = 0; i < 7; i++)
+	for (int i = 0; i < PAUSE_ROWS; i++)
 		text(256, 230 + 30 * i, rows[i], FONT_CENTER, i == 1 && !s_can_save ? dark : grey, 0xc0);
 	if (s_sel != 1 || s_can_save)
 		text(254, 228 + 30 * s_sel, rows[s_sel], FONT_CENTER, grey, 0xff);
