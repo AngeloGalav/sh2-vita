@@ -45,6 +45,9 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones);
 
 // Scene number of the running scene (DramaDemo_PlayInfo.demo_no, the PC's cutscene id), -1 when none.
 int demo_number(void);
+// 0x546550: the room's mirror, if James standing at pos has one. Writes the reflection to lay over his
+// model matrix.
+bool demo_mirror(const float pos[3], C3D_Mtx* reflect);
 // gCutsceneTimer (0x1f7d3b8): the scene frame minus one, as the stage code and the Enhanced Edition
 // compare it.
 float demo_timer(void);

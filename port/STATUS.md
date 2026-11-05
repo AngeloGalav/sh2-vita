@@ -496,6 +496,10 @@ The radio (`radio.c`, 0x48cbc0): the switch and level are not kept in the save (
 story states (0x48c9d0) are not ported, and a body's 0.8 in its death throes (0x4a6ce0) is left out.
 Not run on a console.
 
+James' reflection (`demo.c` `demo_mirror`, 0x546550, 0x546110): the rooms with a wall mirror only, by
+reflecting his whole model where the PC mirrors his position and yaw; no weapon in it, no reflecting
+floors, no copy of his lamp (0x546280). Not run on a console.
+
 ### 5. Smaller things
 
 - An item with no 3D model shows nothing on the item screen (no picture fallback).

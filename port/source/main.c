@@ -2720,6 +2720,19 @@ static void draw_james(const C3D_Mtx* proj, const C3D_Mtx* view)
 	shadow_cast_james(&s_james, jat, s_yaw, s_chrflash.room ? s_chrflash.pos : NULL);
 	combat_set_parts(move_last()->state);
 	chr_draw(&s_james, s_uBones);
+	{
+		C3D_Mtx reflect;
+		if (s_state == ST_GAME && s_cam.mode == CAM_PLAYER && demo_mirror(jat, &reflect)) {
+			C3D_Mtx mirrored, mmv;
+			Mtx_Multiply(&mirrored, &reflect, &model);
+			Mtx_Multiply(&mmv, view, &mirrored);
+			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uSkinModelView, &mmv);
+			chr_set_mirrored(true);
+			chr_draw(&s_james, s_uBones);
+			chr_set_mirrored(false);
+			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uSkinModelView, &mv);
+		}
+	}
 	combat_draw_weapon(s_uBones);
 	combat_weapon_shadow(jat, s_yaw, s_chrflash.room ? s_chrflash.pos : NULL);
 	if (s_state == ST_GAME) {

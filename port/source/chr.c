@@ -593,6 +593,9 @@ void chr_pose_blend(Character* c, const Anim* a, float frame, ChrBlend* b, float
 	pose_finish_look(c, local, b);
 }
 
+static bool s_mirrored;
+void chr_set_mirrored(bool on) { s_mirrored = on; }
+
 void chr_draw(Character* c, int uBones)
 {
 	C3D_BufInfo* bi = C3D_GetBufInfo();
@@ -667,7 +670,7 @@ void chr_draw(Character* c, int uBones)
 			alpha = 0;
 		}
 		// the primitive's back face culling flag (flags bit 2), under the PC's CW cull mode (main.c)
-		C3D_CullFace(d->flags & 4 ? GPU_CULL_BACK_CCW : GPU_CULL_NONE);
+		C3D_CullFace(d->flags & 4 ? (s_mirrored ? GPU_CULL_FRONT_CCW : GPU_CULL_BACK_CCW) : GPU_CULL_NONE);
 		C3D_DrawElements(GPU_TRIANGLES, d->index_count, C3D_UNSIGNED_SHORT, d->indices);
 		gpucost_px(GC_CHR, 0.0f, d->index_count);
 	}

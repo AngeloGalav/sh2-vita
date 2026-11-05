@@ -1587,6 +1587,28 @@ static bool lights_frame(const C3D_Mtx* view, float t)
 	return true;
 }
 
+// 0x546550 sets the plane by room (0x495220); 0x546110 keeps a second James at the mirrored position.
+// Stand-ins: that copy only mirrors his position and negates his yaw, where this reflects the whole
+// model, so his sides come out as a mirror's would; the floors that reflect (axis 1: rooms 0x25, 0x26,
+// 0x62, 0x63, 0x7a..0x85) and the lamp's copy (0x546280) are not ported.
+bool demo_mirror(const float pos[3], C3D_Mtx* reflect)
+{
+	int room = bgm_room_id(ev_glb_crd(), pos[0], pos[2]), axis;
+	float plane;
+	switch (room) {
+	case 1: axis = 0, plane = -20000.0f; break;
+	case 0x24: axis = 2, plane = -99995.0f; break;
+	case 0xd5: axis = 2, plane = 20750.0f; break;
+	default: return false;
+	}
+	Mtx_Identity(reflect);
+	if (axis == 0)
+		reflect->r[0].x = -1.0f, reflect->r[0].w = 2.0f * plane;
+	else
+		reflect->r[2].z = -1.0f, reflect->r[2].w = 2.0f * plane;
+	return true;
+}
+
 void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
 	if (!S.active)
@@ -1629,6 +1651,16 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		if (kind >= 0x100 && kind <= 0x103)
 			chr_set_parts(dc->model, kind <= 0x101 ? 14 : 0, kind == 0x103 ? 0 : 3, ev_have_item(18) ? 21 : 0);
 		chr_draw(dc->model, uBones);
+		C3D_Mtx reflect;
+		if (kind >= 0x100 && kind <= 0x103 && demo_mirror(p, &reflect)) {
+			C3D_Mtx mirrored, mmv;
+			Mtx_Multiply(&mirrored, &reflect, &model);
+			Mtx_Multiply(&mmv, view, &mirrored);
+			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mmv);
+			chr_set_mirrored(true);
+			chr_draw(dc->model, uBones);
+			chr_set_mirrored(false);
+		}
 		if (!own && s_light_hook && k != 1.0f)
 			s_light_hook(1.0f);
 	}

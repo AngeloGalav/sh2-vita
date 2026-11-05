@@ -111,6 +111,8 @@ void chr_pose_blend(Character* c, const Anim* a, float frame, ChrBlend* b, float
 // light environment (the shader outputs normal quaternions), whose colours must come from the two
 // setters below: chr_draw's combiner doubles the lighting and clamps it to 1.
 void chr_draw(Character* c, int uBones);
+// Drawn through a reflection the triangles turn the other way: culling follows (demo_mirror).
+void chr_set_mirrored(bool on);
 
 // The parts a model swaps (0x50dfc0): pose 0 is always drawn, and of the rest only the three given,
 // such as James' right hand, left hand and the flashlight on his chest. A model nobody sets keeps
