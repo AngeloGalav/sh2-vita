@@ -275,12 +275,29 @@ static GLint gl_wrap(u32 v)
 	}
 }
 
+// ETC1 in the Vita's form takes its smaller levels (upload_vita_form), which the game's characters and
+// objects sample whole and the map's atlases down to 256 (room.c tex_setup). Without them every far
+// ETC1 surface read level 0 at a fraction of its size: noise and moire that the fog does not hide,
+// as many texture cache misses. SELECT + square (ctru.c) samples level 0 alone, to compare: the
+// levels stay in memory and each texture takes the new filter when next drawn (c3d_tex_gl).
+static bool s_etc1_mips = true;
+
+void c3d_etc1_mips_toggle(void)
+{
+	s_etc1_mips = !s_etc1_mips;
+	vita_log("ETC1 textures: %s", s_etc1_mips ? "with their smaller levels" : "level 0 only");
+}
+
+static bool is_vita_etc1(const C3D_Tex* t) { return (t->fmt & (GPU_VITA_FORM | 15)) == (GPU_VITA_FORM | GPU_ETC1); }
+
 static void apply_params(C3D_Tex* t)
 {
 	u32 p = t->param;
 	bool mag = (p >> 1) & 1, min = (p >> 2) & 1, mip = (p >> 24) & 1;
 	GLint minf = min ? GL_LINEAR : GL_NEAREST;
-	if (t->maxLevel > 0 && (t->fmt & 15) != GPU_ETC1)   // upload(): mipmaps for all but ETC1
+	// upload(): mipmaps for all but ETC1 that has not been through vitatex.py
+	t->etc1_mips = s_etc1_mips;
+	if (t->maxLevel > 0 && ((t->fmt & 15) != GPU_ETC1 || (is_vita_etc1(t) && s_etc1_mips)))
 		minf = min ? (mip ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_NEAREST)
 		           : (mip ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag ? GL_LINEAR : GL_NEAREST);
@@ -304,34 +321,38 @@ static void upload(C3D_Tex* t)
 void* gpu_alloc_mapped_aligned_for_gpu(size_t alignment, size_t size);
 void SwizzleTexData128Bpp(uint8_t* dst, uint8_t* src, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                           uint32_t stride, uint32_t tileSize);
+void SwizzleTexDataETC1(uint8_t* dst, uint8_t* src, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                        uint32_t stride, uint32_t tileSize);
 
-// A texture already in the Vita's form (vitatex.py): no untiling, DXT5 with the pack's own levels
+// A texture already in the Vita's form (vitatex.py): no untiling, DXT5 and ETC1 with the pack's own levels
 static void upload_vita_form(C3D_Tex* t)
 {
 	GPU_TEXCOLOR base = (GPU_TEXCOLOR)(t->fmt & 15);
 	const u8* d = t->data;
-	if (base == GPU_ETC1A4) {
+	bool dxt = base == GPU_ETC1A4;
+	if (dxt || base == GPU_ETC1) {
 		// The whole chain written here with the CPU, in one block of GPU memory. glCompressedTexImage2D
 		// sends DXT through the GPU's transfer queue without checking the result and reallocates the
 		// block for each new level: the textures came out as noise and black, and waiting on the
 		// queue stalled the game. The swizzle is the one vitaGL itself uses for these formats.
-		u32 total = 0;
+		u32 total = 0, block = dxt ? 16 : 8;
 		for (int k = 0; k <= t->maxLevel; k++)
-			total += (u32)(t->width >> k) * (t->height >> k);
+			total += ((u32)(t->width >> k) / 4) * ((t->height >> k) / 4) * block;
 		u8* mem = gpu_alloc_mapped_aligned_for_gpu(16, total);
 		if (!mem) {
-			vita_log("texture %ux%u DXT5: no GPU memory for %u bytes", t->width, t->height, (unsigned)total);
+			vita_log("texture %ux%u %s: no GPU memory for %u bytes", t->width, t->height, dxt ? "DXT5" : "ETC1", (unsigned)total);
 			return;
 		}
 		u64 t0 = sceKernelGetProcessTimeWide();
 		u8* o = mem;
 		for (int k = 0; k <= t->maxLevel; k++) {
 			u32 bw = (t->width >> k) / 4, bh = (t->height >> k) / 4;
-			SwizzleTexData128Bpp(o, (u8*)d, 0, 0, bw, bh, bw, bw < bh ? bw : bh);
-			d += bw * bh * 16, o += bw * bh * 16;
+			(dxt ? SwizzleTexData128Bpp : SwizzleTexDataETC1)(o, (u8*)d, 0, 0, bw, bh, bw, bw < bh ? bw : bh);
+			d += bw * bh * block, o += bw * bh * block;
 		}
 		c3d_stats.untile_us += sceKernelGetProcessTimeWide() - t0;
-		vglSetupTexture(GL_TEXTURE_2D, mem, SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR, SCE_GXM_TEXTURE_SWIZZLED_ARBITRARY,
+		vglSetupTexture(GL_TEXTURE_2D, mem, dxt ? SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR : SCE_GXM_TEXTURE_FORMAT_ETC1_1BGR,
+		                SCE_GXM_TEXTURE_SWIZZLED_ARBITRARY,
 		                t->width, t->height, t->maxLevel + 1);
 		return;
 	}
@@ -483,6 +504,8 @@ u32 c3d_tex_gl(C3D_Tex* tex)
 		}
 		return tex->gl;
 	}
+	if (is_vita_etc1(tex) && tex->etc1_mips != s_etc1_mips)
+		tex->params_dirty = true;
 	bool written = reg_ok(tex) && s_reg[tex->reg - 1].writes != tex->seen;
 	if (tex->dirty || !tex->gl || written) {
 		upload(tex);

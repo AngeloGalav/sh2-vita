@@ -15,6 +15,7 @@ bool c3d_linear_block(const void* p, const u8** base, u32* size);
 typedef struct { u32 tex_n, tex_kb, buf_n, buf_kb, draw_n, flush_n, flush_kb, dirtied, buf_new; u64 tex_us, untile_us, buf_us, draw_us, swap_us; } C3dStats;
 extern C3dStats c3d_stats;
 void c3d_gpu_test_next(void);
+void c3d_etc1_mips_toggle(void);         // SELECT + square (ctru.c): ETC1's smaller levels or level 0 alone
 void c3d_half_fog_toggle(void);           // SELECT + L (ctru.c): the fog at half size on or off            // SELECT + R (ctru.c): the next GPU cost test
 
 // c3d_shaders.c: the game's vertex programs in Cg
