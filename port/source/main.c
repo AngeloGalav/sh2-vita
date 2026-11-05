@@ -1454,9 +1454,12 @@ static bool files_write(int slot, int mode)
 }
 
 static void title_start(int what);
+static bool s_title_hide;            // a file was chosen in the list: black until the game, no title under it
+
 static void files_load(int slot)
 {
 	s_slot = slot;
+	s_title_hide = savescreen_active();
 	title_start(2);
 }
 
@@ -4435,6 +4438,7 @@ static void title_go(void)
 {
 	int what = s_title_go;
 	s_title_go = -1;
+	s_title_hide = false;
 	if (what == 0)
 		new_game();
 	else if (what == 1)
@@ -5779,7 +5783,7 @@ int main(void)
 			supersample_target(false);
 			C3D_RenderTargetClear(top, C3D_CLEAR_ALL, 0x000000FF, 0);
 			C3D_FrameDrawOn(top);
-			if (s_state == ST_TITLE && !optmenu_active() && !savescreen_active() && !setup_active() &&
+			if (s_state == ST_TITLE && !s_title_hide && !optmenu_active() && !savescreen_active() && !setup_active() &&
 			    !titlemenu_draw_top(ui_draw, bright))      // start00 and the PC's menus
 				draw_title(&ortho, bright);
 			savescreen_draw_top();       // Continue's file list over the title
@@ -5790,7 +5794,8 @@ int main(void)
 			optmenu_draw_top(ui_draw);   // the options from the title, on black
 			setup_draw_top();            // the first run, on black
 #ifdef SH2_VITA
-			touchui_draw_pc();
+			if (!s_title_hide)
+				touchui_draw_pc();
 #endif
 			font_flush();
 #ifdef SH2_VITA
