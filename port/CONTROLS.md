@@ -16,7 +16,7 @@ page of the Options' Controls tab (`controls.c`, drawn in the Options screen's m
 | Action | Button |
 | --- | --- |
 | Move | Left stick |
-| Camera (the Behind camera; targets while aiming) | Right stick |
+| Search camera, back when let go (targets while aiming) | Right stick |
 | Action | Cross |
 | Run (hold) | Square |
 | Aim (hold) / quick turn | R / L |
@@ -24,10 +24,10 @@ page of the Options' Controls tab (`controls.c`, drawn in the Options screen's m
 | Flashlight | Circle |
 | Items | START |
 | Pause | SELECT, on release |
-| Look (also recentres the Behind camera) / next weapon / quick heal | D-Pad up / down / left |
+| Look (also recentres the camera) / next weapon / quick heal | D-Pad up / down / left |
 | Strafe left / right | Rear pad's lower corners |
 
-The right stick turns the camera only with Camera on Behind: the PC camera's shots are fixed. Bindings
+The right stick is the game's search camera, through James' head (`main.c`, `search_view`). Bindings
 saved in `controls.txt` win over these. Test combinations, held with SELECT: L fog, R GPU cost test,
 Triangle the fog's precision, Square ETC1 levels.
 

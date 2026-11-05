@@ -16,6 +16,7 @@ typedef struct {
 	// The character slots (0x1f991a0, the copy 0x542300 makes of James' candidates): enemies
 	// nearest first, kind 0 past the last. NULL: none.
 	SH2CamChara* chara;
+	float head_yaw, head_pitch;   // James' head (0x535720): the search camera looks where it turns
 } GameCamPlayer;
 
 // Loads the .cam roads of every room in the area (<pack>/bg/<area>/<room>.cam); does nothing when

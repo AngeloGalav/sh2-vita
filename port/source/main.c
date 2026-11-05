@@ -1050,7 +1050,14 @@ static void im_leave(void (*then)(void))   // 0x475b80: out over half a second, 
 	s_im_then = then;
 	ui_fade_out(0.5f, im_closed);
 }
-static void im_use(int it, int m0, int m1) { s_inv_last = it, inventory_use(it, m0, m1); }
+static void im_use(int it, int m0, int m1)
+{
+	s_inv_last = it;
+	if (it >= 1 && it <= 3 && !m0 && !m1)
+		heal_item(it);           // 0x471590 case 2: at once, and the screen stays
+	else
+		inventory_use(it, m0, m1);
+}
 static void im_power(int it)
 {
 	if (it == 18) {                  // 0x471590: the flashlight's switch; the radio has no sound here yet
@@ -1092,6 +1099,13 @@ static bool inventory_update(u32 down)
 			s_inv_mark[0] = s_inv_mark[1] = 0;
 			s_inv_dirty = true;
 #ifdef SH2_VITA
+			// a file saved before the two were given (0x49e980) gets them here
+			if (prog_chapter() == 0) {
+				if (ev_item_count(20) <= 0)
+					ev_give_item(20, 1);
+				if (ev_item_count(21) <= 0)
+					ev_give_item(21, 1);
+			}
 			itemmenu_init(PACK_DIR, prog_chapter());
 			itemmenu_open(&s_im_host, s_inv_last);
 			ui_fade_in(0.5f);            // 0x475b80: black, then in over half a second, 0x4ee620(4, 0.5)
@@ -1569,6 +1583,7 @@ static bool s_tp_live;              // the port's behind camera is the one shown
 static bool behind_camera(void) { return s_tp_live; }
 static float s_orbit[2];            // the behind camera's turn this frame, -1..1 (the C-Stick)
 static const float* view_eye(void) { return s_tp_live ? tpcam_eye() : gamecam_eye(); }
+static const float* view_watch(bool tp) { return tp ? tpcam_watch() : gamecam_watch(); }
 
 // 0x556490: 2 in the rooms whose byte in 0x8bcce0 (by the PC room id, 0x524db0) is 0, else 0 on the
 // open-air stages (glb_crd 1..3 and 5) and 1 indoors. Rooms 0..213, one bit each.
@@ -2091,6 +2106,13 @@ static bool s_look_on;               // the search view is up (with Switch, betw
 static bool search_view(u32 held, u32 down)
 {
 	static bool on;
+#ifdef SH2_VITA
+	// The right stick moves the search camera (0x52e110 reads it, 0x535720's head follows it, as the
+	// Enhanced Edition's RestoreSearchCamMovement restores on the PC). Here pushing it is enough, with
+	// no button to hold first (the port's), and letting go ends it.
+	if ((fabsf(s_orbit[0]) >= 0.15f || fabsf(s_orbit[1]) >= 0.15f) && !(prog_running() && prog_player_locked()))
+		return s_look_on = true;
+#endif
 	if (s_opt.view == 0) {
 		on = false;
 		return s_look_on = (held & GK_LOOK) != 0;
@@ -2468,11 +2490,20 @@ static void head_update(const circlePosition* cp, u32 gheld, float dt, bool on)
 {
 	float ty = 0.0f, tp = 0.0f;
 	int st = move_last()->state;
+#ifdef SH2_VITA
+	bool stick = fabsf(s_orbit[0]) >= 0.15f || fabsf(s_orbit[1]) >= 0.15f;
+	if (on && (stick || (st != MV_RELAX && st != MV_ALERT))) {
+#else
 	if (on && st != MV_RELAX && st != MV_ALERT) {
+#endif
 		// looking (the key held, or turned on with Switch; the behind camera's Look only recentres
 		// it, so there the key held): the head follows the circle pad
 		if (s_tp_live ? (gheld & GK_LOOK) != 0 : s_look_on) {
 			float x = cp->dx / 156.0f, y = cp->dy / 156.0f;
+#ifdef SH2_VITA
+			// 0x535720 with the Enhanced Edition's search camera: the right stick, the left moving James
+			x = fabsf(s_orbit[0]) >= 0.15f ? s_orbit[0] : 0.0f, y = fabsf(s_orbit[1]) >= 0.15f ? s_orbit[1] : 0.0f;
+#endif
 			ty = x * 0.8f;                     // the stick right turns the head right (yaw up)
 			tp = y * (y >= 0.0f ? 0.5f : 0.4f);
 		} else {
@@ -3195,6 +3226,9 @@ static bool host_picture(const char* name)
 	}
 	if (!name)
 		return false;
+#ifdef SH2_VITA
+	ui_fade_in(0.5f);                // the picture comes up out of black
+#endif
 	char path[96];
 	snprintf(path, sizeof path, PACK_DIR "/pic/%s", name);
 	char* sep = strchr(path + strlen(PACK_DIR "/pic/"), '_');
@@ -3604,6 +3638,14 @@ static void memos_draw_top(void)
 	font_text(FONT_BIG, 256, 440, t, FONT_CENTER, white, white);
 }
 
+#ifdef SH2_VITA
+static void map_faded(void)
+{
+	map_close();
+	host_panel(NULL);                // its legend, which map_update would take away
+}
+#endif
+
 // One frame of the map or the memo list; true while one of them is open (the game waits). A tap
 // on the touch screen opens the map when the player is free, like the PC's map key.
 static bool screens_update(u32 down, u32 held, const circlePosition* cp, float dt)
@@ -3629,7 +3671,7 @@ static bool screens_update(u32 down, u32 held, const circlePosition* cp, float d
 	if (ui_fading_out())
 		return true;
 	if (map_is_open() && !map_marking() && (down & (KEY_B | KEY_START))) {
-		ui_fade_out(0.5f, map_close);    // out over half a second and in on the world
+		ui_fade_out(0.5f, map_faded);    // out over half a second and in on the world
 		return true;
 	}
 #endif
@@ -4111,6 +4153,8 @@ static void new_game(void)
 	combat_reset();
 	enemy_killed_reset();
 	prog_new_game(s_riddle, s_action);     // FlagInit: difficulty flags, puzzle answers
+	ev_give_item(20, 1);                   // 0x49e980: James starts with Mary's photo and her letter
+	ev_give_item(21, 1);
 	memset(&s_warp, 0, sizeof s_warp);
 	s_warp.kind = EV_WARP;
 	s_warp.stage = 2;
@@ -5264,13 +5308,6 @@ after_world:
 			draw_picture(ortho);
 		draw_sprites();
 		map_draw();
-#ifdef SH2_VITA
-		if (map_is_open()) {             // the sheet is 4:3: what stands past it at a zoom stays in
-			const u32 bk[4] = { 0x000000ffu, 0x000000ffu, 0x000000ffu, 0x000000ffu };
-			font_quad_px(NULL, 0, 0, 40, 240, 0, 0, 0, 0, bk);
-			font_quad_px(NULL, 360, 0, 400, 240, 0, 0, 0, 0, bk);
-		}
-#endif
 		inventory_draw_top();
 		memos_draw_top();
 		optmenu_draw_top(ui_draw);
@@ -5437,9 +5474,9 @@ int main(void)
 	bool test = s_logos_off || playtest_active() || s_autotest || s_spawn_map[0] || s_debug_demo[0] ||
 	            s_debug_movie[0] || s_debug_newgame;
 #ifdef SH2_VITA
-	if (!s_opt.vita_cam) {               // once: the right stick needs the behind camera (tpcam.c)
-		s_opt.vita_cam = 1;
-		s_opt.camera = 1;
+	if (s_opt.vita_cam != 2) {           // once: a build moved everyone to Behind
+		s_opt.vita_cam = 2;
+		s_opt.camera = 0;
 	}
 #endif
 	s_setup_due = s_setup_debug == 1 || (s_setup_debug < 0 && !s_opt.setup && !test);
@@ -5742,6 +5779,12 @@ int main(void)
 		t_part = svcGetSystemTick();
 		if (s_paused) {
 			cp.dx = cp.dy = 0;
+#ifdef SH2_VITA
+		} else if (s_inv_open && s_state == ST_GAME) {
+			// 0x475b80: the item screen is an event of its own, and the world waits under it
+			cp.dx = cp.dy = 0;
+			inventory_update(down);
+#endif
 		} else if (s_cam.mode == CAM_PLAYER && demo_active()) {
 			enemy_event_tick(dt);
 			if (demo_update(down, dt))
@@ -5753,7 +5796,7 @@ int main(void)
 			// drag on the touch screen (touchui_free_drag); Look sets it behind James again
 			s_orbit[0] = s_orbit[1] = 0.0f;
 #ifdef SH2_VITA
-			if (s_tp_live) {
+			{
 #else
 			if (s_tp_live && controls_layout() == CONTROLS_LAYOUT_NEW) {
 #endif
@@ -5888,7 +5931,7 @@ int main(void)
 		t_part = svcGetSystemTick();
 		// the room's effects (roomfx.c) run in scenes too: the burning stairs' flames come with fire_agl
 		if (s_cam.mode == CAM_PLAYER && s_state == ST_GAME)
-			roomfx_update(s_paused ? 0.0f : dt, bgm_room_id(ev_glb_crd(), s_px, s_pz));
+			roomfx_update(s_paused || s_inv_open ? 0.0f : dt, bgm_room_id(ev_glb_crd(), s_px, s_pz));
 		if (s_arrival && (s_tiles_missing == 0 || s_arrival_t >= ARRIVAL_MAX)) {
 			s_arrival = false;
 			perf_event("arrival", "%s: %s after %.2f s more of black", s_rooms[s_room],
@@ -5959,6 +6002,7 @@ int main(void)
 			float fovy;
 			u64 tb = svcGetSystemTick();
 			bool tp = s_opt.camera && s_state == ST_GAME && !boat_active();
+			gp.head_yaw = s_look_yaw, gp.head_pitch = s_look_pitch;
 			gamecam_update(&gp, dt, !tp && search_view(gheld, gdown), &mv, &fovy);
 			tp = tp && !gamecam_scripted();
 			if (tp) {
@@ -6002,7 +6046,7 @@ int main(void)
 			perf_part("cam", tb);
 			s_chr_nofog = ee_final_boss_nofog(view_eye()[1]);
 			memcpy(s_fogf.eye, view_eye(), sizeof s_fogf.eye);
-			memcpy(s_fogf.watch, tp ? tpcam_watch() : gamecam_watch(), sizeof s_fogf.watch);
+			memcpy(s_fogf.watch, view_watch(tp), sizeof s_fogf.watch);
 			s_fogf.scr_z = tp ? 224.0f / tanf(fovy * 0.5f) : gamecam_scr_z();
 			sfx_listener(gp.pos, view_eye());
 			tb = svcGetSystemTick();
@@ -6012,7 +6056,7 @@ int main(void)
 			env_clip(&near, &far);
 			Mtx_PerspTilt(&proj, fovy, C3D_AspectRatioTop, near, far, false);
 			const float* e = view_eye();
-			const float* w = tp ? tpcam_watch() : gamecam_watch();
+			const float* w = view_watch(tp);
 			cam_fovy = fovy, cam_near = near, cam_far = far;
 			cam_focus = sqrtf((w[0] - e[0]) * (w[0] - e[0]) + (w[1] - e[1]) * (w[1] - e[1]) + (w[2] - e[2]) * (w[2] - e[2]));
 		} else {

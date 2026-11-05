@@ -43,16 +43,8 @@ static float s_zoom;             // DAT_00950530
 // the top and bottom together. s_vy (map units) says where it stands: on James' arrow while zoomed out
 // (the top of the sheet, where its title is, when he is not on it) plus what a drag on the touch
 // screen moved it (s_vy_user), and with the pan while zoomed in, so every edge can still be reached.
-#ifdef SH2_VITA
-#define FULL_SCALE 1.0f          // the PC's 4:3 sheet whole in the middle (0x49d9d0), nothing cut off
-#else
 #define FULL_SCALE 1.25f
-#endif
-#ifdef SH2_VITA
-#define FULL_CROP 0.0f
-#else
 #define FULL_CROP 51.2f          // 512 * (1 - 240 / 300) / 2
-#endif
 static float s_vy, s_vy_user;
 static bool s_open_in = true;    // the Game Options' Map: Zoom In (the PC's default) or Zoom Out
 static float s_cx, s_cy;         // DAT_009504cc / 009504f4: the zoomed view's centre, map units
@@ -582,6 +574,8 @@ void map_close(void)
 		free_textures();
 }
 
+void map_drag(float dx, float dy);
+
 bool map_update(u32 down, u32 held, const circlePosition* cp, float dt)
 {
 	if (!s_open)
@@ -613,6 +607,12 @@ bool map_update(u32 down, u32 held, const circlePosition* cp, float dt)
 		else if (down & KEY_DDOWN) m = nav(1);
 		else if (down & (KEY_DRIGHT | KEY_R)) m = nav(2);
 		else if (down & (KEY_DLEFT | KEY_L)) m = nav(3);
+#ifdef SH2_VITA
+		// the sheet across the whole width stands taller than the screen: the left stick moves it
+		float vy = cp->dy / 156.0f;
+		if (fabsf(vy) >= 0.15f)
+			map_drag(0.0f, vy * dt * 225.0f);
+#endif
 		if (m) {
 			if (s_pl.chapter == 1 && m == 1)
 				m = 3;

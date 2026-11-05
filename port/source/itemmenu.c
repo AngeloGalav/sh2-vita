@@ -303,6 +303,8 @@ static void act(int it, int cmd)
 				if (s_mark[i] && s_mark[i] != it)
 					m[k++] = s_mark[i];
 			s_host.use(it, m[0], m[1]);
+			s_state = ST_ITEMS;
+			memset(s_mark, 0, sizeof s_mark);
 		}
 		break;
 	}

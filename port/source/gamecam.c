@@ -158,6 +158,8 @@ void gamecam_update(const GameCamPlayer* p, float dt, bool far_view, C3D_Mtx* vi
 	in.area_code = (uint8_t)p->stage;
 	in.control_type = (uint8_t)p->control_type;          // byte 0 of 0x01DBEB80 holds the stage id
 	in.far_view_button = far_view;
+	in.hero_head_ang_x = p->head_pitch;     // James +0x1dc, +0x1e0 (0x535720): where the search view looks
+	in.hero_head_ang_y = p->head_yaw;
 	in.james_pos_x = p->pos[0];
 	in.james_rot_y = p->yaw;
 	in.james_anim_status = p->anim_status;  // 0x1fba8e8: the first-person mix reads it

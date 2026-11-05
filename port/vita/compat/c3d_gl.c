@@ -398,9 +398,11 @@ C3D_RenderTarget* C3D_RenderTargetCreate(int width, int height, GPU_COLORBUF col
 	t->height = height;
 	// The screen's 2x2 target (supersample.c, 800 x 480 in portrait) is made at the Vita's own
 	// 960 x 544 instead, so the scene is drawn at the size it is shown; the game keeps seeing
-	// 480 x 800 and its viewports are scaled (C3D_SetViewport)
+	// 480 x 800 and its viewports are scaled (C3D_SetViewport). So is the top screen's own 240 x 400,
+	// where the title, the start-up logos and the results are drawn: 400 x 240 stretched out, they
+	// were soft whatever their art.
 	t->gl_w = width, t->gl_h = height;
-	if (width == 480 && height == 800)
+	if ((width == 480 && height == 800) || (width == 240 && height == 400))
 		t->gl_w = (u16)s_view_w, t->gl_h = (u16)s_view_h;
 	t->sx = (float)t->gl_w / width, t->sy = (float)t->gl_h / height;
 	t->screen = -1;
@@ -1882,7 +1884,7 @@ static void res_apply(void)
 	glFinish();
 	for (int i = 0; i < MAX_TARGETS; i++) {
 		C3D_RenderTarget* t = G.targets[i];
-		if (!t || t->width != 480 || t->height != 800)
+		if (!t || !((t->width == 480 && t->height == 800) || (t->width == 240 && t->height == 400)))
 			continue;
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDeleteFramebuffers(1, &t->fbo);
@@ -1985,7 +1987,9 @@ static void hf_free(void)
 static void half_fog_begin(void)
 {
 	C3D_RenderTarget* m = G.target;
-	int w = m->gl_w / s_fog_div, h = m->gl_h / s_fog_div;
+	// whole multiples of 8: a third's 181 left a surface wider than the picture, its last column a
+	// light line along the top of the screen
+	int w = (m->gl_w / s_fog_div) & ~7, h = (m->gl_h / s_fog_div) & ~7;
 	if (HF.rt.fbo && (HF.rt.gl_w != w || HF.rt.gl_h != h))
 		hf_free();
 	if (!HF.rt.fbo) {

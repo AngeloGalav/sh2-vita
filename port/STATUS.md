@@ -300,6 +300,9 @@ Ordered by weight. Each line names where the work starts.
 
 ### 3. PC logic not ported or approximated
 
+- Right stick on the PS Vita (`main.c`, `search_view`): it moves the game's search camera through James' head
+  (0x535720, as the Enhanced Edition's RestoreSearchCamMovement), with no button held first, which is the
+  port's. Letting go ends it.
 - Item screen on the PS Vita (`itemmenu.c`, 0x475230): the bars' brightness per row is a guess, and the status
   panel's noise is flat red where the PC's strips sample the still. Examine shows the text, not the PC's picture
   (0x46a850, 0x46c300). Adjust volume does nothing, as the radio's sound is not ported. The memo list and stage
