@@ -122,4 +122,3 @@ port/vita/eboot.bin
 /ghidra-rebuild.log
 /vita_log.txt
 port/vita/*.d
-/pack-vita2/
