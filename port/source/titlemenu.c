@@ -452,9 +452,9 @@ static void draw_vita(float bright)
 		case SC_MENU:
 			for (int it = 0; it < IT_N; it++)
 				if (listed(it) && it < 5)
-					pic_item(MENU[it], 256, 346 + 24 * it, it == s_sel, bright);
+					pic_item(MENU[it], 256, 332 + 24 * it, it == s_sel, bright);
 				else if (listed(it))
-					item(256, 346 + 24 * it, "Room viewer (debug)", it == s_sel, bright);
+					item(256, 332 + 24 * it, "Room viewer (debug)", it == s_sel, bright);
 			return;
 		case SC_SCENARIO:
 			pic_item(CL_MAIN, 256, 324, s_sel == 0, bright);
