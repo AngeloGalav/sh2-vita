@@ -365,11 +365,6 @@ def write_screens(data, pack, out_voice=True):
     os.makedirs(os.path.join(pack, 'ui'), exist_ok=True)
     jobs = []
     img = load_tex(os.path.join(data, 'pic', 'etc', 'start00.tex')).convert('RGB')
-    if VITA and img.size[0] > 1024:
-        # The Vita's title fills the screen: the Enhanced Edition's 4:3 picture cut to 16:9 at its middle
-        w, h = img.size
-        keep = w * 9 // 16
-        img = img.crop((0, (h - keep) // 2, w, (h + keep) // 2))
     img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
     jobs.append(('ui/start00.png', 'ui/start00.t3x', False, 'rgb8' if VITA else 'rgb565'))
     img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA').crop((0, 0, 256, 256))
@@ -391,10 +386,12 @@ def write_screens(data, pack, out_voice=True):
     if VITA and ee.is_ee(bg_path) and bg_path not in ee._rejected:
         # The Enhanced Edition's start00, which the Vita takes whole, has its logo elsewhere: its own
         # start01's logo (rows 29..354 of 2048) on a canvas of the whole picture, where the two line up
-        # (measured against start00's letters, then cut to 16:9 with it); titlemenu.c lays it over the picture
+        # (measured against start00's letters); titlemenu.c lays it over the picture across the whole
+        # screen. The picture is widened to 16:9, not cut: its logo is 6.4:1 at 4:3 where the original's
+        # stands 8.9:1, and the Enhanced Edition on PC shows it widened too.
         sheet = decode_tex(ee.file(os.path.join(data, 'pic', 'etc', 'start01.tex'), note=False)).convert('RGBA')
         glow = Image.new('RGBA', (1024, 512), (255, 255, 255, 0))
-        glow.paste(sheet.crop((82, 29, 1973, 354)).resize((711, 159), Image.LANCZOS), (157, 110))
+        glow.paste(sheet.crop((82, 29, 1973, 354)).resize((711, 119), Image.LANCZOS), (157, 147))
     glow.save(os.path.join(pack, 'ui', 'titleglow.png'))
     jobs.append(('ui/titleglow.png', 'ui/titleglow.t3x', True, 'la4'))
     # the start-up screens (menu events 4 and 5, 0x405e90): the Konami logo and the splash screen
@@ -402,6 +399,11 @@ def write_screens(data, pack, out_voice=True):
         img = load_tex(os.path.join(data, 'pic', 'etc', name + '.tex')).convert('RGB')
         img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', out + '.png'))
         jobs.append(('ui/%s.png' % out, 'ui/%s.t3x' % out, False, 'rgb8' if VITA else 'rgb565'))
+    if VITA:
+        # start01's menu words as pictures (titlemenu.c s_cell has where each one is), DXT5
+        img = load_tex(os.path.join(data, 'pic', 'etc', 'start01.tex')).convert('RGBA')
+        img.resize((1024, 1024), Image.LANCZOS).save(os.path.join(pack, 'ui', 'titleitems.png'))
+        jobs.append(('ui/titleitems.png', 'ui/titleitems.t3x', True, 'etc1a4'))
     for png, t3x, alpha, fmt in jobs:
         if os.path.exists(os.path.join(pack, t3x)):
             os.remove(os.path.join(pack, t3x))

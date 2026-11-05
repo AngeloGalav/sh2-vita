@@ -1,4 +1,5 @@
 #include "titlemenu.h"
+#include "optmenu.h"
 #include "events.h"
 #include "font.h"
 #include "movie.h"
@@ -56,10 +57,28 @@ static bool load(const char* pack_dir, const char* name, C3D_Tex* tex)
 	return true;
 }
 
+#ifdef SH2_VITA
+// start01's menu words as pictures, in place of the Director's Cut's text, which all draw in English:
+// x0, y0, x1, y1 on the sheet, in thousandths of 2.048 (measured on the Enhanced Edition's; the
+// original's stand in the same places). The oval lies behind the chosen one.
+static C3D_Tex s_items;
+static bool s_items_ok;
+enum { CL_LOAD, CL_CONTINUE, CL_NEW_GAME, CL_OPTIONS, CL_MOVIES, CL_ACTION, CL_RIDDLE, CL_HARD, CL_NORMAL, CL_EASY, CL_BEGINNER,
+       CL_MAIN, CL_SUB, CL_OVAL, CL_N };
+static const short s_cell[CL_N][4] = {
+	{ 271, 412, 507, 483 }, { 167, 540, 606, 615 }, { 159, 668, 618, 744 }, { 188, 796, 583, 868 }, { 1630, 668, 1951, 744 },
+	{ 884, 412, 1414, 483 }, { 894, 1055, 1408, 1125 }, { 1058, 540, 1256, 615 }, { 1007, 668, 1308, 744 }, { 1066, 796, 1249, 868 },
+	{ 975, 922, 1322, 995 }, { 83, 1817, 1457, 1889 }, { 244, 1945, 1290, 2017 }, { 860, 1679, 1449, 1777 },
+};
+#endif
+
 bool titlemenu_init(const char* pack_dir)
 {
 	s_bg_ok = load(pack_dir, "start00", &s_bg);
 	s_glow_ok = load(pack_dir, "titleglow", &s_glow);
+#ifdef SH2_VITA
+	s_items_ok = load(pack_dir, "titleitems", &s_items);
+#endif
 	s_boot_ok[0] = load(pack_dir, "boot0", &s_boot[0]);
 	s_boot_ok[1] = load(pack_dir, "boot1", &s_boot[1]);
 	s_movie_n = 0;
@@ -71,6 +90,10 @@ bool titlemenu_init(const char* pack_dir)
 
 static bool shown(int it)
 {
+#ifdef SH2_VITA
+	if (it == IT_EXIT)
+		return false;           // a console's game has no such row
+#endif
 	if (it == IT_LOAD || it == IT_CONTINUE)
 		return s_saves;
 	if (it == IT_MOVIES)
@@ -375,10 +398,86 @@ static void item(float x, float y, const char* s, bool chosen, float bright)
 }
 
 #ifdef SH2_VITA
+// A word from the sheet centred on x with its top at y, in the PC's 512 x 448 screen, a texel of the
+// original 512 sheet a unit. The chosen one lies over the oval. The game's yellow NEW GAME, after a clear, is not done yet.
+static void cell(int c, float x, float y, float wide, u32 rgb, u32 a)
+{
+	const short* r = s_cell[c];
+	float w = wide > 0.0f ? wide : (r[2] - r[0]) / 4.0f, h = (r[3] - r[1]) / 4.0f;
+	float cy = y + 12.0f;
+	float x0 = 200.0f + (x - w * 0.5f - 256.0f) * 0.625f, x1 = 200.0f + (x + w * 0.5f - 256.0f) * 0.625f;
+	float y0 = 120.0f + (cy - h * 0.5f - 256.0f) * 0.46875f, y1 = 120.0f + (cy + h * 0.5f - 256.0f) * 0.46875f;
+	u32 k = rgb | a;
+	const u32 col[4] = { k, k, k, k };
+	font_quad_px(&s_items, x0, y0, x1, y1, r[0] / 2048.0f, r[1] / 2048.0f, r[2] / 2048.0f, r[3] / 2048.0f, col);
+}
+
+static void pic_item(int c, float x, float y, bool chosen, float bright)
+{
+	u32 g = (u32)(255 * bright) & 0xff, a = (u32)(255 * bright) & 0xff;
+	u32 white = g << 24 | g << 16 | g << 8;
+	float w = (s_cell[c][2] - s_cell[c][0]) / 4.0f;
+	if (chosen)
+		cell(CL_OVAL, x, y, w * 1.4f > 147.0f ? w * 1.4f : 147.0f, white, a / 2);
+	cell(c, x, y, 0.0f, white, chosen ? a : a * 7 / 8);
+}
+
 // One screen: every row on the picture, as the PC draws them, the chosen one again at full alpha a
 // pixel up and left (item). Coordinates in the PC's 512 x 448 screen.
+static MapDrawFn s_panel_draw;
+
 static void draw_vita(float bright)
 {
+	if (s_screen == SC_MOVIES && s_panel_draw) {
+		// the options' panel and rows (optmenu.c): the port's list, the PC's own screen not being ported
+		optmenu_panel(s_panel_draw, msg(210, "Movie Menu"));
+		int first = s_sel - 5 < 0 ? 0 : s_sel - 5;
+		if (first + 11 > s_movie_n)
+			first = s_movie_n - 11 < 0 ? 0 : s_movie_n - 11;
+		for (int i = first; i < s_movie_n && i < first + 11; i++) {
+			bool on = i == s_sel;
+			u32 c = on ? 0xfefefeffu : 0xa8a8a8ffu;
+			const char* m = msg(214 + s_movie_msg[i], MOVIE_FILE[s_movie_msg[i]]);
+			int y = 79 + 31 * (i - first);
+			if (on)
+				font_text(FONT_BIG, 258, y + 2, m, FONT_CENTER, 0x000000c0u, 0x000000c0u);
+			font_text(FONT_BIG, 256, y, m, FONT_CENTER, c, c);
+		}
+		return;
+	}
+	if (s_items_ok) {
+		static const int MENU[5] = { CL_LOAD, CL_CONTINUE, CL_NEW_GAME, CL_OPTIONS, CL_MOVIES };
+		static const int LV[4] = { CL_HARD, CL_NORMAL, CL_EASY, CL_BEGINNER };
+		switch (s_screen) {
+		case SC_MENU:
+			for (int it = 0; it < IT_N; it++)
+				if (listed(it) && it < 5)
+					pic_item(MENU[it], 256, 346 + 24 * it, it == s_sel, bright);
+				else if (listed(it))
+					item(256, 346 + 24 * it, "Room viewer (debug)", it == s_sel, bright);
+			return;
+		case SC_SCENARIO:
+			pic_item(CL_MAIN, 256, 324, s_sel == 0, bright);
+			pic_item(CL_SUB, 256, 357, s_sel == 1, bright);
+			return;
+		case SC_LEVELS:
+			if (s_wish) {
+				pic_item(CL_ACTION, 256, 290, true, bright);
+				for (int i = 0; i < 4; i++)
+					pic_item(LV[i], 256, 322 + 22 * i, s_action_sel == i + 1, bright);
+			} else {
+				pic_item(CL_ACTION, 128, 290, s_step == 0, bright);
+				pic_item(CL_RIDDLE, 384, 290, s_step == 1, bright);
+				for (int i = 0; i < 4; i++)
+					pic_item(LV[i], 128, 322 + 22 * i, s_step == 0 && s_action_sel == i + 1, bright);
+				for (int i = 0; i < 3; i++)
+					pic_item(LV[i], 384, 322 + 22 * i, s_step == 1 && s_riddle_sel == i + 1, bright);
+			}
+			return;
+		default:
+			break;
+		}
+	}
 	switch (s_screen) {
 	case SC_MENU:
 		// 0x496280: LOAD 284, CONTINUE 306, NEW GAME 328, OPTIONS 350, MOVIES 372, EXIT 394, each
@@ -470,6 +569,7 @@ bool titlemenu_draw_top(MapDrawFn draw, float bright)
 	if (!font_ready())
 		return s_bg_ok;
 #ifdef SH2_VITA
+	s_panel_draw = draw;
 	draw_vita(bright);
 	return s_bg_ok;
 #endif
