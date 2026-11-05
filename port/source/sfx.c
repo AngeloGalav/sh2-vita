@@ -527,6 +527,14 @@ void sfx_stop_all(void)
 	s_pending_close.id = 0;
 }
 
+int sfx_channel(int id)
+{
+	for (int i = 0; i < NVOICES; i++)
+		if (s_voices[i].active && s_voices[i].id == id)
+			return FIRST_CH + i;
+	return -1;
+}
+
 bool sfx_playing(int id)
 {
 	for (int i = 0; i < NVOICES; i++)

@@ -154,6 +154,8 @@ void movie_debug(bool log, bool cpu_convert)
 
 const char* movie_status(void) { return s_status; }
 bool movie_active(void) { return s_active; }
+static u32 s_plays;
+u32 movie_plays(void) { return s_plays; }
 
 // Decoder thread: keeps up to s_nslot frames decoded ahead of the display. It decodes every frame
 // (P and B frames need their references); the main thread drops frames that come too late.
@@ -861,9 +863,17 @@ bool movie_play(const char* name)
 		return true;                 // playtest.c: movies count as watched
 	if (!movie_start(name))
 		return false;
+	s_plays++;
+#ifdef SH2_VITA
+	// The game start sound plays out over the movie's start: 0x4a2b30 and what it calls touch no other
+	// sound (see below), so it stays out of the channels held here.
+	int keep_ch = sfx_channel(SFX_GAME_START);
+#else
 	// The title's game start sound (main.c) belongs to the title: when New Game goes straight into
 	// the opening movie it ends there instead of resuming mid-sound a minute later.
 	sfx_stop(SFX_GAME_START);
+	int keep_ch = -1;
+#endif
 	// Music and effects stop for the movie: their channels are paused (nothing refills them while
 	// this loop runs) and continue afterwards from where they were.
 	bool paused[24] = { false };
@@ -879,7 +889,7 @@ bool movie_play(const char* name)
 	if (s_ndsp)
 		for (int ch = 0; ch < 24; ch++)
 #endif
-			if (ch != MOVIE_CH && !ndspChnIsPaused(ch)) {
+			if (ch != MOVIE_CH && ch != keep_ch && !ndspChnIsPaused(ch)) {
 				ndspChnSetPaused(ch, true);
 				paused[ch] = true;
 			}

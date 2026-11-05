@@ -41,6 +41,7 @@ float sfx_pan_at(const float pos[3]);    // 0x515ab0, as the voices use it
 void sfx_stop(int id);
 void sfx_stop_all(void);
 bool sfx_playing(int id);
+int sfx_channel(int id);                 // the ndsp channel playing it, or -1
 
 // Listener for positional sounds: the player (feet) and the camera eye, world units, Y down.
 void sfx_listener(const float player[3], const float eye[3]);

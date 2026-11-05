@@ -1502,13 +1502,14 @@ static float s_fade_hold;
 // program (0x5a1670) reaches the movie, and the fade used to show it in between
 static bool s_start_black;
 static float s_start_black_t;
+static u32 s_start_black_plays;      // movie_plays() when it began: the movie runs in its own loop
 
 static void fade_update(float dt)
 {
 	if (s_start_black) {
 		s_start_black_t += dt;
 		// with no movie coming (a test's start, a stage with none) it lets go by itself
-		if (movie_active() || s_start_black_t > 20.0f || (!prog_running() && !demo_active() && s_start_black_t > 2.0f)) {
+		if (movie_plays() != s_start_black_plays || s_start_black_t > 20.0f || (!prog_running() && !demo_active() && s_start_black_t > 2.0f)) {
 			s_start_black = false;
 		} else {
 			s_fade = 1.0f;
@@ -4198,7 +4199,7 @@ static void new_game(void)
 	s_cam.mode = CAM_PLAYER;
 	s_state = ST_GAME;
 	s_fade = 1.0f;               // fade in from black
-	s_start_black = true, s_start_black_t = 0.0f;
+	s_start_black = true, s_start_black_t = 0.0f, s_start_black_plays = movie_plays();
 	consoleClear();
 }
 
@@ -4446,7 +4447,7 @@ static void title_go(void)
 // while the title fades out, and the game starts once it is black. Enhanced Edition
 // "PreserveSoundsOnLoad" (Patches/PlayWavSound.cpp, zlib licence) exists because the PC cuts this
 // sound off while it loads; the port never stops effects for a load, so a continue plays it out (a
-// new game's opening movie ends it, see movie_play).
+// new game's opening movie lets it play out on the Vita, see movie_play).
 static void title_start(int what)
 {
 	sfx_play(SFX_GAME_START, 1.0f, 0.0f);
@@ -5660,8 +5661,6 @@ int main(void)
 		u64 now_tick = svcGetSystemTick();
 		float dt = (float)(now_tick - last_tick) / (float)SYSCLOCK_ARM11;
 		last_tick = now_tick;
-		if (movie_active())
-			s_start_black = false;       // whichever path draws the movie's frames
 		dt = dt < 1.0f / 60.0f ? 1.0f / 60.0f : dt > 1.0f / 15.0f ? 1.0f / 15.0f : dt;
 		// Frames are shown on the screen's refresh (59.83 Hz), so a frame lasts a whole number of
 		// refreshes; snapping dt to that removes the tick jitter that made motion uneven when the

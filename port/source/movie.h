@@ -27,6 +27,7 @@ bool movie_update(u32 down);
 void movie_draw(void);
 void movie_stop(void);
 bool movie_active(void);
+u32 movie_plays(void);        // how many movies have started
 
 // Plays a movie to the end (or until skipped) with its own frame loop, then returns. Prints timing on
 // the bottom screen. False if it could not start or the app is closing (aptMainLoop returned false).
