@@ -55,7 +55,7 @@ typedef struct {
 	u8 res;              // the Vita: 0 the display's 960 x 544, 1 720 x 416
 	u8 trilinear;        // the Vita: 0 bilinear within a level, 1 trilinear between levels
 	u8 fog_size;         // the Vita: the fog's target, a half, a third or a quarter of the view each way
-	u8 vita_cam;         // the Vita: the camera has been moved to Behind once
+	u8 vita_cam;         // the Vita: 2, the camera was put back on Original after a build moved it
 	u8 ctrllayout;       // Control Options "Layout"
 	u8 camera;           // Control Options "Camera": 0 the PC's, 1 the port's behind camera (tpcam.c)
 	// Cheats (the port's): Infinite Stamina on by default, the rest off
@@ -84,6 +84,7 @@ bool optmenu_brightness(void);
 // Inside a C3D frame on the top screen, after the scene: the panels through draw (main.c's 2D
 // service), the text through font.c (the caller flushes it).
 void optmenu_draw_top(MapDrawFn draw);
+void optmenu_panel(MapDrawFn draw, const char* title);   // the Vita: the options' panel and title, for other lists
 // Noise Effect is the chosen row: the title draws the grain under the explainer, so it can be seen.
 bool optmenu_noise_focus(void);
 // debug.txt "textcheck": every setting's explainer and row laid out in every language the pack has

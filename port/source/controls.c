@@ -330,8 +330,7 @@ bool controls_menu_update(u32 down)
 // its buttons right of it, in the small font for its sixteen rows
 void controls_menu_draw_pc(void)
 {
-	const u32 full = 0xfefefeffu, soft = 0xfefefec0u;
-	font_text(FONT_BIG, 256, 0x1e, "Buttons", FONT_CENTER, full, full);
+	const u32 full = 0xfefefeffu, soft = 0xa8a8a8ffu;
 	for (int i = 0; i < N_MENU_ACTS + 2; i++) {
 		char k[32] = "";
 		const char* name = i < N_MENU_ACTS ? controls_name(MENU_ACTS[i]) : i == N_MENU_ACTS ? "Defaults" : "Back";
@@ -342,7 +341,7 @@ void controls_menu_draw_pc(void)
 				key_names(controls_keys(MENU_ACTS[i]), k, sizeof k);
 		}
 		u32 c = i == C.sel ? full : soft;
-		int y = 0x50 + 0x16 * i, d = i == C.sel ? 2 : 0;
+		int y = 84 + 20 * i, d = i == C.sel ? 2 : 0;     // inside the options' panel
 		font_text(FONT_SMALL, 0xf0 - d, y - d, name, FONT_RIGHT, c, c);
 		font_text(FONT_SMALL, 0x10e - d, y - d, k, FONT_LEFT, c, c);
 	}

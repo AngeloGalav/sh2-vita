@@ -71,7 +71,6 @@ void opt_defaults(Options* o)
 	o->bullet = 1;
 	o->ps2_flash = o->noise_ps2 = o->ps2_camera = o->cutscene_fov = 1;
 #ifdef SH2_VITA
-	o->camera = 1;               // the right stick turns it
 	o->fog_size = 1;             // a third each way (c3d_gl.c half_fog_begin)
 #endif
 	o->hold_stomp = o->swap_attack = 1;
@@ -97,7 +96,7 @@ static const Key s_keys[] = {
 	K("ps2flashlight", ps2_flash, 0, 1), K("ps2noise", noise_ps2, 0, 1), K("ps2camera", ps2_camera, 0, 1),
 	K("cutscenefov", cutscene_fov, 0, 1), K("togglerun", toggle_run, 0, 1), K("holdstomp", hold_stomp, 0, 1),
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
-	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("fogsize", fog_size, 0, 2), K("vitacam", vita_cam, 0, 1), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
+	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("fogsize", fog_size, 0, 2), K("vitacam", vita_cam, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
 };
 
@@ -894,66 +893,141 @@ static void explain(const Setting* s, float t)
 // Over play the explainer has a darker ground than the paused game's half dim (main.c), so its
 // text reads over bright rooms.
 #ifdef SH2_VITA
-// One screen, in the PC's option screens' look (0x4630c0, 0x467e70): the title centred at y 0x1e, a
-// row every 0x1b with its label to the left of the middle and its value at x 0x10e, the rows at alpha
-// 0x60 and the chosen one again at full alpha 2 up and 2 left, what it does along the bottom from
-// y 0x18b (0x460c60's arrows round the value). The tabs are the port's, with the port's own settings
-// among the PC's, changed with L and R. The question as 0x4630c0: Yes and No under it.
+// One screen, in the look of the game's own option screens (0x461600, 0x4630c0, 0x467e70, and the
+// console's as shown in its screenshots, which the positions here follow, in pixels of 640 x 480): the
+// title in spaced capitals, an eight-sided grey panel with a blue edge, a line above the help, labels to
+// the right of x 303 and values from x 340, a row every 29, the chosen one white with violet arrows. The
+// tabs are the port's, with its own settings among the game's, changed with L and R.
+static float px(float x) { return 200.0f + (x - 320.0f) * 0.5f; }   // 320 wide on the 400 layout's 4:3
+static float py(float y) { return y * 0.5f; }
+
+static void poly(const float (*p)[2], int n, u32 c)
+{
+	for (int i = 1; i + 1 < n; i++) {
+		MapVert v[3] = { { px(p[0][0]), py(p[0][1]), 0, 0 }, { px(p[i][0]), py(p[i][1]), 0, 0 }, { px(p[i + 1][0]), py(p[i + 1][1]), 0, 0 } };
+		s_draw(NULL, v, 3, c);
+	}
+}
+
+static void seg(float x0, float y0, float x1, float y1, float w, u32 c)
+{
+	float dx = x1 - x0, dy = y1 - y0, l = hypotf(dx, dy), nx = -dy / l * w * 0.5f, ny = dx / l * w * 0.5f;
+	const float q[4][2] = { { x0 + nx, y0 + ny }, { x1 + nx, y1 + ny }, { x1 - nx, y1 - ny }, { x0 - nx, y0 - ny } };
+	poly(q, 4, c);
+}
+
+static void panel(void)
+{
+	static const float P[8][2] = { { 56, 60 }, { 584, 60 }, { 610, 82 }, { 610, 442 }, { 585, 463 }, { 55, 463 }, { 32, 442 }, { 32, 82 } };
+	MapVert bg[6] = { { 0, 0, 0, 0 }, { 400, 0, 0, 0 }, { 400, 240, 0, 0 }, { 0, 0, 0, 0 }, { 400, 240, 0, 0 }, { 0, 240, 0, 0 } };
+	s_draw(NULL, bg, 6, 0x000000ffu);
+	poly(P, 8, 0x3c3c3cffu);
+	for (int i = 0; i < 8; i++) {
+		const float* a = P[i], *b = P[(i + 1) % 8];
+		seg(a[0], a[1], b[0], b[1], 4.0f, 0x303078ffu);
+		seg(a[0], a[1], b[0], b[1], 1.5f, 0x8080c8ffu);
+	}
+	seg(32, 409, 610, 409, 4.0f, 0x000000ffu);
+	seg(32, 412, 610, 412, 2.0f, 0x5a5a5affu);
+}
+
+// The title in capitals, a letter at a time, wide apart
+static void title(const char* s)
+{
+	const u32 full = 0xfefefeffu;
+	float w = 0.0f;
+	char one[2] = { 0, 0 };
+	for (const char* c = s; *c; c++) {
+		one[0] = *c >= 'a' && *c <= 'z' ? (char)(*c - 32) : *c;
+		w += font_width(FONT_BIG, one) + 12.0f;
+	}
+	float x = 256.0f - (w - 12.0f) * 0.5f;
+	for (const char* c = s; *c; c++) {
+		one[0] = *c >= 'a' && *c <= 'z' ? (char)(*c - 32) : *c;
+		font_text(FONT_BIG, x, 28, one, FONT_LEFT, full, full);
+		x += font_width(FONT_BIG, one) + 12.0f;
+	}
+}
+
+static void violet(float x, float y, int dir)
+{
+	float t = x + 13.0f * dir;
+	MapVert v[3] = { { sx(x), sy(y - 11), 0, 0 }, { sx(t), sy(y), 0, 0 }, { sx(x), sy(y + 11), 0, 0 } };
+	s_draw(NULL, v, 3, 0x7a64e8ffu);
+}
+
+// The game's fifteen blocks, each lighter at the top (0x45bf10)
+static void blocks(float x, float y, int v, int hi, bool on)
+{
+	for (int b = 0; b < hi; b++) {
+		float x0 = sx(x + b * 11.0f), x1 = sx(x + b * 11.0f + 9.0f), y0 = sy(y), ym = sy(y + 11), y1 = sy(y + 22);
+		u32 top = b < v ? (on ? 0xe0e0e0ffu : 0xb0b0b0ffu) : 0x505050ffu, low = b < v ? (on ? 0x909090ffu : 0x707070ffu) : 0x343434ffu;
+		MapVert a[6] = { { x0, y0, 0, 0 }, { x1, y0, 0, 0 }, { x1, ym, 0, 0 }, { x0, y0, 0, 0 }, { x1, ym, 0, 0 }, { x0, ym, 0, 0 } };
+		MapVert c[6] = { { x0, ym, 0, 0 }, { x1, ym, 0, 0 }, { x1, y1, 0, 0 }, { x0, ym, 0, 0 }, { x1, y1, 0, 0 }, { x0, y1, 0, 0 } };
+		s_draw(NULL, a, 6, top);
+		s_draw(NULL, c, 6, low);
+	}
+}
+
+void optmenu_panel(MapDrawFn draw, const char* t)
+{
+	s_draw = draw;
+	panel();
+	title(t);
+}
+
 #define PC_ROWS 11
+#define LABEL_X 242.0f           // 303 of 640
+#define VALUE_X 272.0f           // 340 of 640
 static void draw_pc(void)
 {
-	const u32 full = 0xfefefeffu, soft = 0xfefefec0u, dark = 0x808080c0u, grey = 0xc8c8c8ffu;
+	const u32 full = 0xfefefeffu, soft = 0xa8a8a8ffu, dark = 0x686868ffu, shade = 0x000000c0u;
+	panel();
 	if (s_state == ST_ASK) {
-		font_text(FONT_BIG, 256, 232, msg(89, "Change the settings?"), FONT_CENTER, full, full);
-		font_text(FONT_BIG, 226 - (s_yes ? 2 : 0), 266 - (s_yes ? 2 : 0), msg(90, "Yes"), FONT_RIGHT, s_yes ? full : soft, s_yes ? full : soft);
-		font_text(FONT_BIG, 286 - (s_yes ? 0 : 2), 266 - (s_yes ? 0 : 2), msg(91, "No"), FONT_LEFT, s_yes ? soft : full, s_yes ? soft : full);
+		title(TABS[s_tab]);
+		font_text(FONT_BIG, 256, 200, msg(89, "Change the settings?"), FONT_CENTER, full, full);
+		font_text(FONT_BIG, 226 - (s_yes ? 2 : 0), 240 - (s_yes ? 2 : 0), msg(90, "Yes"), FONT_RIGHT, s_yes ? full : soft, s_yes ? full : soft);
+		font_text(FONT_BIG, 286 - (s_yes ? 0 : 2), 240 - (s_yes ? 0 : 2), msg(91, "No"), FONT_LEFT, s_yes ? soft : full, s_yes ? soft : full);
 		return;
 	}
 	if (s_page == PG_BUTTONS) {
+		title("Buttons");
 		controls_menu_draw_pc();
 		return;
 	}
-	font_text(FONT_BIG, 256, 0x1e, TABS[s_tab], FONT_CENTER, full, full);
-	float tw = font_width(FONT_BIG, TABS[s_tab]) * 0.5f;
-	arrow(256 - tw - 18, 0x2d, -1, full);
-	arrow(256 + tw + 18, 0x2d, 1, full);
+	title(TABS[s_tab]);
 	int first = s_sel >= PC_ROWS ? s_sel - PC_ROWS + 1 : 0;
 	for (int i = first; i < s_n && i < first + PC_ROWS; i++) {
-		const Setting* s = s_rows[i];
+		const Setting* st = s_rows[i];
 		bool on = i == s_sel;
-		int d = on ? 2 : 0, y = 0x50 + 0x1b * (i - first);
-		u32 c = dimmed(s) ? dark : on ? full : soft;
-		font_text(FONT_BIG, 0xf0 - d, y - d, label(s), FONT_RIGHT, c, c);
-		if (s->kind == K_PAGE)
+		int y = 79 + 31 * (i - first);
+		u32 c = dimmed(st) ? dark : on ? full : soft;
+		if (on)
+			font_text(FONT_BIG, LABEL_X + 2, y + 2, label(st), FONT_RIGHT, shade, shade);
+		font_text(FONT_BIG, LABEL_X, y, label(st), FONT_RIGHT, c, c);
+		if (st->kind == K_PAGE)
 			continue;
-		if (s->kind == K_BAR) {
-			// the PC's fifteen blocks (0x45bf10)
-			int v = get(s);
-			for (int b = 0; b < s->hi; b++) {
-				float x0 = sx(0x10e + b * 12.0f - d), y0 = sy(y + 6 - d), x1 = sx(0x10e + b * 12.0f + 9 - d), y1 = sy(y + 26 - d);
-				MapVert q[6] = { { x0, y0, 0, 0 }, { x1, y0, 0, 0 }, { x1, y1, 0, 0 }, { x0, y0, 0, 0 }, { x1, y1, 0, 0 }, { x0, y1, 0, 0 } };
-				s_draw(NULL, q, 6, b < v ? (on ? 0xd0d0d0ffu : 0xa0a0a0ffu) : 0x3a3a3affu);
-			}
+		if (st->kind == K_BAR) {
+			blocks(VALUE_X, y + 4, get(st), st->hi, on);
 			continue;
 		}
 		char val[48];
-		const char* vs = value_name(s, get(s), val, sizeof val);
-		font_text(FONT_BIG, 0x10e - d, y - d, vs, FONT_LEFT, c, c);
+		const char* vs = value_name(st, get(st), val, sizeof val);
+		if (on)
+			font_text(FONT_BIG, VALUE_X + 2, y + 2, vs, FONT_LEFT, shade, shade);
+		font_text(FONT_BIG, VALUE_X, y, vs, FONT_LEFT, c, c);
 		if (on) {
-			arrow(0x106, y + 14 - d, -1, full);
-			arrow(0x10e + font_width(FONT_BIG, vs) + 8 - d, y + 14 - d, 1, full);
+			violet(VALUE_X - 6, y + 15, -1);
+			violet(VALUE_X + font_width(FONT_BIG, vs) + 6, y + 15, 1);
 		}
 	}
 	if (s_sel < s_n) {
-		const Setting* s = s_rows[s_sel];
-		char buf[200], lbuf[200];
-		font_text(FONT_SMALL, 256, 0x18b, expand(s->what, buf, sizeof buf), FONT_CENTER, grey, grey);
-		const char* line = s->lines && s->kind != K_PAGE ? s->lines[get(s) - s->lo] : NULL;
-		const char* note = s->note ? s->note(s_live) : NULL;
-		if (note)
-			font_text(FONT_SMALL, 256, 0x18b + 24, note, FONT_CENTER, grey, grey);
-		else if (line)
-			font_text(FONT_SMALL, 256, 0x18b + 24, expand(line, lbuf, sizeof lbuf), FONT_CENTER, grey, grey);
+		const Setting* st = s_rows[s_sel];
+		char buf[200];
+		const char* t = expand(st->what, buf, sizeof buf);
+		int f = font_width(FONT_BIG, t) * 0.625f > 280.0f ? FONT_SMALL : FONT_BIG;
+		font_text(f, 70 + 2, 452 + 2, t, FONT_LEFT, shade, shade);
+		font_text(f, 70, 452, t, FONT_LEFT, full, full);
 	}
 }
 #endif
