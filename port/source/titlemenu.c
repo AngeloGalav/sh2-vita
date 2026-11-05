@@ -103,8 +103,12 @@ void titlemenu_no_boot(void)
 
 bool titlemenu_booting(void) { return s_screen == SC_BOOT; }
 
+// The picture in from black as the title first comes up (0x496dd0's fade): over a second
+static u64 s_menu_tick;
+
 void titlemenu_reset(bool saves)
 {
+	s_menu_tick = 0;
 	s_saves = saves;
 	if (s_screen != SC_BOOT)             // the start-up screens run on into the menu
 		s_screen = SC_MENU;
@@ -437,10 +441,16 @@ bool titlemenu_draw_top(MapDrawFn draw, float bright)
 		return true;
 	}
 	if (s_bg_ok && draw) {
-		// 0x496dd0: start00 over the whole 4:3 picture
+		// 0x496dd0: start00 over the whole 4:3 picture; the Vita's fills the screen (ui.py)
+		if (!s_menu_tick)
+			s_menu_tick = svcGetSystemTick();
+		float in = (float)(svcGetSystemTick() - s_menu_tick) / (float)SYSCLOCK_ARM11;
+		bright *= in < 1.0f ? in : 1.0f;
 		u32 b = (u32)(bright * 255.0f) & 0xff;
-		MapVert v[6] = { { 40, 0, 0, 0 }, { 360, 0, 1, 0 }, { 360, 240, 1, 1 },
-		                 { 40, 0, 0, 0 }, { 360, 240, 1, 1 }, { 40, 240, 0, 1 } };
+		bool wide = s_bg.width == 2 * s_bg.height;
+		float bx0 = wide ? 0.0f : 40.0f, bx1 = wide ? 400.0f : 360.0f;
+		MapVert v[6] = { { bx0, 0, 0, 0 }, { bx1, 0, 1, 0 }, { bx1, 240, 1, 1 },
+		                 { bx0, 0, 0, 0 }, { bx1, 240, 1, 1 }, { bx0, 240, 0, 1 } };
 		draw(&s_bg, v, 6, b << 24 | b << 16 | b << 8 | 0xff);
 		if (s_glow_ok) {
 			// 0x496dd0 / 0x496a10: start01's white logo at (-257, -103)-(255, -19) of the 512x448
@@ -450,8 +460,8 @@ bool titlemenu_draw_top(MapDrawFn draw, float bright)
 			u32 cc = (u32)(c * bright) & 0xff, aa = (u32)(a > 255.0f ? 255.0f : a) & 0xff;
 			float y0 = 120.0f - 103.0f * 240.0f / 448.0f, y1 = 120.0f - 19.0f * 240.0f / 448.0f;
 			float x0 = 200.0f - 257.0f * 0.625f, x1 = 200.0f + 255.0f * 0.625f, t1 = 96.0f / 128.0f;
-			if (s_glow.width == s_glow.height)     // the Vita's: a canvas of the whole picture (ui.py)
-				x0 = 40.0f, x1 = 360.0f, y0 = 0.0f, y1 = 240.0f, t1 = 1.0f;
+			if (s_glow.height >= 512)     // the Vita's: a canvas of the whole picture (ui.py)
+				x0 = bx0, x1 = bx1, y0 = 0.0f, y1 = 240.0f, t1 = 1.0f;
 			MapVert g[6] = { { x0, y0, 0, 0 }, { x1, y0, 1, 0 }, { x1, y1, 1, t1 },
 			                 { x0, y0, 0, 0 }, { x1, y1, 1, t1 }, { x0, y1, 0, t1 } };
 			draw(&s_glow, g, 6, cc << 24 | cc << 16 | cc << 8 | aa);

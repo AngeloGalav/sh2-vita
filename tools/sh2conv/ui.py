@@ -270,7 +270,7 @@ def write_save_screen(data, pack):
         # nearly all one hue (James' red), and RGB565 left 17 of its 137 reds, in blotches
         img = load_tex(os.path.join(data, 'menu', 'mc', name + '.tbn2')).convert('RGB')
         png = 'ui/%s.png' % name
-        img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, png))
+        img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, png))
         t3x = 'ui/%s.t3x' % name
         if os.path.exists(os.path.join(pack, t3x)):
             os.remove(os.path.join(pack, t3x))
@@ -365,7 +365,12 @@ def write_screens(data, pack, out_voice=True):
     os.makedirs(os.path.join(pack, 'ui'), exist_ok=True)
     jobs = []
     img = load_tex(os.path.join(data, 'pic', 'etc', 'start00.tex')).convert('RGB')
-    img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
+    if VITA and img.size[0] > 1024:
+        # The Vita's title fills the screen: the Enhanced Edition's 4:3 picture cut to 16:9 at its middle
+        w, h = img.size
+        keep = w * 9 // 16
+        img = img.crop((0, (h - keep) // 2, w, (h + keep) // 2))
+    img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
     jobs.append(('ui/start00.png', 'ui/start00.t3x', False, 'rgb8' if VITA else 'rgb565'))
     img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA').crop((0, 0, 256, 256))
     img.save(os.path.join(pack, 'ui', 'gameover.png'))
@@ -386,16 +391,16 @@ def write_screens(data, pack, out_voice=True):
     if VITA and ee.is_ee(bg_path) and bg_path not in ee._rejected:
         # The Enhanced Edition's start00, which the Vita takes whole, has its logo elsewhere: its own
         # start01's logo (rows 29..354 of 2048) on a canvas of the whole picture, where the two line up
-        # (measured against start00's letters); titlemenu.c lays a square glow over the whole picture
+        # (measured against start00's letters, then cut to 16:9 with it); titlemenu.c lays it over the picture
         sheet = decode_tex(ee.file(os.path.join(data, 'pic', 'etc', 'start01.tex'), note=False)).convert('RGBA')
-        glow = Image.new('RGBA', (1024, 1024), (255, 255, 255, 0))
-        glow.paste(sheet.crop((82, 29, 1973, 354)).resize((711, 239), Image.LANCZOS), (157, 293))
+        glow = Image.new('RGBA', (1024, 512), (255, 255, 255, 0))
+        glow.paste(sheet.crop((82, 29, 1973, 354)).resize((711, 159), Image.LANCZOS), (157, 110))
     glow.save(os.path.join(pack, 'ui', 'titleglow.png'))
     jobs.append(('ui/titleglow.png', 'ui/titleglow.t3x', True, 'la4'))
     # the start-up screens (menu events 4 and 5, 0x405e90): the Konami logo and the splash screen
     for name, out in (('konami2048x2048', 'boot0'), ('splash_logo', 'boot1')):
         img = load_tex(os.path.join(data, 'pic', 'etc', name + '.tex')).convert('RGB')
-        img.resize(vita_size(img, 1024) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', out + '.png'))
+        img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', out + '.png'))
         jobs.append(('ui/%s.png' % out, 'ui/%s.t3x' % out, False, 'rgb8' if VITA else 'rgb565'))
     for png, t3x, alpha, fmt in jobs:
         if os.path.exists(os.path.join(pack, t3x)):

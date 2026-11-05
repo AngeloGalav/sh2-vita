@@ -140,7 +140,13 @@ def main():
             ee.like_original(img.convert('RGBA'), src).save(os.path.join(pack, png))
             jobs['rgba4'].append((png, f'map/{name}.t3x', True))
         else:
-            img.convert('RGB').resize((1024, 512), Image.LANCZOS).save(os.path.join(pack, png))
+            # The Image Enhancement Pack's sheets are 4:3 with black at the sides of the original's
+            # square (5464 x 4096): map.dat and the map's window are in the square's texels
+            if img.size[0] > img.size[1]:
+                w, h = img.size
+                img = img.crop(((w - h) // 2, 0, (w + h) // 2, h))
+            size = (1024, 1024) if os.environ.get('SH2_VITA_TEX') else (1024, 512)
+            img.convert('RGB').resize(size, Image.LANCZOS).save(os.path.join(pack, png))
             jobs['rgb565'].append((png, f'map/{name}.t3x', False))
     for fmt, j in jobs.items():
         encode_textures(j, pack, fmt=fmt, mipmaps=False)
