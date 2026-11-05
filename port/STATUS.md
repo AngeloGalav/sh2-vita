@@ -4,9 +4,10 @@ Goal: Silent Hill 2 Director's Cut (PC) running natively on the New 3DS and, wit
 original 3DS (real hardware and Azahar), as an installable `.cia` / `.3dsx` that uses the player's own
 game data, with the Enhanced Edition's fixes folded in where they apply.
 
-Last updated 2026-10-30: the Picture's soft pass and the 2x2 supersampling (`VISUALS.md`), after the
-textures at the PC's sizes and 0.2.2's fixes for the players' reports (sources and triage kept locally
-in `.triage/`).
+Last updated 2026-11-05: on the Vita, the radio, James' damage motions and reflection, the scenes' filters
+and the movies' frame rate, none of it confirmed on a console yet. Before that, 2026-10-30: the Picture's
+soft pass and the 2x2 supersampling (`VISUALS.md`), after the textures at the PC's sizes and 0.2.2's fixes
+for the players' reports (sources and triage kept locally in `.triage/`).
 
 ## Where it stands
 
@@ -280,6 +281,12 @@ Earlier results, as of 2026-10-18:
 
 Ordered by weight. Each line names where the work starts.
 
+### To do on the Vita, from console tests
+
+- Movies: shown at the 3DS's aspect ratio; they should fill the Vita's 16:9.
+- Attacks: every attack comes out heavy; light and heavy should follow the PC port's setting.
+- Examine on the item screen: should work as on the PC.
+
 ### 1. Real hardware
 
 - A New 3DS pass with `perflog`: frame and GPU time in the town, fog rooms, shadow rooms and the busiest
@@ -314,7 +321,7 @@ Ordered by weight. Each line names where the work starts.
 - Controls (`move.c`, `combat.c`, `main.c`): the arms' aim pitch and the shotgun's three aim heights
   (0x535a90); the swing lunges (0x558830 per-frame speeds) and the combo window (0x544ac0);
   0x1fba908/0x1fba904 bit 0x40 freeing the gait mid-attack (the port keeps it for the whole attack);
-  the lock-run animation speed (0x538e00 0x200); the 2D type's turn toward the last stick direction
+  the 2D type's turn toward the last stick direction
   after release (0x546760 runs every frame); the auto-ready distance uses the feet (the PC uses James'
   0xa0); the back-off turn reversal option (0x1dbec01). The camera's slots hold enemies only (no Maria or items) and drop dying ones at once (dead_timer 1.5 s);
   every live enemy counts as active (status bit 0x400); the look line (0x527850) is `col_clamp_ray`
@@ -503,7 +510,6 @@ floors, no copy of his lamp (0x546280). Not run on a console.
 ### 5. Smaller things
 
 - An item with no 3D model shows nothing on the item screen (no picture fallback).
-- No PC stop animations; stopping is a speed ramp-down.
 - The text console shows for a moment at boot before the touch screen starts.
 - The EE packs are tested only on a synthetic copy built in the packs' layout, never on the real packs.
 - The cube room's arms sit 75 units lower than the PC's added floors.
