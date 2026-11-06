@@ -82,6 +82,27 @@ static void bed_free(void)
 
 void stagemdl_maria_bed(bool on) { s_bed.on = on; }
 
+// Angela at the grave (stage 4, 0x59fd30, which each visit runs while flag 320 is off): character 0x107 facing
+// pi, before the scene (flag 36 off) at 0x8ea24c with motion 0xf3d, after it at 0x8ea26c with 0xf3e, both
+// looping (0x5407c0); pack/chr/agl/agl_grave_1.s3a and _2.s3a (motion.py). Stage 4's events 18 and 19 are the
+// talks. The scenes move their own copy.
+static struct {
+	bool loaded, failed;
+	Character chr;
+	Anim anim[2];
+	float t;
+} s_grave;
+
+static void grave_free(void)
+{
+	if (s_grave.loaded) {
+		chr_free(&s_grave.chr);
+		anim_free(&s_grave.anim[0]);
+		anim_free(&s_grave.anim[1]);
+	}
+	s_grave.loaded = s_grave.failed = false;
+}
+
 // Bones the stage code moves (the labyrinth lift's gates, 0x5831aa; the endings' falling stairs,
 // 0x440470): added to the bone's place.
 static struct { int kind, bone; float d[3]; } s_bone[12];
@@ -105,6 +126,7 @@ static void free_models(void)
 	memset(s_models, 0, sizeof s_models);
 	s_nmodels = 0;
 	bed_free();
+	grave_free();
 }
 
 static Line* s_all;
@@ -400,6 +422,47 @@ static void bed_draw(const C3D_Mtx* view, int uModelView, int uBones)
 	chr_draw(&s_bed.chr, uBones);
 }
 
+static void grave_draw(const C3D_Mtx* view, int uModelView, int uBones)
+{
+	if (ev_stage() != 4 || s_grave.failed || ev_flag(320) || demo_has_kind(0x107))
+		return;
+	if (!s_grave.loaded) {
+		char err[64];
+		if (!chr_load(&s_grave.chr, PACK_DIR "/chr/agl", "agl", err, sizeof err)) {
+			s_grave.failed = true;
+			return;
+		}
+		if (!anim_load(&s_grave.anim[0], PACK_DIR "/chr/agl/agl_grave_1.s3a")) {
+			chr_free(&s_grave.chr);
+			s_grave.failed = true;
+			return;
+		}
+		if (!anim_load(&s_grave.anim[1], PACK_DIR "/chr/agl/agl_grave_2.s3a")) {
+			anim_free(&s_grave.anim[0]);
+			chr_free(&s_grave.chr);
+			s_grave.failed = true;
+			return;
+		}
+		s_grave.loaded = true;
+		s_grave.t = 0.0f;
+	}
+	static const float POS[2][3] = { { 2430.61646f, 2636.63135f, -1708.84473f }, { 781.121277f, 2505.67407f, -394.283203f } };
+	int k = ev_flag(36) ? 1 : 0;
+	const Anim* a = &s_grave.anim[k];
+	if (!stereo_eye())               // once a frame, not once an eye (stereo.h)
+		s_grave.t += 1.0f / 30.0f;
+	float frame = fmodf(s_grave.t * 30.0f, (float)(a->frames ? a->frames : 1));
+	C3D_Mtx model, mv;
+	Mtx_Identity(&model);
+	Mtx_Translate(&model, POS[k][0], POS[k][1], POS[k][2], true);
+	Mtx_RotateY(&model, 3.1415927f, true);
+	Mtx_Multiply(&mv, view, &model);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
+	chr_pose_loop(&s_grave.chr, a, frame, 0, (int)a->frames - 1);
+	chrlight_at(POS[k], false);
+	chr_draw(&s_grave.chr, uBones);
+}
+
 // The PC sets placed models up as "stay objects" (0x537cf0 picks the handler by kind): the 0x3xx and
 // 0x5xx kinds (0x555120), the 0x4xx ones but for 0x421 and the mirrored copies 0x443, 0x444 and 0x460
 // (0x53b780), and the items, 0x7xx (0x554840), go through 0x554710, which multiplies every bone's bind
@@ -469,6 +532,7 @@ void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones)
 	if (!second)
 		stagemdl_update(ev_stage());
 	bed_draw(view, uModelView, uBones);
+	grave_draw(view, uModelView, uBones);
 	if (!s_nplaces)
 		return;
 	if (!second)

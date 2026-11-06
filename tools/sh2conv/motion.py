@@ -39,6 +39,9 @@ from sound import Exe  # noqa: E402
 # (motion id, record table, first id, model, anm, output folder, output name)
 MOTIONS = [
     (0xd49, 0x6e7728, 3400, 'chr/mar/hhh_mar.mdl', 'demo/mar_hagureru/hhh_mar.anm', 'mar', 'hhh_mar_s3'),
+    # Angela at the grave: 0x59fd30 with the file list 0x8ea4a4, 0x5407c0 (first id 0xf3c: the records' first is empty)
+    (0xf3d, 0x6e5c20, 0xf3c, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_1'),
+    (0xf3e, 0x6e5c20, 0xf3c, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_2'),
 ]
 
 # (model, anm, output folder, output name): the whole .anm
@@ -84,7 +87,9 @@ def convert(exe, data, pack, anim, table, base, mdl, anm, folder, name):
         frames = sh2mdl.load_anm(t.name, m)
     finally:
         os.unlink(t.name)
-    first, last = max(0, rec[3]), max(0, min(rec[4], len(frames) - 1))
+    # a record's start and end can count from the first motion of the file: 0xf3e's are 64 and 155 of its 92
+    shift = rec[3] if rec[4] >= len(frames) else 0
+    first, last = max(0, rec[3] - shift), max(0, min(rec[4] - shift, len(frames) - 1))
     frames = frames[first:last + 1] or frames[:1]
     out = os.path.join(pack, 'chr', folder, name + '.s3a')
     os.makedirs(os.path.dirname(out), exist_ok=True)
