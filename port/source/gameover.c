@@ -13,7 +13,8 @@ static C3D_Tex s_tex;
 static bool s_ok, s_on;
 static int s_step;               // 0x9503bc
 static float s_t, s_level;       // the step's timer; the text's brightness 0..0x60 (0x9503b8)
-static int s_jitter[3];
+static int s_jitter[6];
+static float s_jit_t;
 static float s_all;              // since the start
 static C3D_Tex s_still;          // the last frame of play (gameover_capture)
 static bool s_still_ok, s_have_still;
@@ -52,6 +53,10 @@ void gameover_start(void)
 
 void gameover_capture(const void* color, int w, int h)
 {
+#ifdef SH2_VITA
+	(void)color, (void)w, (void)h;   // the PC's screen is on black; the layer has no CPU copy of the frame
+	return;
+#endif
 	int tw = w <= 256 ? 256 : 512, th = h <= 512 ? 512 : 1024;   // 1024 rows for Sharp's 2x2 (480 x 800)
 	if (s_still_ok && (s_still.width != tw || s_still.height != th)) {
 		C3D_TexDelete(&s_still);
@@ -110,8 +115,12 @@ bool gameover_update(float dt)
 		}
 	}
 	// 0x496ee0: each copy moves by rand() % 30 - 15 lines a frame
-	for (int i = 0; i < 3; i++)
-		s_jitter[i] = rand() % 30 - 15;
+	s_jit_t += dt;
+	if (s_jit_t >= 1.0f / 30.0f) {
+		s_jit_t = 0.0f;
+		for (int i = 0; i < 6; i++)
+			s_jitter[i] = rand() % 30 - 15;
+	}
 	return true;
 }
 
@@ -150,6 +159,9 @@ static void still_uv(float x, float y, float z, float* u, float* v)
 
 void gameover_draw_back(void)
 {
+#ifdef SH2_VITA
+	return;                          // 0x498780: black, the frame cleared by main.c
+#endif
 	if (!s_on)
 		return;
 	// The frame James fell in, already bled red by the dying veil (main.c draw_dying), keeps sinking
@@ -185,6 +197,27 @@ void gameover_draw_top(MapDrawFn draw)
 {
 	if (!s_on || !s_ok || !draw || s_level <= 0.0f)
 		return;
+#ifdef SH2_VITA
+	// 0x496ee0 with the table 0x496c90 makes: the second and third rows of the sheet (v 48, 96), each three
+	// times with its own jump, then the first row steady, all 160 x 48 round the middle in the menus' units
+	// (x -80..80, y -24..23), at the same grey (0x60 of the PS2's 0x80 at most), blended by the texture
+	{
+		u32 g = (u32)(s_level * 2.0f);
+		g = g > 255 ? 255 : g;
+		u32 c = g << 24 | g << 16 | g << 8 | 0xff;
+		const float kx = 0.625f, ky = 0.46875f, x0 = 200.0f - 80.0f * kx, x1 = 200.0f + 80.0f * kx;
+		const float u1 = 160.0f / 256.0f;
+		for (int i = 0; i < 7; i++) {
+			float v0 = i < 6 ? (i % 2 ? 96.0f : 48.0f) : 0.0f, dy = i < 6 ? (float)s_jitter[i] : 0.0f;
+			float y0 = 120.0f + (-24.0f + dy) * ky, y1 = 120.0f + (23.0f + dy) * ky;
+			float t0 = v0 / 256.0f, t1 = (v0 + 47.0f) / 256.0f;
+			MapVert v[6] = { { x0, y0, 0, t0 }, { x1, y0, u1, t0 }, { x1, y1, u1, t1 },
+			                 { x0, y0, 0, t0 }, { x1, y1, u1, t1 }, { x0, y1, 0, t1 } };
+			draw(&s_tex, v, 6, c);
+		}
+		return;
+	}
+#endif
 	// the brightness in PS2 units (0x80 full): the steady copy pale as the PC draws it, the jumping
 	// ones in blood red behind it
 	float a = s_level / 96.0f;

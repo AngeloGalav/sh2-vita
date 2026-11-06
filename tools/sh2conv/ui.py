@@ -381,7 +381,9 @@ def write_screens(data, pack, out_voice=True):
     img = load_tex(os.path.join(data, 'pic', 'etc', 'start00.tex')).convert('RGB')
     img.resize(vita_size(img) if VITA else (512, 256), Image.LANCZOS).save(os.path.join(pack, 'ui', 'start00.png'))
     jobs.append(('ui/start00.png', 'ui/start00.t3x', False, 'rgb8' if VITA else 'rgb565'))
-    img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA').crop((0, 0, 256, 256))
+    # the top left quarter whatever its size: the Enhanced Edition's picture is 2048x2048, not 512x512
+    img = load_tex(os.path.join(data, 'pic', 'etc', 'gameover1.tex')).convert('RGBA')
+    img = img.crop((0, 0, img.size[0] // 2, img.size[1] // 2)).resize((256, 256), Image.LANCZOS)
     img.save(os.path.join(pack, 'ui', 'gameover.png'))
     jobs.append(('ui/gameover.png', 'ui/gameover.t3x', True, 'la4'))
     # the title's white logo that pulses over start00's red one (start01.tex's first item, 0x496dd0):
