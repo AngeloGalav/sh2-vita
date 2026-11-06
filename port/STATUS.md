@@ -295,6 +295,10 @@ Ordered by weight. Each line names where the work starts.
 - Levels sometimes jitter: the hospital, and the labyrinth's rooms with the water. Later.
 - The finishing blow on a fallen enemy with X alone, without R as on the PC, doesn't work. Later.
 - Save screen: its background is stretched. Later.
+- Input: the Circle press that closes a text (and in other such cases) also switches the flashlight. Later.
+- Memos: the text's position is wrong while reading them. Later.
+- Sound events missing: the bark at the start in the forest, the whisper on entering a room, among others. Later.
+- Firing a gun doesn't light the level up a little. Later.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
 - The light is wrong in some levels. Later.
