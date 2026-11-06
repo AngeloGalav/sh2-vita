@@ -102,7 +102,7 @@ cuts it, so a fast room load does not chop the door. In Azahar the ap06 to ap38 
 | 10051 | save menu opened at a save point | `shSdCall(0x2743, 1.0)` in 0x48C680 (high) |
 | 10000 / 10002 / 10003 | menu move / confirm / cancel | EE MenuSounds.cpp and the callers (high) |
 | 15002 | game start: New Game, Born From a Wish, Continue (played while the title fades out) | `shSdCall(0x3a9a, 1.0)` at 0x498201 and 0x4978c4 (high) |
-| 18001 / 18000 | flashlight on / off | the PC has **no** flashlight sound; the EE adds its own WAVs. These are short button clicks from the bank standing in (port choice) |
+| 18001 / 18000 | flashlight on / off | the PC has **no** flashlight sound; the EE adds its own WAVs. The port plays them from pack/sound/flashlight_*.pcm (sound.py) when the player has the EE; without them, short button clicks from the bank stand in (port choice) |
 
 ## Footsteps
 

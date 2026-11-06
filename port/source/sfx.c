@@ -218,6 +218,38 @@ static bool request_load(int s)
 	return true;
 }
 
+// The flashlight's sounds from the Enhanced Edition, when the pack has them (sound.py: pack/sound/<name>.pcm, u32
+// the rate, then mono PCM16). The PC has none; a button click from the bank stands in without them.
+static void sfx_extra(int id, const char* name)
+{
+	char path[96];
+	snprintf(path, sizeof path, PACK_DIR "/sound/%s.pcm", name);
+	FILE* f = fopen(path, "rb");
+	if (!f)
+		return;
+	u32 rate = 0;
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f) - 4;
+	fseek(f, 0, SEEK_SET);
+	s16* pcm = size > 0 && fread(&rate, 4, 1, f) == 1 ? linearAlloc(size) : NULL;
+	if (pcm && fread(pcm, 1, size, f) == (size_t)size) {
+		for (u32 i = 0; i < s_nids; i++)
+			if (s_ids[i].id == (u32)id) {
+				DSP_FlushDataCache(pcm, size);
+				u32 s = s_nsamples++;
+				s_samples[s] = (BankSample){ 0, (u32)size / 2, rate, 0 };
+				s_loaded[s] = (Loaded){ pcm, 0, true, L_READY };
+				s_ids[i].sample = s;
+				s_cache_used += size;
+				pcm = NULL;
+				break;
+			}
+	}
+	if (pcm)
+		linearFree(pcm);
+	fclose(f);
+}
+
 static void load_steps(void)
 {
 	FILE* f = fopen(PACK_DIR "/sound/steps.txt", "r");
@@ -247,10 +279,10 @@ bool sfx_init(void)
 		return false;
 	}
 	s_nsamples = h[2], s_nids = h[3], s_ndoors = h[4], s_data_offset = h[7];
-	s_samples = malloc(s_nsamples * sizeof *s_samples);
+	s_samples = malloc((s_nsamples + 2) * sizeof *s_samples);
 	s_ids = malloc(s_nids * sizeof *s_ids);
 	s_doors = malloc(s_ndoors * sizeof *s_doors);
-	s_loaded = calloc(s_nsamples, sizeof *s_loaded);
+	s_loaded = calloc(s_nsamples + 2, sizeof *s_loaded);
 	bool ok = s_samples && s_ids && s_doors && s_loaded &&
 	          fread(s_samples, sizeof *s_samples, s_nsamples, s_bank) == s_nsamples &&
 	          !fseek(s_bank, h[5], SEEK_SET) && fread(s_ids, sizeof *s_ids, s_nids, s_bank) == s_nids &&
@@ -274,6 +306,8 @@ bool sfx_init(void)
 		svcGetThreadPriority(&prio, CUR_THREAD_HANDLE);
 		R.thread = threadCreate(reader, NULL, 16 * 1024, prio + 1, -2, false);
 	}
+	sfx_extra(SFX_LIGHT_ON, "flashlight_on");
+	sfx_extra(SFX_LIGHT_OFF, "flashlight_off");
 	// Sounds that play all the time stay resident: footsteps, menus, pickup, flashlight.
 	static const int resident[] = { 11000, 11001, 11002, 11003, 11004, 11005, 11006, 11007, 11008, 11009,
 	                                SFX_MENU_MOVE, SFX_MENU_OK, SFX_MENU_CANCEL, SFX_ITEM_PICKUP,

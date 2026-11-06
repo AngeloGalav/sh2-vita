@@ -50,6 +50,7 @@ import argparse
 import csv
 import os
 import struct
+import wave
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -500,6 +501,22 @@ def build_bgm(exe, out):
                                                                sum(len(r) for r in stages)))
 
 
+def build_extras(data, out):
+    """The Enhanced Edition's flashlight sounds, sh2e/sound/extra, as pack/sound/<name>.pcm for sfx.c: the rate as
+    a u32, then the mono PCM16. Left out when the player has no Enhanced Edition: the PC itself has none."""
+    for name in ('flashlight_on', 'flashlight_off'):
+        path = os.path.join(os.path.dirname(os.path.abspath(data)), 'sh2e', 'sound', 'extra', name + '.wav')
+        if not os.path.exists(path):
+            continue
+        with wave.open(path, 'rb') as w:
+            if w.getnchannels() != 1 or w.getsampwidth() != 2:
+                continue
+            rate, pcm = w.getframerate(), w.readframes(w.getnframes())
+        with open(os.path.join(out, name + '.pcm'), 'wb') as f:
+            f.write(struct.pack('<I', rate) + pcm)
+        print('wrote %s.pcm' % name)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
     ap.add_argument('--data', default=DEFAULT_DATA)
@@ -514,6 +531,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     if not a.no_bank:
         build_bank(exe, a.data, a.out)
+    build_extras(a.data, a.out)
     build_floors(a.data, a.out, set(a.areas.split(',')) if a.areas else None)
     build_steps(a.data, a.out, os.path.dirname(os.path.abspath(a.out)))
     build_bgm(exe, a.out)
