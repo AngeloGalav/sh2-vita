@@ -1395,8 +1395,6 @@ static u8 grip_flags(void);
 static void start_swing(const CombatBody* b, bool combo, bool heavy)
 {
 	const MeleeDef* m = md();
-	float ang = 0.0f;
-	Enemy* t = find_target(b, &ang, 4000.0f);
 	// 0x557960 sets 0x1fbad08 while the legs run (lower status 0xc..0x10), and 0x5569b0 then gives
 	// the plank and Maria's knife the light swing (request 3) whatever was pressed
 	int legs = move_last()->state;
@@ -1414,9 +1412,8 @@ static void start_swing(const CombatBody* b, bool combo, bool heavy)
 	s_snd_frame = -1;
 	int side = s_side;
 	if (m->kind == MK_PLANK) {
-		// heavy: the plank's attack 14 (request 4); a downed target also gets it (port choice, as a
-		// level swing passes over a body on the floor)
-		if (heavy || (!legs_run && t && enemy_is_down(t) && t->p_dist < 1400.0f)) {
+		// heavy: the plank's attack 14 (request 4); 0x533ff0 goes by the press alone, never the target
+		if (heavy) {
 			s_atk = &m->a_heavy[side], s_atk_heavy = true;
 			play(&m->heavy[side]);
 		} else if (combo) {

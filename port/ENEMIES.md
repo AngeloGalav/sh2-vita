@@ -306,7 +306,7 @@ attack's frame window.
 
 Controls: hold **R** to ready (James turns to the nearest enemy within 4000 and 100 degrees, or with
 the circle pad, and can step forward or back at 500 / 350 units/s), **A** swings, A again during the follow-through chains the next swing, releasing R puts
-the plank away. A target on the floor gets the downward swing. James has 100 health; a hit makes him
+the plank away. James has 100 health; a hit makes him
 flinch (anime 121) and gives one second of immunity; at 0 he falls and stays down (the PC holds the
 damage motion's end, 0x559100 setting 0x1fbad17 to 2), and the game over follows.
 The acid spray (attack 42, kind 4) takes health without making James drop his guard while the plank is
@@ -392,9 +392,8 @@ good. Bodies placed dead in a stage never open.
 
 The plank keeps its own downward swing (attack 14, anims 375 / 379). That is its heavy attack: the PC
 asks for it on every first press (pressure again), and the port follows the EE's "SwapLightHeavyAttack"
-(`swapattack`): a tap is the light swing (12), holding A for 0.2 s the heavy downswing. A downed target
-within 1400 units always gets the downswing (port choice: the level swing passes over a body on the
-floor). Pressing A again during a plank swing chains the short swing from the other shoulder (the PC
+(`swapattack`): a tap is the light swing (12), holding A for 0.2 s the heavy downswing, whatever the
+target is doing (0x533ff0 never looks at it). Pressing A again during a plank swing chains the short swing from the other shoulder (the PC
 sets `DAT_01fbad19` and the next request becomes attack 13). After the follow-through (367 / 373, the
 pipe's 413 / 419) the PC reads the button only once the clip ends (0x5569b0), so the next swing waits
 for it; with the Enhanced Edition's Swap Light/Heavy a tap in its last 0.3 s, or in the raise's, is
