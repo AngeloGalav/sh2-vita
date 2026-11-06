@@ -104,7 +104,7 @@ static void touch(void)
 				snprintf(text[i], sizeof text[i], "%d. %.22s   %s", i + 1, place(&s_info[i]), s_info[i].clear ? "" : t);
 			} else {
 				snprintf(text[i], sizeof text[i], "%d. %s", i + 1, s_mode == SS_LOAD ? "-" : card(36, "Save to new file."));
-				if (s_mode == SS_LOAD)
+				if (s_mode == SS_LOAD && i < 64)
 					dim |= 1ull << i;
 			}
 			rows[i] = text[i];

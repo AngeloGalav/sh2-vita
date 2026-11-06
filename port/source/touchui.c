@@ -19,7 +19,7 @@
 
 // ---------------------------------------------------------------- state
 
-#define MAX_ROWS 64
+#define MAX_ROWS 80
 #define MAX_BUTTONS 6
 #define MAX_VERTS 8192
 #define SOLID_END 3584                // s_verts: solids, then pictures, then glyphs
@@ -648,7 +648,7 @@ static void footer(char label_[][16], const u32* key, int n, u32 dim)
 	rule(12, 308, FOOT_Y, RULE);
 	float slot = 304.0f / n, cy = 223.0f;
 	for (int i = 0; i < n; i++) {
-		bool off = dim >> i & 1;
+		bool off = i < 64 && dim >> i & 1;
 		u32 c = off ? DIM : RING;
 		float gw = glyph_width(key[i]), lw = font_width_px(FONT_SMALL, label_[i]);
 		float w = gw + (gw > 0 && lw > 0 ? 5.0f : 0.0f) + lw;
@@ -809,7 +809,7 @@ static void draw_menu(int id)
 	float lh = font_line_px(FONT_BIG);
 	for (int i = first; i < m->n && i < first + fit; i++) {
 		float y = top + (i - first) * rh, ty = y + (rh - lh) * 0.5f;
-		bool on = i == sel, off = m->dim >> i & 1;
+		bool on = i == sel, off = i < 64 && m->dim >> i & 1;
 		if (on)
 			band(8, y, right, y + rh - 1);
 		u32 ct = off ? DIM : s_grey_top, cb = off ? DIM : s_grey_bottom;
@@ -1343,7 +1343,7 @@ void touchui_draw_pc(void)
 		for (int i = first; i < me->n && i < first + per; i++) {
 			bool on = i == sel;
 			int d = on ? 2 : 0;
-			u32 c = (me->dim >> i) & 1 ? dark : on ? full : soft;
+			u32 c = i < 64 && (me->dim >> i) & 1 ? dark : on ? full : soft;
 			txt(f, x - d, (file ? 0x50 + 0x26 * (i - first) : 0x50 + 0x1c * (i - first)) - d, me->rows[i], al, c);
 		}
 	} else if (s_box_on && s_box[0]) {

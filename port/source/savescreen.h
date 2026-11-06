@@ -7,7 +7,11 @@
 // Drawn on the top screen in the PC font over the whole width (savescreen.c lays it out, a 3DS-only
 // layout of the PC's parts), driven from the touch screen (touchui.c) and buttons.
 
+#ifdef SH2_VITA
+#define SAVE_SLOTS 75        // room for a PC player's files (tools/pcsave.py)
+#else
 #define SAVE_SLOTS 10
+#endif
 
 typedef struct {
 	bool used, clear;        // a file is there; it is clear data
