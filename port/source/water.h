@@ -40,4 +40,6 @@ void water_reset(void);              // a new game, a load: nothing carries over
 // fades it itself; this binds its own fog colour and table, so the caller binds the room's again.
 void water_draw(const C3D_Mtx* proj, const C3D_Mtx* view, float fog_start, float fog_end, float near, float far);
 bool water_active(void);
+// The labyrinth's lower rooms: a still surface over the PC's areas of its water (stand-in, water.c)
+void water_indoor_draw(const C3D_Mtx* proj, const C3D_Mtx* view, int room);
 const char* water_status(void);      // debug HUD line

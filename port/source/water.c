@@ -486,6 +486,74 @@ void water_draw(const C3D_Mtx* proj, const C3D_Mtx* view, float fog_start, float
 	C3D_AlphaTest(false, GPU_ALWAYS, 0);
 }
 
+// The indoor water of the labyrinth's lower rooms. The PC's Effect2 classes 29..34 (HH_Effect_Object_AutoPost's
+// table 0x8942c8: rooms 0x80, 0x85, 0x7a, 0x7c, 0x7e, 0x82) draw textured waves from James' steps over these
+// areas (0x8a0aa0, 0x8a05d0, 0x8a0010, 0x89faf0, 0x89f5d0, 0x89f358: x, z of a corner, then its sizes, y the height).
+// Stand-in (port/STATUS.md): one still, dim, see-through surface over each area, no texture and no waves. The
+// colour is the port's own.
+typedef struct { float x, z, w, d; } IndoorArea;
+static const struct { int room; float y; int n; IndoorArea a[8]; } INDOOR[] = {
+	{ 0x80, -180.0f, 4, { { 56700, 17100, 2600, 1600 }, { 59100, 17100, 1600, 4200 }, { 59100, 21100, 4000, 1600 },
+	                      { 59100, 22500, 1600, 7800 } } },
+	{ 0x85, -180.0f, 7, { { 96300, 19100, 3800, 1600 }, { 99900, 19100, 1200, 2800 }, { 100900, 19100, 3800, 1600 },
+	                      { 104500, 19100, 4000, 1600 }, { 99900, 21700, 1200, 3800 }, { 96100, 24300, 4000, 1200 },
+	                      { 95100, 23500, 1200, 2000 } } },
+	{ 0x7a, -165.0f, 8, { { 136300, 53300, 3200, 3200 }, { 137100, 56300, 3200, 3600 }, { 138700, 59700, 4800, 1600 },
+	                      { 139300, 54100, 4200, 1600 }, { 141900, 55500, 1600, 4400 }, { 141900, 61100, 1600, 5400 },
+	                      { 137900, 64900, 4200, 1600 }, { 139500, 66300, 1600, 3800 } } },
+	{ 0x7c, -165.0f, 7, { { 139900, 9500, 4000, 4000 }, { 141100, 13300, 1600, 4800 }, { 138900, 16700, 2400, 1400 },
+	                      { 137500, 16700, 1600, 5600 }, { 138900, 18100, 2400, 1400 }, { 141100, 18100, 3800, 2800 },
+	                      { 138900, 20700, 3000, 1600 } } },
+	{ 0x7e, -180.0f, 7, { { 57700, -24300, 1600, 1600 }, { 57700, -25300, 4800, 1200 }, { 62300, -25300, 1200, 8400 },
+	                      { 60300, -22900, 2200, 1600 }, { 57700, -18100, 4800, 1200 }, { 56700, -24300, 1200, 7400 },
+	                      { 57700, -19300, 3000, 1400 } } },
+	{ 0x82, -180.0f, 3, { { 19500, -58700, 1600, 5000 }, { 19500, -60100, 4000, 1600 }, { 21900, -62900, 1600, 3000 } } },
+};
+
+void water_indoor_draw(const C3D_Mtx* proj, const C3D_Mtx* view, int room)
+{
+	static V* buf;
+	static int built = -1, count;
+	int k = -1;
+	for (unsigned i = 0; i < sizeof INDOOR / sizeof INDOOR[0]; i++)
+		if (INDOOR[i].room == room)
+			k = (int)i;
+	if (k < 0 || !s_bind)
+		return;
+	if (!buf && !(buf = linearAlloc(8 * 6 * sizeof(V))))
+		return;
+	if (built != k) {
+		V* v = buf;
+		for (int i = 0; i < INDOOR[k].n; i++) {
+			const IndoorArea* a = &INDOOR[k].a[i];
+			float y = INDOOR[k].y, x1 = a->x + a->w, z1 = a->z + a->d;
+			const float c[4][2] = { { a->x, a->z }, { x1, a->z }, { x1, z1 }, { a->x, z1 } };
+			static const u8 ix[6] = { 0, 1, 2, 0, 2, 3 };
+			for (int j = 0; j < 6; j++)
+				*v++ = (V){ c[ix[j]][0], y, c[ix[j]][1], 0.0f, 0.0f, { 26, 34, 30, 170 }, { 0, 0, 0, 0 } };
+		}
+		count = (int)(v - buf);
+		GSPGPU_FlushDataCache(buf, count * sizeof(V));
+		built = k;
+	}
+	s_bind(proj, view);
+	C3D_DepthMap(true, -1.0f, 0.0f);
+	C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_COLOR);
+	C3D_CullFace(GPU_CULL_NONE);
+	C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_SRC_ALPHA,
+	               GPU_ONE_MINUS_SRC_ALPHA);
+	C3D_TexEnv* env = C3D_GetTexEnv(0);
+	C3D_TexEnvInit(env);
+	C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
+	C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+	C3D_TexEnvInit(C3D_GetTexEnv(1));
+	C3D_TexEnvInit(C3D_GetTexEnv(2));
+	C3D_BufInfo* bi = C3D_GetBufInfo();
+	BufInfo_Init(bi);
+	BufInfo_Add(bi, buf, sizeof(V), 4, 0x3210);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, count);
+}
+
 const char* water_status(void)
 {
 	if (!S.def)

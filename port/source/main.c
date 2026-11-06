@@ -2169,6 +2169,7 @@ static void water_frame(const C3D_Mtx* proj, const C3D_Mtx* view, float dt)
 	if (!stereo_eye())
 		water_update(&in, dt);
 	perf_part("water", t0);
+	water_indoor_draw(proj, view, in.room);   // in the room's own fog, set by lighting_frame
 	if (!water_active())
 		return;
 	t0 = svcGetSystemTick();
