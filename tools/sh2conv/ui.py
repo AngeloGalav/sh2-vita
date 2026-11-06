@@ -234,6 +234,20 @@ def write_font(pack, exe_path, data=None):
     print(f'wrote {t3x} ({FONT_ATLAS}x{height}) and ui/font.bin')
 
 
+def write_map_arrows(data, pack):
+    """The arrows of the map screen on the Vita (0x49ce40, 0x49d9d0), with their alpha: map/carsol.t3x, where
+    map.c looks, from data/pic/etc/carsol.tex. pics.py's pic/etc/carsol.t3x has none."""
+    img = load_tex(os.path.join(data, 'pic', 'etc', 'carsol.tex')).convert('RGBA')
+    os.makedirs(os.path.join(pack, 'map'), exist_ok=True)
+    img.save(os.path.join(pack, 'map', 'carsol.png'))
+    t3x = os.path.join(pack, 'map', 'carsol.t3x')
+    if os.path.exists(t3x):
+        os.remove(t3x)
+    encode_textures([('map/carsol.png', 'map/carsol.t3x', True)], pack, fmt='rgba8', mipmaps=False)
+    os.remove(os.path.join(pack, 'map', 'carsol.png'))
+    print('wrote map/carsol.t3x')
+
+
 def write_item_menu(data, pack, exe_path):
     """The item screen's sprites on the Vita (0x475db0, 0x475d20): the PC's sheets of item pictures
     as ui/itemmenu.t3x (data/pic/etc/itemmenu2.tex) and ui/itemmenux.t3x (Born From a Wish,
@@ -470,6 +484,7 @@ def main():
     write_font(pack, exe_path, data)
     if VITA:
         write_item_menu(data, pack, exe_path)
+        write_map_arrows(data, pack)
     write_save_screen(data, pack)
     write_options(data, pack)
     write_pause(pack, exe_path)

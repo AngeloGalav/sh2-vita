@@ -51,6 +51,8 @@ static float s_cx, s_cy;         // DAT_009504cc / 009504f4: the zoomed view's c
 static C3D_Tex s_tex, s_mark;
 static char s_tex_name[16], s_mark_name[16];
 static bool s_tex_ok, s_mark_ok;
+static C3D_Tex s_carsol;         // data/pic/etc/carsol.tex: the maps' arrows (0x49ce40, 0x49d9d0)
+static int s_carsol_ok;          // 0 not tried, 1 loaded, -1 not in the pack
 static char s_legend[200];
 
 // The marking animation programs start (0x49c0f0 / 0x49dbd0 / 0x49c180): the map opens by itself,
@@ -401,6 +403,8 @@ static bool load_t3x(C3D_Tex* tex, const char* name)
 static void textures_for(int m)
 {
 	const MapRec* r = &s_maps[m];
+	if (!s_carsol_ok)
+		s_carsol_ok = load_t3x(&s_carsol, "carsol") ? 1 : -1;
 	if (strcmp(s_tex_name, r->tex)) {
 		if (s_tex_ok) C3D_TexDelete(&s_tex);
 		s_tex_ok = r->tex[0] && load_t3x(&s_tex, r->tex);
@@ -677,6 +681,29 @@ static void quad(C3D_Tex* tex, float x0, float y0, float x1, float y1, float u0,
 	s_draw(tex, v, 6, rgba);
 }
 
+// 0x49ce40: an arrow towards each side that leads to another map, fading out as the map zooms in, by
+// half way. The places and texels (in the PC's 256 x 128) are 0x8917ac and 0x89179c. The sheet here is
+// larger than the screen (FULL_CROP), so the arrows go by the screen's height and not the sheet's.
+static void nav_arrows(void)
+{
+	static const float POS[4][2] = { { -36, -224 }, { -36, 176 }, { 212, 0 }, { -244, 0 } };
+	static const u8 UV[4][4] = { { 0x60, 0, 0x9f, 0x3f }, { 0xa0, 0, 0xdf, 0x3f }, { 0x30, 0, 0x5f, 0x5f }, { 0, 0, 0x2f, 0x5f } };
+	float z = s_zoom, f = z / (2.0f - z);
+	if (s_carsol_ok <= 0 || s_mode >= 0 || z > 0.5f)
+		return;
+	int a = 0x80 - (int)(z * 256.0f);
+	u32 rgba = 0xffffff00u | (u32)(a >= 0x80 ? 0xff : a * 2);
+	for (int d = 0; d < 4; d++) {
+		if (!nav(d))
+			continue;
+		float x = (POS[d][0] - s_cx) * f + POS[d][0], y = (POS[d][1] - s_cy) * f + POS[d][1];
+		float w = (UV[d][2] - UV[d][0]) * (f + 1.0f), h = (UV[d][3] - UV[d][1]) * (f + 1.0f);
+		float yc = 120.0f + (y + h * 0.5f) * (240.0f / 512.0f), hh = h * 0.5f * (240.0f / 512.0f) * FULL_SCALE;
+		quad(&s_carsol, sx(x), yc - hh, sx(x + w), yc + hh, UV[d][0] / 256.0f, UV[d][1] / 128.0f, UV[d][2] / 256.0f,
+		     UV[d][3] / 128.0f, rgba);
+	}
+}
+
 void map_draw(void)
 {
 	if (!s_open || !s_draw)
@@ -724,6 +751,7 @@ void map_draw(void)
 			     m->rect[1] / (float)s_mark.height, m->rect[2] / (float)s_mark.width, m->rect[3] / (float)s_mark.height,
 			     rgba);
 		}
+	nav_arrows();
 	// the player's arrow, on the map he is on (the town map only around the town rooms)
 	float X, Y;
 	if (s_shown != s_james || !james_pos(&X, &Y))
@@ -735,6 +763,25 @@ void map_draw(void)
 	else if (s_shown == 0x12 || s_shown == 0x13) a += (float)M_PI / 2.0f;
 	else if (s_room == 9 || s_room == 10 || s_room == 11 || s_room == 0x5c) a -= (float)M_PI;
 	float s = sinf(a), c = cosf(a);
+	if (s_carsol_ok > 0) {
+		// 0x49d9d0: 20 by 32 units turned about him, x times 0.8, the shadow 2 and 0.5 off and under it;
+		// the sheet's texels at 0x8917cc in the PC's 256 x 128
+		static const float corner[4][2] = { { -10, -16 }, { 10, -16 }, { 10, 16 }, { -10, 16 } };
+		static const float tu[2][2] = { { 176, 207 }, { 144, 175 } };
+		for (int pass = 0; pass < 2; pass++) {
+			float px[4], py[4];
+			for (int i = 0; i < 4; i++) {
+				float wx = (corner[i][0] * c - corner[i][1] * s) * 0.8f + X + (pass ? 0.0f : 2.0f);
+				float wy = corner[i][0] * s + corner[i][1] * c + Y + (pass ? 0.0f : 0.5f);
+				px[i] = sx((wx - s_cx) * f + wx), py[i] = sy((wy - s_cy) * f + wy);
+			}
+			float u0 = tu[pass][0] / 256.0f, u1 = tu[pass][1] / 256.0f, v0 = 64.0f / 128.0f, v1 = 127.0f / 128.0f;
+			MapVert v[6] = { { px[0], py[0], u0, v0 }, { px[1], py[1], u1, v0 }, { px[2], py[2], u1, v1 },
+			                 { px[0], py[0], u0, v0 }, { px[2], py[2], u1, v1 }, { px[3], py[3], u0, v1 } };
+			s_draw(&s_carsol, v, 6, 0xffffffff);
+		}
+		return;
+	}
 	static const float shape[6][2] = { { 0, -16 }, { -10, 12 }, { 0, 5 }, { 0, -16 }, { 0, 5 }, { 10, 12 } };
 	for (int pass = 0; pass < 2; pass++) {
 		MapVert v[6];

@@ -4658,7 +4658,8 @@ static u32 menu_keys(u32 down, u32 held, float dt, bool menu)
 	u32 now = (held & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT)) | stick;
 	bool pressed = stick && stick != s_stick;
 	s_stick = stick;
-	if (!menu) {
+	// the map takes its keys as they are: the D-pad's presses change maps, the stick moves the view
+	if (!menu || map_is_open()) {
 		s_wait = now;
 		return down;
 	}
