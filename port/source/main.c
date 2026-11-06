@@ -5248,19 +5248,19 @@ static void filters_frame(void)
 	extern void vita_fx_motion(int alpha);
 	extern void vita_fx_motion_reset(void);
 	extern void vita_fx_soft(float alpha);
+	extern void vita_fx_blur2(float a, float b);
 	if (!s_opt.filters || s_state != ST_GAME || s_paused || s_inv_open) {
 		vita_fx_motion_reset();
 		return;
 	}
 	int stage = ev_stage(), dn = demo_number(), motion = 0;
-	float t = demo_timer(), soft = 0.0f;
+	float t = demo_timer(), soft = 0.0f, blur_a = -1.0f, blur_b = 0.0f;
 	if (stage == 2 && dn == 1) {
 		// 0x5a2100, the mirror scene in the first toilet: mode 8 with two strengths that trade places,
-		// x = 1 + (timer - 1) * 0.15472 up to 96 and (97 - x) / 2. The PC blurs near and far apart;
-		// stand-in: one soft layer at their sum, doubled as 0x478de0 doubles its alpha.
+		// x = 1 + (timer - 1) * 0.15472 up to 96 and (97 - x) / 2, in bytes that 0x479840 takes / 24
 		float x = 1.0f + (t - 1.0f) * 0.15472312f;
-		x = x > 96.0f ? 96.0f : x;
-		soft = (x + (97.0f - x) * 0.5f) * 2.0f / 255.0f;
+		x = x > 96.0f ? 96.0f : x < 0.0f ? 0.0f : x;
+		blur_a = (float)(int)x / 24.0f, blur_b = (float)(int)((97.0f - x) * 0.5f) / 24.0f;
 	} else if (stage == 5 && (dn == 6 || dn == 7)) {
 		// 0x59f390: mode 6 while the view is at z below 50000 and y above -2000. Stand-in: its strength
 		// (0x945248 = 3, 0x19, 0xd8, 0xfc) isn't worked out, and the test uses the camera's eye.
@@ -5282,6 +5282,8 @@ static void filters_frame(void)
 			motion = 0x40;
 		break;
 	}
+	if (blur_a >= 0.0f)
+		vita_fx_blur2(blur_a, blur_b);
 	if (soft > 0.0f)
 		vita_fx_soft(soft);
 	if (motion > 0)

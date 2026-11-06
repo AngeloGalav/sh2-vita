@@ -2137,6 +2137,8 @@ void vita_capture_draw(float x0, float y0, float x1, float y1)
 static struct { C3D_RenderTarget rt; C3D_Tex tex; bool ready; } FXM, FXS;
 static GLuint s_fx_prog;
 static GLint s_fx_tex, s_fx_alpha;
+static GLuint s_fx4_prog;            // vita_fx_blur2
+static GLint s_fx4_tex, s_fx4_off, s_fx4_alpha;
 
 static void fx_target(C3D_RenderTarget* rt, C3D_Tex* tex, int w, int h)
 {
@@ -2217,6 +2219,68 @@ void vita_fx_soft(float alpha)
 	fx_target(&FXS.rt, &FXS.tex, 136, 240);
 	fx_copy(m, &FXS.rt);
 	fx_over(FXS.tex.gl, alpha);
+}
+
+// 0x479840 mode 8 (0x4791e0, 0x477a60): the view shrunk by 2^level (up to 3) for each of two strengths and
+// laid back through four taps a side, across and then down, at -1, -1/3, 1/3 and 1 of the strength in the
+// PC's 640 x 480 pixels. The small level 0 of the PC isn't kept: at least half size here. The second is
+// blended by the frame's alpha on the PC; half and half here (stand-in, port/STATUS.md).
+static struct { C3D_RenderTarget rt; C3D_Tex tex; } FXB[3], FXT[3];
+
+static void fx_blur_pass(C3D_RenderTarget* to, GLuint tex, float ou, float ov, float alpha)
+{
+	G.target = NULL;
+	bind_target(to);
+	glViewport(0, 0, to->gl_w, to->gl_h);
+	quad_state();
+	if (alpha < 1.0f) {
+		glEnable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	glUseProgram(s_fx4_prog);
+	glUniform1i(s_fx4_tex, 0);
+	glUniform1f(s_fx4_alpha, alpha);
+	glUniform4f(s_fx4_off, ou, ov, ou / 3.0f, ov / 3.0f);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+void vita_fx_blur2(float a, float b)
+{
+	C3D_RenderTarget* m = fx_view();
+	if (!m || !s_fx4_prog)
+		return;
+	float str[2] = { a, b };
+	int lv[2], top = 0;
+	for (int i = 0; i < 2; i++) {
+		lv[i] = (int)str[i] < 1 ? 1 : (int)str[i] > 3 ? 3 : (int)str[i];
+		top = lv[i] > top ? lv[i] : top;
+	}
+	C3D_RenderTarget* from = m;
+	for (int l = 0; l < top; l++) {
+		fx_target(&FXB[l].rt, &FXB[l].tex, s_view_w >> (l + 1), s_view_h >> (l + 1));
+		fx_target(&FXT[l].rt, &FXT[l].tex, s_view_w >> (l + 1), s_view_h >> (l + 1));
+		G.target = NULL;
+		bind_target(&FXB[l].rt);
+		glViewport(0, 0, FXB[l].rt.gl_w, FXB[l].rt.gl_h);
+		quad_state();
+		glBindTexture(GL_TEXTURE_2D, from->tex->gl);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		from = &FXB[l].rt;
+	}
+	for (int i = 0; i < 2; i++) {
+		int l = lv[i] - 1;
+		// the surface is portrait: its u runs along the display's height, its v along the width
+		fx_blur_pass(&FXT[l].rt, FXB[l].tex.gl, 0.0f, str[i] / 640.0f, 1.0f);
+		fx_blur_pass(m, FXT[l].tex.gl, str[i] / 480.0f, 0.0f, i ? 0.5f : 1.0f);
+	}
+	glViewport(0, 0, m->gl_w, m->gl_h);
+	G.unif_gen++;
 }
 
 // GPU cost tests (SELECT + R while playing, vita_log.txt says which): 1 the fragment lighting off,
@@ -2360,6 +2424,11 @@ static const char FX_FS[] =
 	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float alpha) : COLOR\n"
 	"{ return float4(tex2D(tex, o_uv).rgb, alpha); }\n";
 
+static const char FX4_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float4 off, uniform float alpha) : COLOR\n"
+	"{ float3 c = tex2D(tex, o_uv - off.xy).rgb + tex2D(tex, o_uv - off.zw).rgb + tex2D(tex, o_uv + off.zw).rgb +\n"
+	"tex2D(tex, o_uv + off.xy).rgb; return float4(c * 0.25, alpha); }\n";
+
 static void present_init(void)
 {
 	s_present_prog = glCreateProgram();
@@ -2385,6 +2454,19 @@ static void present_init(void)
 	glLinkProgram(s_fx_prog);
 	s_fx_tex = glGetUniformLocation(s_fx_prog, "tex");
 	s_fx_alpha = glGetUniformLocation(s_fx_prog, "alpha");
+	s_fx4_prog = glCreateProgram();
+	if (!link(s_fx4_prog, compile(GL_VERTEX_SHADER, PRESENT_VS), compile(GL_FRAGMENT_SHADER, FX4_FS))) {
+		vita_log("blur program not built");
+		glDeleteProgram(s_fx4_prog);
+		s_fx4_prog = 0;
+		return;
+	}
+	glBindAttribLocation(s_fx4_prog, 0, "pos");
+	glBindAttribLocation(s_fx4_prog, 1, "uv");
+	glLinkProgram(s_fx4_prog);
+	s_fx4_tex = glGetUniformLocation(s_fx4_prog, "tex");
+	s_fx4_off = glGetUniformLocation(s_fx4_prog, "off");
+	s_fx4_alpha = glGetUniformLocation(s_fx4_prog, "alpha");
 }
 
 // One screen's texture into r. portrait: a PICA render target (u along the screen's height from
