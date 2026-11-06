@@ -166,8 +166,8 @@ bool savescreen_update(u32 down)
 			s_sel = (s_sel + (down & KEY_DDOWN ? 1 : SAVE_SLOTS - 1)) % SAVE_SLOTS;
 			sfx_play(SFX_MENU_MOVE, 1.0f, 0.0f);
 		}
-		if (down & (KEY_L | KEY_R | KEY_DLEFT | KEY_DRIGHT)) {       // the other page
-			s_sel = (s_sel + PER_PAGE) % SAVE_SLOTS;
+		if (down & (KEY_L | KEY_R | KEY_DLEFT | KEY_DRIGHT)) {       // a page on, or back
+			s_sel = (s_sel + (down & (KEY_R | KEY_DRIGHT) ? PER_PAGE : SAVE_SLOTS - PER_PAGE)) % SAVE_SLOTS;
 			sfx_play(SFX_MENU_MOVE, 1.0f, 0.0f);
 		}
 		if (down & KEY_B) {

@@ -1459,11 +1459,23 @@ static bool s_title_hide;            // a file was chosen in the list: black unt
 static void files_load(int slot)
 {
 	s_slot = slot;
-	s_title_hide = savescreen_active();
 	title_start(2);
 }
 
-static const SaveScreenHost s_files = { files_info, files_write, files_load };
+static void enter_title(void);
+static bool s_paused;
+
+static void files_chosen(int slot)
+{
+	if (s_state == ST_GAME) {        // from the pause menu: the game goes only now a file is chosen
+		s_paused = false;
+		enter_title();
+	}
+	s_title_hide = true;
+	files_load(slot);
+}
+
+static const SaveScreenHost s_files = { files_info, files_write, files_chosen };
 
 static bool any_save(void)
 {
@@ -4234,6 +4246,7 @@ static void new_game_wish(void)
 static void enter_title(void)
 {
 	titlemenu_reset(any_save());
+	s_title_hide = false;
 	touchui_box(NULL, NULL, 0);
 	touchui_panel("");
 	map_close();
@@ -4438,13 +4451,15 @@ static void title_go(void)
 {
 	int what = s_title_go;
 	s_title_go = -1;
-	s_title_hide = false;
 	if (what == 0)
 		new_game();
 	else if (what == 1)
 		new_game_wish();
 	else if (!continue_game())
 		printf("\x1b[25;9HNo save file yet.        ");
+	// the frame of the start is still the title's: hidden too, on to the game. Left on the title: shown
+	if (s_state == ST_TITLE)
+		s_title_hide = false;
 }
 
 // Starting a game plays the PC's game start sound (15002: new game 0x498201, continue 0x4978c4)
@@ -4751,7 +4766,7 @@ static bool pause_update(u32 down)
 		return true;
 	}
 	if (savescreen_active()) {
-		if (!savescreen_update(down))
+		if (!savescreen_update(down) && s_state == ST_GAME)
 			pausemenu_open(pause_can_save());
 		return true;
 	}
@@ -4766,10 +4781,8 @@ static bool pause_update(u32 down)
 		savescreen_open(SS_SAVE, &s_files, prog_chapter());
 		break;
 	case PM_LOAD:
-		// the PC's load screen (menu event 0x11); the port shows it over the title
-		s_paused = false;
+		// the PC's load screen (menu event 0x11): cancelling comes back here, a file starts it (files_chosen)
 		pausemenu_close();               // its rows and question off the touch screen
-		enter_title();
 		savescreen_open(SS_LOAD, &s_files, 0);
 		break;
 	case PM_OPTIONS:
