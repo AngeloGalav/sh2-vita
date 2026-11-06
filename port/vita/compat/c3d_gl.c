@@ -1053,15 +1053,16 @@ void C3D_LightPosition(C3D_Light* l, C3D_FVec* p)
 	l->positional = p->w != 0.0f;
 }
 void C3D_LightSpotEnable(C3D_Light* l, bool on) { l->spot_on = on; }
-// citro3d stores the direction negated and normalised; the PICA's spot input is -L . that
+// The direction the light points, normalised. The spot's input in the fragment programs is -L . this, the
+// light's way to the fragment against it: 1 on the beam's axis, where the game's tables have their top
 void C3D_LightSpotDir(C3D_Light* l, float x, float y, float z)
 {
 	float n = sqrtf(x * x + y * y + z * z);
 	if (n <= 0.0f)
 		n = 1.0f;
-	l->spot_dir[0] = -x / n;
-	l->spot_dir[1] = -y / n;
-	l->spot_dir[2] = -z / n;
+	l->spot_dir[0] = x / n;
+	l->spot_dir[1] = y / n;
+	l->spot_dir[2] = z / n;
 	l->spot_on = true;
 }
 void C3D_LightSpotLut(C3D_Light* l, C3D_LightLut* lut)
