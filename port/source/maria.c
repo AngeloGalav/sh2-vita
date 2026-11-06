@@ -529,6 +529,16 @@ bool maria_hit(float x, float z, float yaw, float reach, float arc, float ap)
 
 bool maria_present(void) { return M.here || M.waiting; }
 
+bool maria_column(float* x, float* y, float* z, float* r)
+{
+	if (!M.here || maria_dead())
+		return false;
+	*x = M.x, *y = M.y, *z = M.z, *r = M.radius;
+	return true;
+}
+
+void maria_pushed(float x, float z) { M.x = x, M.z = z; }
+
 bool maria_target(const EnPlayer* james, EnPlayer* out)
 {
 	if (!M.here || M.sub == SUB_DYING)

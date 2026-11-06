@@ -6134,7 +6134,7 @@ void enemy_stream_update(int stage, const Collision* col)
 // from the port's own move code (James' last place is kept here, the enemies' by enemy_update), a
 // move longer than the radius counts as a placing, and a column that met nobody keeps the place
 // that code gave it.
-typedef struct { float cx, cz, mx, mz, feet, top, r, px, pz; int w; bool moved; Enemy* e; } PushCol;
+typedef struct { float cx, cz, mx, mz, feet, top, r, px, pz; int w; bool moved; Enemy* e; bool maria; } PushCol;
 
 static void push_share(float* a, float b)       // 0x522940
 {
@@ -6146,7 +6146,9 @@ static void push_walls(PushCol* c, float fx, float fz, float jy)
 {
 	if (!s_col)
 		return;
-	if (!c->e) {        // James: his feet, off the column's centre by its distance ahead
+	if (c->maria) {     // MariaSetHitColumn (0x52b330), as maria.c tests it
+		col_push(s_col, &c->cx, &c->cz, c->feet + 10.0f, 760.0f, c->r);
+	} else if (!c->e) {        // James: his feet, off the column's centre by its distance ahead
 		float x = c->cx - fx, z = c->cz - fz;
 		col_push(s_col, &x, &z, jy, 900.0f, 130.0f);
 		c->cx = x + fx, c->cz = z + fz;
@@ -6168,6 +6170,12 @@ void enemy_push_apart(float jx, float jz, float jy, float jyaw, float jr, float 
 		wx = s_jwas[0], wz = s_jwas[1];
 	if (jr > 0.0f)       // 0x534d70: from 50 above his feet to 850 above, weight 2 (0x536f10)
 		c[n++] = (PushCol){ wx + fx, wz + fz, jx - wx, jz - wz, jy - 50.0f, jy - 850.0f, jr, 0.0f, 0.0f, 2, false, NULL };
+	{
+		// Maria (MariaSetHitColumn 0x52b330: 50 to 800 above her feet, her radius); her weight is taken as James' 2
+		float mx, my, mz, mr;
+		if (maria_column(&mx, &my, &mz, &mr))
+			c[n++] = (PushCol){ mx, mz, 0.0f, 0.0f, my - 50.0f, my - 800.0f, mr, 0.0f, 0.0f, 2, false, NULL, true };
+	}
 	for (int i = 0; i < ENEMY_MAX; i++) {
 		Enemy* e = &s_en[i];
 		float r;
@@ -6229,6 +6237,10 @@ void enemy_push_apart(float jx, float jz, float jy, float jyaw, float jr, float 
 		PushCol* a = &c[i];
 		if (!a->moved)        // the port's own move code placed it already
 			continue;
+		if (a->maria) {
+			maria_pushed(a->cx, a->cz);
+			continue;
+		}
 		if (!a->e) {
 			*jdx = a->cx - fx - jx, *jdz = a->cz - fz - jz;
 			if (s_log)        // debug.txt "enemylog 1"
