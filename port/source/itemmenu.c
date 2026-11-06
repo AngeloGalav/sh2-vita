@@ -16,7 +16,7 @@
 #include <string.h>
 #include <tex3ds.h>
 
-enum { ST_ITEMS = 1, ST_OPTION = 2, ST_MEMO = 3, ST_MAP = 4, ST_EQUIP = 5, ST_CMD = 6, ST_CMD_EQ = 7, ST_READ = 11, ST_PIC = 12 };
+enum { ST_ITEMS = 1, ST_OPTION = 2, ST_MEMO = 3, ST_MAP = 4, ST_EQUIP = 5, ST_CMD = 6, ST_CMD_EQ = 7, ST_READ = 11, ST_PIC = 12, ST_PIC_END = 13 };
 enum { CMD_USE = 0, CMD_RELOAD = 1, CMD_VOLUME = 2, CMD_POWER = 3, CMD_ON = 4, CMD_OFF = 5, CMD_EXAMINE = 6, CMD_EQUIP = 7,
        CMD_UNEQUIP = 8, CMD_COMBINE = 15 };
 #define MAX_ITEMS 86
@@ -40,6 +40,12 @@ static int s_mark[3];
 static float s_mark_a[3];
 static int s_hold, s_seed;
 static float s_tint_t;
+static bool s_moved;                   // the frame is on its way (0x9443c2)
+static char s_pack[96];
+static int s_read_page;                // ST_READ: which of the item's texts
+static C3D_Tex s_pic;                  // ST_PIC: the item's picture (0x46a850)
+static bool s_pic_ok;
+static int s_pic_side;                 // 0x9443aa: 1 the front, 2 a coin's back
 
 static float X(float x) { return 200.0f + x * 0.625f; }
 static float Y(float y) { return 120.0f + y * 0.46875f; }
@@ -53,6 +59,7 @@ void itemmenu_panel(float* x0, float* y0, float* x1, float* y1)
 void itemmenu_init(const char* pack_dir, int chapter)
 {
 	s_chapter = chapter;
+	snprintf(s_pack, sizeof s_pack, "%s", pack_dir);
 	static const char* const NAME[2] = { "itemmenu", "itemmenux" };
 	char path[160];
 	for (int i = 0; i < 2; i++) {
@@ -124,6 +131,89 @@ static int commands(int it, int* cmd, int* ytext)
 	return n;
 }
 
+// 0x471590's Examine: the texts of the items with no picture, in 0x472e80's order (0x9445f4 5, then 6).
+// An item with neither goes straight back to the list, as on the PC.
+static int read_text(int it, int page)
+{
+	if (page == 0)
+		return it == 0x17 ? 0xcc : it == 0x1e ? 0xc6 : -1;
+	switch (it) {
+	case 0x15: return 0xd1;
+	case 0x17: return 0xcd;
+	case 0x18: return 0xbf;
+	case 0x1d: return 0xc4;
+	case 0x1e: return ev_flag(1611) ? 199 : 0xc5;       // 0x1f7d6a8 & 0x800
+	case 0x1f: return 200;
+	case 0x2b: return 0xcb;
+	case 0x37: return 0xbe;
+	case 0x4d: return 0xce;
+	case 0x4f: return 0xf6;
+	case 0x50: return 0xf7;
+	case 0x51: return 0xf8;
+	default: return -1;
+	}
+}
+
+// 0x46a850: the picture of the items that have one
+static const char* pic_name(int it)
+{
+	switch (it) {
+	case 0x14: return "x_mary_p";
+	case 0x1a: return "x_keygate";
+	case 0x1c: return "x_keyclock";
+	case 0x20: return "x_keynorth";
+	case 0x24: return "x_keyrapis";
+	case 0x29: return "x_keyspiral";
+	case 0x32: return "x_coinsnake";
+	case 0x33: return "x_coinelder";
+	case 0x34: return "x_coinprisoner";
+	case 0x38: return "x_ringopper";
+	case 0x39: return "x_ringlead";
+	case 0x3b: return "x_plate_kick";
+	case 0x3c: return "x_plate_pig";
+	case 0x3d: return "x_plate_female";
+	default: return NULL;
+	}
+}
+
+static void pic_free(void)
+{
+	if (s_pic_ok)
+		C3D_TexDelete(&s_pic);
+	s_pic_ok = false;
+}
+
+static void pic_load(const char* name)
+{
+	pic_free();
+	char path[160];
+	snprintf(path, sizeof path, "%s/pic/item/%s.t3x", s_pack, name);
+	FILE* f = fopen(path, "rb");
+	if (!f)
+		return;
+	Tex3DS_Texture t = Tex3DS_TextureImportStdio(f, &s_pic, NULL, false);
+	fclose(f);
+	if (t) {
+		Tex3DS_TextureFree(t);
+		C3D_TexSetFilter(&s_pic, GPU_LINEAR, GPU_LINEAR);
+		s_pic_ok = true;
+	}
+}
+
+// 0x46c300 and 0x472e80 (0x9445f4 7): what is written under a picture; -1 the item's name and description
+static int pic_text(int it)
+{
+	switch (it) {
+	case 0x1c: return ev_flag(77) ? 0xc0 : -1;          // 0x1f7d5e8 & 0x2000
+	case 0x20: return 0xc9;
+	case 0x29: return 0xca;
+	case 0x32: return prog_riddle_level() == 3 ? 0xc1 : -1;
+	case 0x33: return s_pic_side == 2 ? 0xf4 : 0xc2;
+	case 0x34: return s_pic_side == 2 ? 0xf5 : 0xc3;
+	default: return -1;
+	}
+}
+
 // 0x46a4f0: the ten places of the ring from s_start; the fifth is the chosen one
 static void places(int* slot)
 {
@@ -165,6 +255,8 @@ void itemmenu_open(const ItemMenuHost* host, int last_item)
 		s_eq_fade[i] = 0.0f;
 	}
 	s_state = ST_ITEMS, s_row = 0, s_turning = false, s_hold = 0;
+	pic_free();
+	s_pic_side = 0;
 	static const float start[4][2] = { { -120, -120 }, { -120, 120 }, { 120, 120 }, { 120, -120 } };   // 0x46b3e0 case 0
 	memcpy(s_frame, start, sizeof s_frame);
 	for (int i = 0; i < 8; i++)
@@ -228,6 +320,7 @@ static void step(void)
 		moved |= x != s_frame[i][0] || y != s_frame[i][1];
 		s_frame[i][0] = x, s_frame[i][1] = y;
 	}
+	s_moved = moved;
 	// 0x475230: the lit heading's colour goes round 0..2 in 0.04 steps, from 0 while the frame moves
 	s_flash = moved || s_flash >= 2.0f ? 0.0f : s_flash;
 	s_flash += 0.04f;
@@ -276,7 +369,14 @@ static void act(int it, int cmd)
 	case CMD_EXAMINE:
 		prog_score_examine(it);
 		sfx_play(SFX_MENU_OK, 1.0f, 0.0f);
-		s_state = ST_READ;
+		if (pic_name(it)) {
+			pic_load(pic_name(it));
+			s_pic_side = 1;
+			s_state = ST_PIC;
+		} else {
+			s_read_page = read_text(it, 0) >= 0 ? 0 : 1;
+			s_state = read_text(it, s_read_page) >= 0 ? ST_READ : ST_ITEMS;
+		}
 		break;
 	case CMD_COMBINE:                      // 0x471590: up to three go in the marks along the bottom
 		for (int i = 0; i < 3; i++)
@@ -401,9 +501,36 @@ bool itemmenu_update(u32 down, u32 held)
 		}
 		break;
 	}
-	case ST_READ:
-		if (down & (KEY_A | KEY_B))
-			go(ST_ITEMS);
+	case ST_READ:                          // 0x474410 case 0xb, 0x472e80: a press once the frame has stopped
+		if ((down & (KEY_A | KEY_B)) && !s_moved) {
+			if (s_read_page == 0 && read_text(it, 1) >= 0)
+				s_read_page = 1;
+			else
+				s_state = ST_ITEMS;
+		}
+		break;
+	case ST_PIC:                           // 0x474410 case 0xc: a press closes it, the coins' backs load first
+		if (down & (KEY_A | KEY_B)) {
+			s_state = ST_PIC_END;
+			if (it == 0x32)
+				pic_load("x_coinsnake_ura");
+			else if (it == 0x33)
+				pic_load("x_coinelder_ura");
+			else if (it == 0x34)
+				pic_load("x_coinprisoner_ura");
+		}
+		break;
+	case ST_PIC_END:                       // case 0xd: on the top riddle level a coin then shows its back
+		if (!s_moved) {
+			if ((it == 0x32 || it == 0x33 || it == 0x34) && s_pic_side == 1 && prog_riddle_level() == 3) {
+				s_pic_side = 2;
+				s_state = ST_PIC;
+			} else {
+				pic_free();
+				s_pic_side = 0;
+				s_state = ST_ITEMS;
+			}
+		}
 		break;
 	}
 	return true;
@@ -581,7 +708,42 @@ static void shaded(int f, float x, float y, const char* s, int al, u32 c)
 	font_text(f, x, y, s, al, c, c);
 }
 
-void itemmenu_draw(void)
+// 0x46c300: the picture fills the frame, between four grey outlines each way, fainter going out
+static void picture(void)
+{
+	if (s_state != ST_PIC && s_state != ST_PIC_END)
+		return;
+	float x0 = s_frame[0][0], y0 = s_frame[0][1], x1 = s_frame[2][0], y1 = s_frame[2][1];
+	if (s_pic_ok) {
+		const u32 k[4] = { 0xffffffffu, 0xffffffffu, 0xffffffffu, 0xffffffffu };
+		font_quad_px(&s_pic, X(x0), Y(y0), X(x1), Y(y1), 0, 0, 1, 1, k);
+	}
+	for (int i = 0; i < 4; i++) {
+		u32 g = (u32)((3 - i) * 0x2d + 0x1e), c = g << 24 | g << 16 | g << 8 | 0x40;
+		for (int s = -1; s <= 1; s += 2) {
+			float d = (float)(s * i);
+			line(x0 - d, y0 - d, x1 + d, y0 - d, c);
+			line(x1 + d, y0 - d, x1 + d, y1 + d, c);
+			line(x0 - d, y1 + d, x1 + d, y1 + d, c);
+			line(x0 - d, y0 - d, x0 - d, y1 + d, c);
+		}
+	}
+}
+
+static void written(int msg, float x, float y)
+{
+	const char* m = ev_item_message(msg);
+	if (!m)
+		return;
+	char text[400];
+	snprintf(text, sizeof text, "%s", m);
+	for (char* c = text; *c; c++)
+		if (*c == '\f')
+			*c = '\n';
+	shaded(FONT_BIG, x, y, text, FONT_LEFT, 0xfefefeffu);
+}
+
+static void draw_all(void)
 {
 	const u32 black = 0x000000ffu, full = 0xfefefeffu, dim = 0x404040ffu;
 	float px0, py0, px1, py1;
@@ -619,6 +781,7 @@ void itemmenu_draw(void)
 		if (s_eq_fade[i] > 0.0f)
 			sprite(s_list[i], 0.0f, -134.0f, 0xff, s_eq_fade[i]);
 	marks();
+	picture();
 	frame();
 	// 0x472e80's text. The headings and the bottom row, centred
 	font_text(FONT_BIG, 0x60, 0x32, ev_item_message(12), FONT_CENTER, full, full);
@@ -657,6 +820,13 @@ void itemmenu_draw(void)
 		bool on = s_host.power_on && s_host.power_on(subject);
 		font_text(FONT_BIG, 0x130, 0x122, ev_item_message(on ? CMD_ON : CMD_OFF), FONT_RIGHT, full, full);
 	}
+	// 0x472e80: an Examine's own text takes the place of the name and description
+	int own = s_state == ST_READ ? read_text(subject, s_read_page) :
+	          s_state == ST_PIC || s_state == ST_PIC_END ? pic_text(subject) : -1;
+	if (own >= 0) {
+		written(own, 0x2d, 0x154);
+		return;
+	}
 	char name[64];
 	const char* nm = ev_item_name(subject);
 	snprintf(name, sizeof name, "%.*s", nm ? (int)strcspn(nm, "\n") : 0, nm ? nm : "");
@@ -670,4 +840,18 @@ void itemmenu_draw(void)
 				*c = '\n';
 		shaded(FONT_BIG, 0x2d, 0x168, text, FONT_LEFT, full);
 	}
+}
+
+// The whole screen a little larger than the PC's on the Vita's display (not the PC's: 15%, round the
+// middle, which leaves the outermost text and the frame about 16 pixels from the display's edge)
+#define MENU_ZOOM 1.15f
+
+void itemmenu_draw(void)
+{
+	extern void vita_view_zoom(float zoom);
+	font_flush();
+	vita_view_zoom(MENU_ZOOM);
+	draw_all();
+	font_flush();
+	vita_view_zoom(1.0f);
 }

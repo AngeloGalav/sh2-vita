@@ -2045,6 +2045,16 @@ static void half_fog_route(void)
 		half_fog_begin();
 }
 
+// The current target's picture larger round its middle, 1 as usual: what falls outside is cut off
+void vita_view_zoom(float zoom)
+{
+	C3D_RenderTarget* t = G.target;
+	if (!t)
+		return;
+	int w = (int)(t->gl_w * zoom + 0.5f), h = (int)(t->gl_h * zoom + 0.5f);
+	glViewport((t->gl_w - w) / 2, (t->gl_h - h) / 2, w, h);
+}
+
 // The item screen's still (0x46f180 samples a texture of the frame, 0x46a150): the game view copied
 // once into a small target as the menu opens, then laid into the status panel. Both copies keep the
 // surface's portrait rows, as half_fog_end's does; blit says how they lie on the display.

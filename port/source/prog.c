@@ -627,6 +627,8 @@ void prog_score_examine(int item)
 		(*n)++;
 	if (item == 0x18)
 		p_set(630);                         // Angela's knife: FLAGW_608 |= 0x400000 (In Water)
+	if (item == 0x1a)
+		p_set(1498);                        // 0x46c300: FLAGW_1472 |= 0x4000000 (the gate key)
 }
 
 void prog_score_overheal(float part) { SCORE(0x1f7d9d4) += part; }
