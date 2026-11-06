@@ -284,8 +284,27 @@ Ordered by weight. Each line names where the work starts.
 ### To do on the Vita, from console tests
 
 - Movies: shown at the 3DS's aspect ratio; they should fill the Vita's 16:9.
-- Attacks: every attack comes out heavy; light and heavy should follow the PC port's setting.
-- Examine on the item screen: should work as on the PC.
+- Attacks: every attack came out heavy. The plank forced the heavy swing on a target on the floor within 1400
+  units, the port's own choice, which also caught Lying Figures crawling; taken out (0x533ff0 goes by the press
+  alone). Works on a console.
+- Examine on the item screen (0x46a850, 0x46c300, 0x472e80) and the screen 15% larger (`MENU_ZOOM`, not the PC's) work on a
+  console; the coins' backs on the top riddle level are still to be seen. The Letter from Mary shows only its envelope, as the
+  PC's code does: message 0xd1, and nothing in the exe refers to pic/item/p_letterm.tex (the encrypted parts aside).
+- Game over as on the PC (0x498780, 0x496ee0, the 0x496c90 table), on black; on the 3DS the port's own version stays. Works on a console.
+- FMV subtitles don't show (a commit on the 3DS repo may help). Later.
+- Levels sometimes jitter: the hospital, and the labyrinth's rooms with the water. Later.
+- The finishing blow on a fallen enemy with X alone, without R as on the PC, doesn't work. Later.
+- Save screen: its background is stretched. Later.
+- A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
+- Some animation errors in play. Later.
+- The light is wrong in some levels. Later.
+- Map screen: the arrows to the other maps and James' own from the PC's sheet (0x49ce40, 0x49d9d0; `map/carsol.t3x`, new in
+  Vita packs), the D-pad's presses change maps, the stick only moves the view (the PC's stick also changes maps; asked for on the Vita). Works on a console.
+- Flashlight and character spots: the layer's spot direction was negated, so the beam lit behind the lamp (`C3D_LightSpotDir`). Fixed; the flashlight's direction confirmed on a console.
+- Labyrinth water: rooms 0x80, 0x85, 0x7a, 0x7c, 0x7e, 0x82 get a still see-through surface over the PC's areas (stand-in for classes 29..34: no texture, no waves). James and Maria's columns now push each other (her weight taken as James'). Flashlight sounds from the EE's WAVs when the pack has them. All work on a console.
+- Angela at the grave in play (stage 4, 0x59fd30, `stagemdl.c`): new `chr/agl/agl_grave_*.s3a` in the pack (motion.py). Works on a console.
+- PC saves: `tools/pcsave.py` converts `sh2pcsave??.dat` (0x44d780, 0x455220) to save files, from slot 10 on; the Vita lists 75 slots. Loads on a console; the room comes from the position, Maria's place and the radio aren't carried over.
+- Mirror scene's blur (first toilet): the PC's two strengths and passes (0x479840 mode 8), works on a console. The second is laid half and half where the PC blends by the frame's alpha (stand-in), and level 0 isn't used.
 
 ### 1. Real hardware
 
@@ -311,8 +330,7 @@ Ordered by weight. Each line names where the work starts.
   (0x535720, as the Enhanced Edition's RestoreSearchCamMovement), with no button held first, which is the
   port's. Letting go ends it.
 - Item screen on the PS Vita (`itemmenu.c`, 0x475230): the bars' brightness per row is a guess, and the status
-  panel's noise is flat red where the PC's strips sample the still. Examine shows the text, not the PC's picture
-  (0x46a850, 0x46c300). Adjust volume shows the level as a number (stand-in for 0x46ee90's blocks). The memo list and stage
+  panel's noise is flat red where the PC's strips sample the still. Adjust volume shows the level as a number (stand-in for 0x46ee90's blocks). The memo list and stage
   panels are drawn by `touchui_draw_pc`, with no PC function behind them yet.
 - Fog on the PS Vita (`port/vita/compat/c3d_gl.c`): the sprites are drawn at half size and without
   the PC's depth test, so a sprite also lays over what stands in front of it. Chosen on a console: it
