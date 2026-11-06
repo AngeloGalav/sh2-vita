@@ -15,7 +15,7 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 ## Install
 
 1. Install `sh2vita.vpk` with VitaShell.
-2. Copy the pack to `ux0:data/sh23ds/`, so that `ux0:data/sh23ds/ui/font.t3x` exists. Make it with
+2. Copy the pack to `ux0:data/sh2-vita/`, so that `ux0:data/sh2-vita/ui/font.t3x` exists. Make it with
    the packer and `-e VITA=1`, or convert a 3DS pack with
    `python3 tools/sh2conv/vitatex.py <pack>/3ds/sh23ds` (10 seconds; the 3DS cannot read it after).
    This writes the textures in the Vita's form, so they are not untiled or decoded as they load, and
@@ -24,7 +24,7 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 3. The shaders are compiled on the console at run time: `ur0:data/libshacccg.suprx` must be
    installed (the usual step for vitaGL ports; extract it with ShaRKBR33D).
 
-`ux0:data/sh23ds/vita_log.txt` records start-up and any shader that fails to compile.
+`ux0:data/sh2-vita/vita_log.txt` records start-up and any shader that fails to compile.
 
 ## On the console
 
@@ -45,7 +45,7 @@ installs it from there. `vita_log.txt` starts over at every launch, so run `pull
 ### Saves from the PC
 
 `python3 tools/pcsave.py <folder with sh2pcsave??.dat> --out <folder>` writes the port's files from slot 10 on
-(`save11.dat` ..), leaving slots 0..9 alone. Copy them to `ux0:data/sh23ds/`: `vita.sh put <file> ux0:/data/sh23ds/`.
+(`save11.dat` ..), leaving slots 0..9 alone. Copy them to `ux0:data/sh2-vita/`: `vita.sh put <file> ux0:/data/sh2-vita/`.
 
 ## How the layer works
 

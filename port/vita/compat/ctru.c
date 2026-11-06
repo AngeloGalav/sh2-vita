@@ -2,6 +2,8 @@
 // language, the SD card paths and the 3DS framebuffers nodata.c draws into. Vita-only; there is
 // no PC counterpart (the PC game sits on Win32, the 3DS port on libctru).
 #include <3ds.h>
+#include <psp2/io/fcntl.h>
+#include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/ctrl.h>
@@ -45,6 +47,10 @@ extern u32 __ctru_heap_size, __ctru_linear_heap_size;
 
 int __wrap_main(int argc, char** argv)
 {
+	// The data folder had the 3DS port's name: an old install moves over, saves and all, before anything opens it
+	SceIoStat st;
+	if (sceIoGetstat(VITA_DATA_DIR, &st) < 0 && sceIoGetstat("ux0:data/sh23ds", &st) >= 0)
+		sceIoRename("ux0:data/sh23ds", VITA_DATA_DIR);
 	__ctru_heap_size = 32u << 20;
 	__ctru_linear_heap_size = 92u << 20;
 	vita_log("sh2vita start: heap %u MB, %u KB free", HEAP_SIZE >> 20, (unsigned)(linearSpaceFree() >> 10));
@@ -502,8 +508,8 @@ Result CFGU_GetSystemLanguage(u8* language)
 }
 
 // ---------------------------------------------------------------- the SD card
-// The game opens "sdmc:/3ds/sh23ds/..."; on the Vita the pack lives in ux0:data/sh23ds/, and any
-// other sdmc: path under ux0:data/sh23ds/sdmc/. The linker routes the calls here (--wrap).
+// The game opens "sdmc:/3ds/sh23ds/..."; on the Vita the pack lives in ux0:data/sh2-vita/, and any
+// other sdmc: path under ux0:data/sh2-vita/sdmc/. The linker routes the calls here (--wrap).
 
 const char* vita_path(const char* in, char* buf, size_t n)
 {

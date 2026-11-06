@@ -487,13 +487,13 @@ static void top_screen(Screen* s, const char* pack_dir, int kind, const char* fo
 			text(s, ND_MONO, x + 72, y, C_DIM, line, 0);
 		}
 		para(s, x, y + 28, w, 18, ND_BODY, C_TEXT2,
-		     "Copy the pack from the packer to ux0:data/sh23ds again. Back up your save*.dat files first.");
+		     "Copy the pack from the packer to ux0:data/sh2-vita again. Back up your save*.dat files first.");
 	} else {
 		para(s, x, 96, w, 19, ND_ITALIC, C_DIM,
 		     "The engine is here. The game comes from your own PC copy, converted once on a computer.");
 		static const char* const steps[] = {
 			"Open the packer on a computer:\n" MONO PACKER_URL,
-			"Copy the sh23ds folder it makes to ux0:data",
+			"Copy what is in the sh23ds folder it makes to ux0:data/sh2-vita",
 			"Start the game again",
 		};
 		int y = 146;
@@ -756,7 +756,7 @@ static void show(const Screen* s, Shown* held, int screen, u32 t, int fade, int 
 static void fallback(void)
 {
 	consoleInit(GFX_TOP, &s_top);
-	printf("\n  The game data was not found in\n  ux0:data/sh23ds/\n\n"
+	printf("\n  The game data was not found in\n  ux0:data/sh2-vita/\n\n"
 	       "  Install guide:\n  " GUIDE_URL "\n\n  Press START to quit.");
 	while (aptMainLoop()) {
 		hidScanInput();

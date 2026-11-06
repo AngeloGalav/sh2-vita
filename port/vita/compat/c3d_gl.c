@@ -110,7 +110,7 @@ static struct {
 	u16 zw, zh;
 } HF = { .on = true, .no_test = true, .fog_prog = -2 };
 
-// ux0:data/sh23ds/halffog0.txt starts with it off (a test switch)
+// ux0:data/sh2-vita/halffog0.txt starts with it off (a test switch)
 static void half_fog_init(void)
 {
 	FILE* f = fopen(VITA_DATA_DIR "/halffog0.txt", "r");
@@ -146,7 +146,7 @@ void c3d_fog_precision_toggle(void)
 
 static void half_fog_end(void);
 
-// The game view's surface, portrait as the PICA's. ux0:data/sh23ds/res416.txt (Options, Resolution)
+// The game view's surface, portrait as the PICA's. ux0:data/sh2-vita/res416.txt (Options, Resolution)
 // draws it at 720 x 416, a little over half the pixels, and the present stretches it. Read at start-up. 416
 // and not 408: a depth surface's rows are whole multiples of 32 samples, and the half-size fog reads
 // the depth as a texture of exactly that width.
@@ -184,7 +184,7 @@ void vita_gl_init(void)
 		vita_log("ur0:data/libshacccg.suprx: %lld bytes", (long long)st.st_size);
 	// Larger GXM rings than the defaults (VDM 128 KB, vertex 2 MB, fragment 512 KB, USSE 16 KB), and
 	// more scenes per FBO for frames split between targets, as other vitaGL ports set them for a frame
-	// with many draws and passes. ux0:data/sh23ds/gxmrings0.txt keeps the defaults (a test switch,
+	// with many draws and passes. ux0:data/sh2-vita/gxmrings0.txt keeps the defaults (a test switch,
 	// read here because these must precede vitaGL's start)
 	FILE* rings = fopen(VITA_DATA_DIR "/gxmrings0.txt", "r");
 	if (rings) {
@@ -1553,7 +1553,7 @@ static Program* build(const FragKey* k)
 		s_nprogs = 0;
 	}
 	GLuint vs = vertex_shader(k->vprog, vflip);
-	static int dump = -1;             // ux0:data/sh23ds/dumpshaders.txt: every fragment program into the log
+	static int dump = -1;             // ux0:data/sh2-vita/dumpshaders.txt: every fragment program into the log
 	if (dump < 0) {
 		FILE* f = fopen(VITA_DATA_DIR "/dumpshaders.txt", "r");
 		dump = f != NULL;

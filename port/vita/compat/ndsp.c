@@ -35,7 +35,7 @@ static pthread_t s_thread;
 static int s_port = -1;
 
 // ---------------------------------------------------------------- audio capture (diagnostics)
-// With ux0:data/sh23ds/audiodump.txt present, the first 20 s after ndspInit are kept: the mixed
+// With ux0:data/sh2-vita/audiodump.txt present, the first 20 s after ndspInit are kept: the mixed
 // output (mix.raw, s16 stereo 48 kHz) and the music channel's buffers as the game queued them
 // (music.raw, s16 stereo at the stream's own rate, named in the log), then written out once.
 #define CAP_SECONDS 20

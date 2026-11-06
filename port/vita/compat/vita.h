@@ -2,7 +2,7 @@
 #pragma once
 #include <3ds.h>
 
-#define VITA_DATA_DIR "ux0:data/sh23ds"
+#define VITA_DATA_DIR "ux0:data/sh2-vita"
 
 void vita_log(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 bool vita_quit_requested(void);

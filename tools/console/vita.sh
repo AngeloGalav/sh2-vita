@@ -6,8 +6,8 @@
 #   tools/console/vita.sh vpk            upload the whole VPK to ux0:data, to install it in VitaShell
 #   tools/console/vita.sh pull [dir]     download the logs (default .lr3ds/console/vita-<date-time>,
 #                                        and .lr3ds/console/vita-latest points at it)
-#   tools/console/vita.sh put <file> [path]  upload a file (default the pack's ui/, ux0:/data/sh23ds/ui/)
-#   tools/console/vita.sh ls [path]      list a folder (default the pack, ux0:/data/sh23ds/)
+#   tools/console/vita.sh put <file> [path]  upload a file (default the pack's ui/, ux0:/data/sh2-vita/ui/)
+#   tools/console/vita.sh ls [path]      list a folder (default the pack, ux0:/data/sh2-vita/)
 #   tools/console/vita.sh get <path> [dir]   download one file, e.g. ux0:/data/psp2core-x.psp2dmp
 #   tools/console/vita.sh run | stop     start or close the game (vitacompanion only)
 #
@@ -18,7 +18,7 @@
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 TITLE=SHIL00002
-PACK=ux0:/data/sh23ds
+PACK=ux0:/data/sh2-vita
 BUILD=$ROOT/port/vita
 IP_FILE=$ROOT/.lr3ds/vita_ip
 PORT=${VITA_FTP_PORT:-1337}
