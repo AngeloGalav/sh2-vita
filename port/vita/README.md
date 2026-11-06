@@ -26,6 +26,27 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 
 `ux0:data/sh23ds/vita_log.txt` records start-up and any shader that fails to compile.
 
+## On the console
+
+`tools/console/vita.sh` updates the game and fetches its logs over Wi-Fi. It needs an FTP server on the
+console on port 1337: VitaShell's (set START > Main settings > SELECT button to FTP, press SELECT and stay in VitaShell), or the vitacompanion plugin's, which
+stays on in game.
+
+```sh
+tools/console/vita.sh ip 192.168.1.50   # once, the address VitaShell shows
+tools/console/vita.sh install           # the eboot.bin just built, over the installed game
+tools/console/vita.sh pull              # logs into .lr3ds/console/vita-latest/
+```
+
+`install` only replaces `eboot.bin`, which is what a code change touches. The first install, a new LiveArea
+image or a changed `param.sfo` need the whole VPK: `vita.sh vpk` uploads it to `ux0:data`, and VitaShell
+installs it from there. `vita_log.txt` starts over at every launch, so run `pull` before starting the game again.
+
+### Saves from the PC
+
+`python3 tools/pcsave.py <folder with sh2pcsave??.dat> --out <folder>` writes the port's files from slot 10 on
+(`save11.dat` ..), leaving slots 0..9 alone. Copy them to `ux0:data/sh23ds/`: `vita.sh put <file> ux0:/data/sh23ds/`.
+
 ## How the layer works
 
 | File | Does |
