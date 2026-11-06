@@ -23,7 +23,7 @@ sh2-vita plays Silent Hill 2 from the PC version's own data, as native code on t
 - Single-screen menus: title, pause, items, options, save and load, map, drawn after the original game's
 - Textures in DXT straight from the PC's pixels, with their mipmaps
 - The fog drawn on a smaller target, with a choice of detail in the options
-- The Enhanced Edition's high resolution font, art and maps, when your game folder has them
+- The Enhanced Edition's high resolution font, art and maps
 
 ## Install
 
@@ -31,7 +31,7 @@ You need:
 
 - a PS Vita with custom firmware (HENkaku or Ensō), and enough room on `ux0:` for about 2.6 GB of game data
 - `ur0:data/libshacccg.suprx`, the system's shader compiler, which the game compiles its shaders with
-- the PC release of *Silent Hill 2: Director's Cut*, optionally with the [Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) installed
+- the PC release of *Silent Hill 2: Director's Cut*, with the [Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) installed: it is required, and the executable has to be the Director's Cut, whose tables the converters read
 - on your computer: Docker, Python 3 with numpy and Pillow, ffmpeg and a C++ compiler
 
 There are no prebuilt releases yet, so build the package yourself:
@@ -43,7 +43,7 @@ There are no prebuilt releases yet, so build the package yourself:
    SH2_VITA_TEX=1 SH2_TEXENC=native tools/make_pack.sh "/path/to/Silent Hill 2" pack-vita/3ds/sh23ds --strip-extras
    python3 tools/sh2conv/vitatex.py pack-vita/3ds/sh23ds
    ```
-3. Copy the contents of `pack-vita/3ds/sh23ds/` to `ux0:data/sh23ds/`.
+3. Copy the contents of `pack-vita/3ds/sh23ds/` to `ux0:data/sh2-vita/`.
 
 The first time each shader is needed it is compiled and kept on the card, so the first run has some short pauses.
 
@@ -87,12 +87,12 @@ Under *Options*, *System*:
 
 Open at the moment:
 
-- **Item screen:** close to the original, but the layout is about 13% wider than 4:3, Examine shows text rather than the item's picture and Adjust volume shows a number in place of the blocks
+- **Item screen:** close to the original, but the layout is about 13% wider than 4:3 and Adjust volume shows a number in place of the blocks
 - **Options:** the look follows the original's screens, the tabs and some settings are the port's own
 - **Other menus:** the memo list, stage panels and first run use the same style without being ported from the game's own screens, and the Movie Menu takes the options' look
 - **Title:** the menu's words are the game's pictures, which exist only in English
 - **Sound:** crackling can be heard
-- **Not wired:** subtitles on the movies, the game-over still and New Game+'s yellow NEW GAME
+- **Not wired:** subtitles on the movies and New Game+'s yellow NEW GAME
 
 More in [port/vita/README.md](port/vita/README.md) and [port/STATUS.md](port/STATUS.md).
 
@@ -111,26 +111,6 @@ The game is ported by reading the PC executable in Ghidra and translating its fu
 
 To test on a console, these combinations work while holding SELECT: L changes the fog's mode, R the GPU cost test, Triangle the fog's precision and Square the ETC1 levels. `vita_log.txt` and `perf.txt` are written next to the game data.
 
-## FAQ
-
-<details>
-<summary><b>Where do I get the game files?</b></summary>
-<br>
-From your own copy of the PC game. This project doesn't host, link to or share game files.
-</details>
-
-<details>
-<summary><b>Can I use the Enhanced Edition?</b></summary>
-<br>
-Yes: with its files in your game folder, the converters use its art, maps, font and text. The executable has to be the Director's Cut; the converters read their tables from it.
-</details>
-
-<details>
-<summary><b>Is this the 2024 remake, or an emulator?</b></summary>
-<br>
-Neither. This is the 2001 game, rebuilt from the PC Director's Cut and running as native code. The game's data is converted once, on your computer.
-</details>
-
 ## Thanks
 
 - [Silent Hill 2: Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) by Elisha Riedlinger and contributors, for its fixes, its research into the PC game and its high resolution packs
@@ -145,3 +125,7 @@ Neither. This is the 2001 game, rebuilt from the PC Director's Cut and running a
 sh2-vita is released under the [GNU General Public License v3.0](LICENSE). Bundled third-party code keeps its own license.
 
 This is a fan project, not affiliated with or endorsed by Konami or Sony. *Silent Hill* is a trademark of Konami Digital Entertainment and PlayStation Vita is a trademark of Sony Interactive Entertainment.
+
+## AI disclosure
+
+Much of this port's code, documentation and commit messages was written with AI coding agents, including Claude Code. A person directs the work, decides what goes in and tests the builds on a real console. Expect mistakes, and check the code against the original game before relying on it.
