@@ -22,6 +22,19 @@
 static inline float snap_x(float v) { return floorf(v / GLYPH_SX + 0.5f) * GLYPH_SX; }
 static inline float snap_y(float v) { return floorf(v / GLYPH_SY + 0.5f) * GLYPH_SY; }
 
+// The glyphs' shape as the Enhanced Edition draws them: its font cell is 20 x 32 (Settings.h CustomFontCharWidth,
+// CustomFontCharHeight) where the PC's lines are 30 apart (NormalFontHeight), on a 4:3 picture of 1.25 x 1.07
+// pixels a unit. The Vita's layout is 1.5 x 1.0625 display pixels a font unit, which made the text wide: the glyphs
+// stand this much taller about the middle of their cell, the lines' spacing and the widths staying the PC's.
+#ifdef SH2_VITA
+#define GLYPH_TALL ((1.5f / 1.0625f) / (1.25f / (480.0f / 448.0f)) * (32.0f / 30.0f))   // about 1.29
+// and all of it a little smaller, both ways and the pen's steps with it (asked for; port's own)
+#define GLYPH_SIZE 0.9f
+#else
+#define GLYPH_TALL 1.0f
+#define GLYPH_SIZE 1.0f
+#endif
+
 typedef struct {
 	u16 x, y; u8 w, h, adv;      // atlas rectangle (3DS pixels), advance (PC units)
 	u8 ix0, iy0, ix1, iy1;       // the ink inside the rectangle (font_ink_px), ix1 = 0: none
@@ -138,7 +151,10 @@ static const Glyph* glyph(int font, int code)
 
 // 0x47f400: codes below 0xe0 advance by their width plus 2 (the space by 7), the full-width ones
 // by the cell width plus 2; a line's width leaves out the last 2.
-static int advance(int font, int code)
+static float advance_pc(int font, int code);
+static float advance(int font, int code) { return advance_pc(font, code) * GLYPH_SIZE; }
+
+static float advance_pc(int font, int code)
 {
 	// 0xfcnn / 0xfdnn move the pen back / on by nn (the titles' kerning); 0xfffe, a full-width
 	// space, falls through to the full-width advance
@@ -188,13 +204,25 @@ static int line_codes(const char** s, u16* out, int max)
 
 static float line_width(int font, const u16* codes, int n)
 {
-	int w = 0;
+	float w = 0.0f;
 	for (int i = 0; i < n; i++)
 		w += advance(font, codes[i]);
-	return w > 2 ? (float)(w - 2) : 0.0f;
+	return w > 2.0f * GLYPH_SIZE ? w - 2.0f * GLYPH_SIZE : 0.0f;
 }
 
-static void put_glyph(const Glyph* g, float x, float y, u32 top, u32 bottom)
+static void tall(int font, float top, float* y0, float* y1);
+
+// y0..y1, a glyph whose cell starts at top, stretched GLYPH_TALL about the cell's middle
+static void tall(int font, float top, float* y0, float* y1)
+{
+	if (GLYPH_TALL * GLYPH_SIZE == 1.0f)
+		return;
+	float mid = top + s_font[font & 1].cell_h * 0.46875f * 0.5f;
+	*y0 = mid + (*y0 - mid) * GLYPH_TALL * GLYPH_SIZE;
+	*y1 = mid + (*y1 - mid) * GLYPH_TALL * GLYPH_SIZE;
+}
+
+static void put_glyph(int font, const Glyph* g, float x, float y, u32 top, u32 bottom)
 {
 	if (!g->w || s_nverts + 6 > MAX_GLYPHS * 6)
 		return;
@@ -202,7 +230,8 @@ static void put_glyph(const Glyph* g, float x, float y, u32 top, u32 bottom)
 	// glyph at its 3DS size, so it goes on whole pixels one texel per pixel.
 	float x0 = snap_x(200.0f + (x + GLYPH_PEN - 256.0f) * 0.625f);
 	float y0 = snap_y(120.0f + (y + 1.0f - 256.0f) * 0.46875f);
-	float x1 = x0 + g->w * GLYPH_SX, y1 = y0 + g->h * GLYPH_SY;
+	float x1 = x0 + g->w * GLYPH_SX * GLYPH_SIZE, y1 = y0 + g->h * GLYPH_SY;
+	tall(font, y0, &y0, &y1);
 	float u0 = g->x / (float)s_tex.width, v0 = g->y / (float)s_tex.height;
 	float u1 = (g->x + g->w) / (float)s_tex.width, v1 = (g->y + g->h) / (float)s_tex.height;
 	FontVert a = { x0, y0, u0, v0, top }, b = { x1, y0, u1, v0, top };
@@ -225,7 +254,7 @@ void font_codes(int font, float x, float y, const u16* codes, int n, int align, 
 	for (int i = 0; i < n; i++) {
 		const Glyph* g = glyph(font, codes[i]);
 		if (g)
-			put_glyph(g, pen, y, top, bottom);
+			put_glyph(font, g, pen, y, top, bottom);
 		pen += advance(font, codes[i]);
 	}
 }
@@ -277,8 +306,10 @@ bool font_ink_px(int font, const char* s, float* x0, float* y0, float* x1, float
 		const Glyph* g = glyph(font, line[i]);
 		if (g && g->ix1) {
 			float gx = snap_x(pen + GLYPH_PEN * 0.625f); // as font_layout_px places it
-			bx0 = fminf(bx0, gx + g->ix0 * GLYPH_SX), bx1 = fmaxf(bx1, gx + g->ix1 * GLYPH_SX);
-			by0 = fminf(by0, g->iy0 * GLYPH_SY), by1 = fmaxf(by1, g->iy1 * GLYPH_SY);
+			bx0 = fminf(bx0, gx + g->ix0 * GLYPH_SX * GLYPH_SIZE), bx1 = fmaxf(bx1, gx + g->ix1 * GLYPH_SX * GLYPH_SIZE);
+			float iy0 = g->iy0 * GLYPH_SY, iy1 = g->iy1 * GLYPH_SY;
+			tall(font, 0.0f, &iy0, &iy1);
+			by0 = fminf(by0, iy0), by1 = fmaxf(by1, iy1);
 		}
 		pen += advance(font, line[i]) * 0.625f;
 	}
@@ -306,7 +337,8 @@ int font_layout_px(int font, float x, float y, const char* s, int align, u32 top
 			const Glyph* g = glyph(font, line[i]);
 			if (g && g->w && n + 6 <= max) {
 				float x0 = snap_x(pen + GLYPH_PEN * 0.625f), y0 = snap_y(y);
-				float x1 = x0 + g->w * GLYPH_SX, y1 = y0 + g->h * GLYPH_SY;
+				float x1 = x0 + g->w * GLYPH_SX * GLYPH_SIZE, y1 = y0 + g->h * GLYPH_SY;
+				tall(font, y0, &y0, &y1);
 				float u0 = g->x / (float)s_tex.width, v0 = g->y / (float)s_tex.height;
 				float u1 = (g->x + g->w) / (float)s_tex.width, v1 = (g->y + g->h) / (float)s_tex.height;
 				FontVert a = { x0, y0, u0, v0, top }, b = { x1, y0, u1, v0, top };
