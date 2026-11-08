@@ -6470,6 +6470,47 @@ void enemy_hit_cylinder(const Enemy* e, float* x, float* z, float* r, float* top
 	}
 }
 
+// 0x543210, a blow landing: the sound by the attack first, then by the enemy's kind, a random one of its set
+// (0x448810 >> 10, % 4 or as given) at its volume. The hyper spray (8, 9, 0x2a, 0x2b) makes none; the
+// chainsaw (0x17, 0x18) its own; kicks and stomps (31..40) a thud, but on a creeper.
+static void hit_sound(Enemy* e, int atk)
+{
+	int id = 0, n = 4;
+	float vol = 1.0f;
+	if (atk == 8 || atk == 9 || atk == 0x2a || atk == 0x2b)
+		return;
+	if (atk == 0x17 || atk == 0x18) {
+		id = 11046, n = 1, vol = 0.8f;
+	} else if (atk >= 31 && atk <= 40 && e->kind != EN_KIND_TYU) {
+		id = 11033, n = 1, vol = 0.8f;
+	} else {
+		switch (e->kind) {
+		case EN_KIND_SCU: id = 12015; break;                     // 0x200
+		case EN_KIND_MKN: id = 12501; break;                     // 0x201
+		case EN_KIND_TYU: id = 12208, n = 6, vol = 0.8f; break;  // 0x202
+		case EN_KIND_IKE: id = 18501, n = 3; break;              // 0x203
+		case EN_KIND_PAP: id = 18301, vol = 0.8f; break;         // 0x204
+		case EN_KIND_EDI: id = 18203; break;                     // 0x205
+		case EN_KIND_BOS: id = 18858, vol = 0.8f; break;         // 0x206
+		case EN_KIND_NSE: id = 12113; break;                     // 0x207, 0x20b
+		case EN_KIND_ARM: id = 12254; break;                     // 0x20a
+		case EN_KIND_RED: case EN_KIND_ONI:                      // 0x208, 0x209: by the weapon
+			if (atk == 1 || atk == 2 || atk == 4 || atk == 6)
+				id = 16110, n = 1;
+			else if (atk >= 0xc && atk <= 0xe)
+				id = 16112, n = 1;
+			else if (atk >= 0xf && atk <= 0x12)
+				id = 16111, n = 1;
+			else
+				id = 16114, vol = 0.8f;
+			break;
+		default: return;                                         // the nests and the rest: none
+		}
+	}
+	float pos[3] = { e->x, e->y, e->z };
+	sfx_play_at(id + (n > 1 ? (int)(rnd() * (n - 0.01f)) : 0), vol, pos);
+}
+
 void enemy_damage(Enemy* e, int attack_id, float ap, float sp, float dir_x, float dir_z)
 {
 	if (!enemy_alive(e))
@@ -6484,12 +6525,7 @@ void enemy_damage(Enemy* e, int attack_id, float ap, float sp, float dir_x, floa
 		if (e->kind == EN_KIND_SCU || e->kind == EN_KIND_MKN || e->kind == EN_KIND_NSE)
 			return;
 	}
-	play_at(e, e->kind == EN_KIND_MKN ? 12503 + (int)(rnd() * 1.99f)
-	         : e->kind == EN_KIND_NSE ? 12113 + (int)(rnd() * 3.99f)
-	         : e->kind == EN_KIND_TYU ? 12208 + (int)(rnd() * 5.99f)
-	         : e->kind == EN_KIND_RED || e->kind == EN_KIND_ONI ? 16110
-	         : e->kind == EN_KIND_PAP ? 18301 : e->kind == EN_KIND_ARM ? 12255
-	         : e->kind == EN_KIND_BOS ? 18863 : 12017 + (int)(rnd() * 1.99f));
+	hit_sound(e, attack_id);
 	e->damage += ap;
 	e->shock = sp;
 	e->last_atk = attack_id;
