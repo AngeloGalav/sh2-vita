@@ -283,25 +283,38 @@ Ordered by weight. Each line names where the work starts.
 
 ### To do on the Vita, from console tests
 
-- Movies: shown at the 3DS's aspect ratio; they should fill the Vita's 16:9.
+- Movies: fill the 16:9 display at their own shape, the rest cut off, as the EE's FullscreenVideos (Auto, which plays as Fill). Not run on a console.
 - Attacks: every attack came out heavy. The plank forced the heavy swing on a target on the floor within 1400
   units, the port's own choice, which also caught Lying Figures crawling; taken out (0x533ff0 goes by the press
   alone). Works on a console.
 - Examine on the item screen (0x46a850, 0x46c300, 0x472e80) and the screen 15% larger (`MENU_ZOOM`, not the PC's) work on a
-  console; the coins' backs on the top riddle level are still to be seen. The Letter from Mary shows only its envelope, as the
-  PC's code does: message 0xd1, and nothing in the exe refers to pic/item/p_letterm.tex (the encrypted parts aside).
+  console; the coins' backs on the top riddle level are still to be seen. Examine on the letters, books, boards and the birthday
+  card (kind 9) shows them full screen with their text, then the item screen again (0x471590 0x472266..0x4723e0); Mary's
+  letter is blank from flag 626 on. Not run on a console.
 - Game over as on the PC (0x498780, 0x496ee0, the 0x496c90 table), on black; on the 3DS the port's own version stays. Works on a console.
-- FMV subtitles don't show (a commit on the 3DS repo may help). Later.
+- FMV subtitles: taken from sh23ds upstream (8b0de2f): the PC's tables (`movsubs.c`, 0x43de10), drawn with the game's message text; the stage's music goes on under a movie and keeps real time under the pause menu. Not run on a console.
 - Levels sometimes jitter: the hospital, and the labyrinth's rooms with the water. Later.
-- The finishing blow on a fallen enemy with X alone, without R as on the PC, doesn't work. Later.
-- Save screen: its background is stretched. Later.
-- Input: the Circle press that closes a text (and in other such cases) also switches the flashlight. Later.
+- Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Not run on a console.
+- Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
+- Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.
+- Input: the flashlight switch now waits while a message, a question, a stage program or a scene holds James (it took Circle presses meant for those). Not run on a console.
 - Memos: the text's position is wrong while reading them. Later.
 - Sound events missing: the bark at the start in the forest, the whisper on entering a room, among others. Later.
 - Firing a gun doesn't light the level up a little. Later.
+- Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Not run on a console.
+- Font: on the Vita the glyphs have the Enhanced Edition's shape (its 20 x 32 cell on a 4:3 picture), about 29% taller than the 16:9 layout made them, about their cell's middle (`GLYPH_TALL`), and all of it 10% smaller (`GLYPH_SIZE`, the pen's steps too); line spacing stays the PC's. Not run on a console.
+- Light shadows are sometimes corrupted until James moves a little. Later.
+- Lying Figure, Mannequin, Nurse: stepping back after an attack played a burst of footsteps (the walk played backward counted as a wrap every frame); `step_passed` tells the two apart. Not run on a console.
+- Enemy hit sounds as 0x543210 picks them, by attack and kind (Eddie had the Lying Figure's; most had a subset of their set). Not run on a console.
+- Pyramid Head's knife is hidden in the apartment closet scene (sankaku; red.mdl part 3), from the console test; the PC's own way isn't traced. Not run on a console.
+- NPCs missing in play (not in scenes): the PC's stage and room functions place characters with 0x48fcc0 and a looping
+  motion, as Angela's 0x59fd30 (done). Not drawn yet: Maria behind the labyrinth bars (0x582bd0, 0x106, motion 0xd4b),
+  Laura (0x593d70, 0x104, 0xb55), Maria (0x593fa0, 0x106, 0xd4d), Eddie (0x57f480 0x12c3, 0x591dd0 0x12c2, 0x59d120
+  0x12c1). One table in stagemdl.c (stage, room, flags, model, motion from motion.py, place, facing) would cover them all.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
 - The light is wrong in some levels. Later.
+- Map screen: a change of map goes to black and back over 0.2 s each way (`MAP_XFADE`, asked for). Not run on a console.
 - Map screen: the arrows to the other maps and James' own from the PC's sheet (0x49ce40, 0x49d9d0; `map/carsol.t3x`, new in
   Vita packs), the D-pad's presses change maps, the stick only moves the view (the PC's stick also changes maps; asked for on the Vita). Works on a console.
 - Flashlight and character spots: the layer's spot direction was negated, so the beam lit behind the lamp (`C3D_LightSpotDir`). Fixed; the flashlight's direction confirmed on a console.
@@ -406,7 +419,7 @@ Ordered by weight. Each line names where the work starts.
   (0x598700). The ending programs' page 0x2b and the page-0 sets in their results are not ported. The
   0.7 scene duck is from SOUND.md's formula (the function that applies it, 0x56e3b0, is encrypted).
 - Movies (`movie.c`): A or START always skip, where the PC has its own skip rules (0x43ded0) and treats
-  `gero` apart; no subtitles over movies.
+  `gero` apart. Subtitles only over the nine movies a story program hands a table (`movsubs.c`).
 - The hospital elevator's radio quiz plays as a voice track over the game view; the PC also turns the
   0x4a43 elevator hum down to 0.7 meanwhile (0x588e60 case 10).
 - Cutscenes (`demo.c`): scene light gains are a guess (colour x 0.5 x brightness) and scene lights don't
