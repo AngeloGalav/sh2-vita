@@ -847,8 +847,11 @@ static void scene_end(void)
 	memset(&S, 0, sizeof S);
 }
 
+static char s_scene_name[24];     // the scene playing (its .dem), for the rules below that go by scene
+
 static bool scene_start(const char* pack_dir, const char* key)
 {
+	snprintf(s_scene_name, sizeof s_scene_name, "%s", key);
 	scene_end();
 	char path[128];
 	snprintf(path, sizeof path, "%s/demo/%s.dem", pack_dir, key);
@@ -1650,6 +1653,14 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		int kind = dc->rec->kind;
 		if (kind >= 0x100 && kind <= 0x103)
 			chr_set_parts(dc->model, kind <= 0x101 ? 14 : 0, kind == 0x103 ? 0 : 3, ev_have_item(18) ? 21 : 0);
+		// Pyramid Head (0x208) has no knife in the apartment closet scene: red.mdl's blade is its part 3, on
+		// bone 36. The port's own rule, from the console test; the PC's way of hiding it isn't traced
+		// (0x53d3f0 clears his +0x19c through 0x4a56d0)
+		if (kind == 0x208) {
+			memset(dc->model->parts, 0xff, sizeof dc->model->parts);
+			if (!strcmp(s_scene_name, "sankaku"))
+				dc->model->parts[0] &= ~(1u << 3);
+		}
 		chr_draw(dc->model, uBones);
 		C3D_Mtx reflect;
 		if (kind >= 0x100 && kind <= 0x103 && demo_mirror(p, &reflect)) {
