@@ -54,6 +54,11 @@ static bool s_tex_ok, s_mark_ok;
 static C3D_Tex s_carsol;         // data/pic/etc/carsol.tex: the maps' arrows (0x49ce40, 0x49d9d0)
 static int s_carsol_ok;          // 0 not tried, 1 loaded, -1 not in the pack
 static char s_legend[200];
+// Going from one map to another: to black and back, a fifth of a second each way (port's own)
+#define MAP_XFADE 0.2f
+static int s_next_map;           // the map to show once it is black, 0 none
+static float s_black;            // 0..1 over the map
+static int s_black_dir;          // 1 going dark, -1 coming back, 0 still
 
 // The marking animation programs start (0x49c0f0 / 0x49dbd0 / 0x49c180): the map opens by itself,
 // moves to each new mark, zooms in and fades it in. Modes 0..4 come from the programs, 5 follows 0.
@@ -573,6 +578,7 @@ bool map_marking(void) { return s_open && s_mode >= 0; }
 void map_close(void)
 {
 	s_open = false;
+	s_black = 0.0f, s_black_dir = 0, s_next_map = 0;
 	s_mode = -1;
 	if (!s_mini_used)
 		free_textures();
@@ -599,6 +605,18 @@ bool map_update(u32 down, u32 held, const circlePosition* cp, float dt)
 		s_zoom = 1.0f, s_zoom_state = 2;
 	if (s_zoom_state == 3 && (s_zoom -= dt * 2.0f) <= 0.0f)
 		s_zoom = 0.0f, s_zoom_state = 0;
+	if (s_black_dir) {               // the change of map: nothing else until it is back
+		s_black += s_black_dir * dt / MAP_XFADE;
+		if (s_black_dir > 0 && s_black >= 1.0f) {
+			s_black = 1.0f, s_black_dir = -1;
+			if (s_next_map)
+				show(s_next_map);
+			s_next_map = 0;
+		} else if (s_black_dir < 0 && s_black <= 0.0f) {
+			s_black = 0.0f, s_black_dir = 0;
+		}
+		return true;
+	}
 	if (down & (KEY_B | KEY_START)) {
 		map_close();
 		return false;
@@ -620,7 +638,8 @@ bool map_update(u32 down, u32 held, const circlePosition* cp, float dt)
 		if (m) {
 			if (s_pl.chapter == 1 && m == 1)
 				m = 3;
-			show(m);
+			s_next_map = m;
+			s_black_dir = 1;
 		}
 	} else if (s_zoom_state == 2) {
 		if (down & KEY_A) {
@@ -704,7 +723,7 @@ static void nav_arrows(void)
 	}
 }
 
-void map_draw(void)
+static void map_draw_all(void)
 {
 	if (!s_open || !s_draw)
 		return;
@@ -793,6 +812,15 @@ void map_draw(void)
 		}
 		s_draw(NULL, v, 6, pass ? 0xd01818ff : 0x000000c0);
 	}
+}
+
+void map_draw(void)
+{
+	if (!s_open || !s_draw)
+		return;
+	map_draw_all();
+	if (s_black > 0.0f)
+		quad(NULL, 0, 0, 400, 240, 0, 0, 0, 0, (u32)(s_black * 255.0f));
 }
 
 // ---------------------------------------------------------------- the touch screen's small map
