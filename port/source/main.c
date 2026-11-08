@@ -4894,6 +4894,34 @@ static void draw_top_text(void)
 		draw_message_top(s_opt.subtitles ? sub : NULL);
 	} else if (s_msg_page && !s_inv_open && !s_save_prompt) {
 		draw_message_top(s_msg_page);
+	} else if (prog_choice_question() && !s_inv_open && !s_save_prompt) {
+		// a stage program's question where messages are, its answers in a row under it, the chosen white
+		const char* const* labels;
+		int* answer;
+		const char* title;
+		int n = prog_choice(&labels, &answer, &title);
+		const char* q = ev_msg_expand(prog_choice_question());
+		draw_message_top(q);
+		int lines = 1;
+		for (const char* c = q; *c && *c != '\f'; c++)
+			lines += *c == '\n';
+		int h = font_line_height(FONT_BIG);
+		float y = 476.0f - (float)((lines + 4) * h / 2);
+		if (lines > 3)
+			y -= (float)((lines - 3) * h / 2);
+		y += (float)(lines * h) + (float)h * 0.5f;
+		float gap = 48.0f, w = 0.0f;
+		for (int i = 0; i < n; i++)
+			w += font_width(FONT_BIG, labels[i]) + (i ? gap : 0.0f);
+		float x = 256.0f - w * 0.5f;
+		u32 white, dummy;
+		font_pc_color(0, &white, &dummy);
+		for (int i = 0; i < n; i++) {
+			u32 c = answer && *answer == i ? white : 0x808080ffu;
+			font_text(FONT_BIG, x + 1.6f, y + 2.1f, labels[i], FONT_LEFT, 0x000000c0, 0x000000c0);
+			font_text(FONT_BIG, x, y, labels[i], FONT_LEFT, c, c);
+			x += font_width(FONT_BIG, labels[i]) + gap;
+		}
 	}
 }
 
@@ -6345,6 +6373,10 @@ int main(void)
 			int* answer;
 			const char* title;
 			int n = s_paused || s_inv_open ? 0 : prog_choice(&labels, &answer, &title);
+#ifdef SH2_VITA
+			if (s_msg_top && font_ready() && prog_choice_question())
+				n = 0;                   // draw_top_text shows it with its question, as the PC's box does
+#endif
 			if (n)
 				touchui_menu_ex(TOUI_CHOICE, title, labels, n, answer, ok, 2, 0, TOUI_ONE_TAP);
 			else

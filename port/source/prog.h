@@ -206,6 +206,7 @@ int prog_choice_waiting(void);         // a choice is up: how many answers (0 no
 // The choice up now for the touch screen: its answers, the one chosen (written by a tap) and the
 // question; 0 when none.
 int prog_choice(const char* const** labels, int** answer, const char** title);
+const char* prog_choice_question(void);   // its last page as it is, NULL with none
 
 // Called by the program helpers; the engine hook decides what to show. True when finished.
 bool prog_demo_request(int id);

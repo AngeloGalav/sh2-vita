@@ -460,7 +460,10 @@ static int s_choice_n;               // answers of the choice waiting last frame
 static const char* const* s_choice_labels;
 static int* s_choice_answer;
 static char s_choice_title[192];     // the question: the last page of its message, on one line
+static char s_choice_page[640];      // the same page as it is, its lines kept (prog_choice_question)
 int prog_choice_waiting(void) { return s_running ? s_choice_n : 0; }
+
+const char* prog_choice_question(void) { return s_running && s_choice_n && s_choice_page[0] ? s_choice_page : NULL; }
 
 int prog_choice(const char* const** labels, int** answer, const char** title)
 {
@@ -783,12 +786,22 @@ int p_choice(Prog* p, int msg, const char* const* labels, int n)
 {
 	switch (p->sub) {
 	case 0:
-	case 1:
-		if (msg >= 0 && !p_message(p, msg))
-			return 0;
+	case 1: {
+		// the pages before the last are messages; the last is the question, shown once with its answers
+		// as the PC's ff f6 does (its box holds both), not as a message and then again over the choice
+		const char* text = msg >= 0 ? ev_stage_message(msg) : NULL;
+		const char* last = text ? strrchr(text, '\f') : NULL;
+		if (last) {
+			static char before[640];
+			snprintf(before, sizeof before, "%.*s", (int)(last - text), text);
+			if (!p_message_text(p, before))
+				return 0;
+		}
 		p->answer = 0;
 		p->sub = 2;
-		choice_title(msg >= 0 ? ev_stage_message(msg) : NULL);
+		choice_title(text);
+		snprintf(s_choice_page, sizeof s_choice_page, "%s", last ? last + 1 : text ? text : "");
+	}
 		// fallthrough
 	case 2:
 		s_choice_n = n;
