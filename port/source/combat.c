@@ -202,6 +202,7 @@ static const AttackInfo ATK_SPRAY[2] = { { 8, 1.0f, 5.0f, 0.0f, 1000.0f, 8, 25 }
 #define HOLD_SECONDS 0.2f
 static bool s_hold_to_stomp = true, s_swap_light_heavy = true;
 static float s_charge = -1.0f;    // seconds A has been held for a pending tap/hold choice, -1 none
+static float s_free_charge = -1.0f;   // the same for a kick or stomp asked for without Aim (combat_update M_FREE)
 static bool s_charge_stomp;       // the pending choice is kick/stomp (else light/heavy swing)
 
 // Weapons. Guns: raise / lower / aim hold / shot / reload entries of their pjames table, the attack,
@@ -742,6 +743,7 @@ void combat_reset(void)
 	s_target = NULL;
 	s_ncand = 0;
 	s_vis = s_stompable = s_stomp_e = NULL;
+	s_free_charge = -1.0f;
 	s_attack_seq = false;
 	s_carried = false;
 	s_col_r = 200.0f, s_col_ahead = 0.0f, s_die_held = false;   // 0x536f10
@@ -1955,6 +1957,30 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 				play(&w->raise);
 			}
 			return true;
+		}
+		// Action alone on one lying on the floor at his feet kicks or stomps it, as the player knows the game
+		// to do (the port's reading of 0x5569b0 wanted Aim held first; the console test says otherwise).
+		// With Hold to Stomp, the EE's tap and 0.2 s hold decide which.
+		if (s_free_charge >= 0.0f) {
+			s_free_charge += dt;
+			bool hold = (held & KEY_A) != 0;
+			if (!hold || s_free_charge >= HOLD_SECONDS) {
+				s_free_charge = -1.0f;
+				if (s_stompable) {
+					start_stomp(hold);
+					return true;
+				}
+			}
+			free_moves(b, cp, held, dt);
+			return false;
+		}
+		if (action_down && s_stompable && s_weapon != W_KNIFE && move_can_aim() && !s_maria) {
+			if (s_hold_to_stomp) {
+				s_free_charge = 0.0f;
+			} else {
+				start_stomp(true);
+				return true;
+			}
 		}
 		free_moves(b, cp, held, dt);
 		return false;
