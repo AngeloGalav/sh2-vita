@@ -5929,7 +5929,10 @@ int main(void)
 		// Enhanced Edition Room312FlashlightFix (Patches/Room312FlashlightFix.cpp, zlib licence): the
 		// flashlight switch (0x48f078) does nothing in hotel room 312 while James has the videotape
 		// the switch does nothing until James has the flashlight (the PC's 0x48f078 tests item 18)
+		// and only while James is free to act: not under a message, a question or a stage program holding him
 		if (s_cam.mode == CAM_PLAYER && (gdown & KEY_X) && !screens_open() && !s_inv_open && ev_have_item(18) &&
+		    !s_msg_page && !s_save_prompt && !prog_choice_waiting() && !prog_player_locked() && !demo_active() &&
+		    !s_warp_pending && !savescreen_active() &&
 		    !(bgm_room_id(ev_glb_crd(), s_px, s_pz) == 0xa2 && ev_have_item(0x17))) {
 			s_flash_on = !s_flash_on;
 			sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
