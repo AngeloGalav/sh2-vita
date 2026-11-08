@@ -138,7 +138,6 @@ static int read_text(int it, int page)
 	if (page == 0)
 		return it == 0x17 ? 0xcc : it == 0x1e ? 0xc6 : -1;
 	switch (it) {
-	case 0x15: return 0xd1;
 	case 0x17: return 0xcd;
 	case 0x18: return 0xbf;
 	case 0x1d: return 0xc4;
@@ -147,10 +146,26 @@ static int read_text(int it, int page)
 	case 0x2b: return 0xcb;
 	case 0x37: return 0xbe;
 	case 0x4d: return 0xce;
-	case 0x4f: return 0xf6;
-	case 0x50: return 0xf7;
-	case 0x51: return 0xf8;
 	default: return -1;
+	}
+}
+
+// 0x471590, kind 9 (0x472266..0x4723e0): Examine shows the item full screen, data/pic as the stills are named,
+// with its text; Mary's letter is blank once flag 626 is set (0x1f7d62c & 0x40000)
+static const char* read_page(int it, int* msg)
+{
+	switch (it) {
+	case 0x15:
+		*msg = ev_flag(626) ? 0xd0 : 0xcf;
+		return ev_flag(626) ? "etc_p_letterm_w" : "etc_p_letterm";
+	case 0x16: *msg = 0xd2; return "etc_p_laura_letter";
+	case 0x4a: *msg = 0xd3; return "out_p_lostmemory";
+	case 0x4b: *msg = 0xd4; return "htl_p_redreling";
+	case 0x4f: *msg = 0xf6; return "add_xwhitehouban";
+	case 0x50: *msg = 0xf7; return "add_xblackhouban";
+	case 0x51: *msg = 0xf8; return "add_xredhouban";
+	case 0x54: *msg = 0xf9; return "add_p_birthday";
+	default: return NULL;
 	}
 }
 
@@ -369,7 +384,12 @@ static void act(int it, int cmd)
 	case CMD_EXAMINE:
 		prog_score_examine(it);
 		sfx_play(SFX_MENU_OK, 1.0f, 0.0f);
-		if (pic_name(it)) {
+		int rmsg;
+		const char* page = kind_of(it) == 9 ? read_page(it, &rmsg) : NULL;
+		if (page && s_host.read) {
+			s_host.read(page, ev_item_message(rmsg));
+			s_state = ST_ITEMS;
+		} else if (pic_name(it)) {
 			pic_load(pic_name(it));
 			s_pic_side = 1;
 			s_state = ST_PIC;

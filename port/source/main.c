@@ -1051,6 +1051,23 @@ static void im_leave(void (*then)(void))   // 0x475b80: out over half a second, 
 	s_im_then = then;
 	ui_fade_out(0.5f, im_closed);
 }
+// Examine on a letter or a book (itemmenu.c read_page): the screen out, the picture and its text, then the
+// item screen again once the text is closed (inventory_update)
+static bool host_picture(const char* name);
+static const char* s_read_pic;
+static const char* s_read_text;
+static bool s_reading;
+static void read_show(void)
+{
+	host_picture(s_read_pic);
+	show_message(s_read_text);
+	s_reading = true;
+}
+static void im_read(const char* picture, const char* text)
+{
+	s_read_pic = picture, s_read_text = text;
+	im_leave(read_show);
+}
 static void im_use(int it, int m0, int m1)
 {
 	s_inv_last = it;
@@ -1080,7 +1097,7 @@ static void im_memos(void)
 	if (!prog_running())
 		open_memos();
 }
-static const ItemMenuHost s_im_host = { im_use, im_power, im_power_on, im_reload, im_leave, im_options, im_memos, open_map };
+static const ItemMenuHost s_im_host = { im_use, im_power, im_power_on, im_reload, im_leave, im_options, im_memos, open_map, im_read };
 #endif
 
 static bool inventory_update(u32 down)
@@ -1092,6 +1109,13 @@ static bool inventory_update(u32 down)
 		return true;
 	}
 #endif
+	if (s_reading) {                     // back to the item screen once the text is closed
+		if (s_msg_page)
+			return false;
+		s_reading = false;
+		host_picture(NULL);
+		down |= KEY_Y;
+	}
 	if (!s_inv_open) {
 		if (down & KEY_Y) {
 			sfx_play(SFX_MENU_OK, 1.0f, 0.0f);

@@ -13,6 +13,7 @@ typedef struct {
 	void (*options)(void);
 	void (*memos)(void);
 	void (*map)(void);
+	void (*read)(const char* picture, const char* text);   // a letter or a book full screen, then back
 } ItemMenuHost;
 
 void itemmenu_init(const char* pack_dir, int chapter);
