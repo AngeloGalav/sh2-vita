@@ -74,6 +74,7 @@ extern u32 camray_stat[4];   // camray.c: the rays' work, for debug.txt "tpcam"
 #include "playtest.h"
 #include "prog.h"
 #include "room.h"
+#include "movsubs.h"
 #include "skin_shbin.h"
 #include "world_shbin.h"
 
@@ -4865,6 +4866,63 @@ static void draw_message_top(const char* page)
 	font_text(FONT_BIG, x, y, buf, FONT_LEFT, white, white);
 }
 
+// ---------------------------------------------------------------- movies: music under them, subtitles over them
+// Taken from sh23ds upstream (8b0de2f). The PC's movie loop (0x43ded0) runs SeBgmManager (0x516080) every
+// frame except for gero.sfd, so inside the game the stage's music goes on under the picture; and it shows
+// the subtitles of the stage's message file between the frames of a table (movsubs.h) when the Subtitles
+// option is on (0x43de10). The title's Movie Menu has neither: 0x43e900 clears the table before its movie.
+static const MovieSubs* s_mv_subs;
+static int s_mv_sub;                 // the table entry shown now, -1 none
+static char s_mv_text[256];
+
+static bool movie_hook_begin(const char* name)
+{
+	bool game = s_state == ST_GAME;
+	s_mv_subs = game ? movsubs_find(name) : NULL;
+	s_mv_sub = -1;
+	s_mv_text[0] = 0;
+	return game && strcmp(name, "gero") != 0;
+}
+
+static void movie_hook_tick(float dt)
+{
+	audio_update();
+	if (bgm_ready()) {
+		float feet[3] = { s_px, s_py, s_pz };
+		bgm_update(ev_stage(), ev_glb_crd(), feet, dt);
+	}
+}
+
+static void movie_hook_overlay(const char* name, u32 frame)
+{
+	(void)name;
+	if (!s_mv_subs || !s_opt.subtitles || !font_ready())
+		return;
+	int i = movsubs_at(s_mv_subs, frame);
+	if (i != s_mv_sub) {
+		s_mv_sub = i;
+		s_mv_text[0] = 0;
+		if (i >= 0) {
+			const char* m = ev_stage_message(s_mv_subs->base + i);     // the loaded stage's file, as the PC
+			size_t k = 0;
+			for (; m && m[k] && m[k] != '\f' && k < sizeof s_mv_text - 1; k++)
+				s_mv_text[k] = m[k];
+			s_mv_text[k] = 0;
+		}
+	}
+	if (s_mv_text[0]) {
+		s_ui_used = 0;                   // each movie frame starts the 2D vertices over (ui_draw_font)
+		draw_message_top(s_mv_text);
+		font_flush();
+	}
+}
+
+static void movie_hook_end(const char* name)
+{
+	(void)name;
+	s_mv_subs = NULL;
+}
+
 static float s_test_shown;      // seconds left of the console test's name (SELECT + R)
 
 static void draw_test_name(float dt)
@@ -5669,6 +5727,10 @@ int main(void)
 	prog_init(&s_prog_host);
 	playtest_init(&s_pt_host);
 	movie_skip_all(playtest_active());
+	{
+		static const MovieHooks hooks = { movie_hook_begin, movie_hook_tick, movie_hook_overlay, movie_hook_end };
+		movie_set_hooks(&hooks);
+	}
 	list_areas();
 	for (int i = 0; i < s_nareas; i++)
 		if (!strcmp(s_areas[i], "ap"))
@@ -5743,6 +5805,9 @@ int main(void)
 			float n = roundf(dt / refresh);
 			dt = (n < 1.0f ? 1.0f : n) * refresh;
 		}
+		// the music runs on real time, behind every menu: the PC's frame loop (0x402d00) runs
+		// SeBgmManager (0x516080) every frame whatever screen is up (sh23ds upstream 8b0de2f)
+		const float real_dt = dt;
 		perf_frame_begin();
 		perf_crumb("loop top");
 		if (s_stalltest && frame == s_stalltest) {
@@ -6147,7 +6212,7 @@ int main(void)
 			s_fogf.scr_z = 224.0f / tanf(fovy * 0.5f);
 			sfx_listener(feet, eye);
 			u64 tb = svcGetSystemTick();
-			bgm_update(ev_stage(), ev_glb_crd(), feet, dt);
+			bgm_update(ev_stage(), ev_glb_crd(), feet, real_dt);
 			perf_part("bgm", tb);
 			float near, far;
 			env_clip(&near, &far);
@@ -6229,7 +6294,7 @@ int main(void)
 			s_fogf.scr_z = tp ? 224.0f / tanf(fovy * 0.5f) : gamecam_scr_z();
 			sfx_listener(gp.pos, view_eye());
 			tb = svcGetSystemTick();
-			bgm_update(gp.stage, gp.glb_crd, gp.pos, dt);
+			bgm_update(gp.stage, gp.glb_crd, gp.pos, real_dt);
 			perf_part("bgm", tb);
 			float near, far;
 			env_clip(&near, &far);
