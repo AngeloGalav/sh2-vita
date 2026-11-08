@@ -10,7 +10,8 @@ game data is what 0x455220 gathers, 0x1fc0 bytes from 0x1f5f300. Files whose che
 The port's files are numbered from the first slot given, so slots 0..9 (save.dat, save2.dat ..) are not
 touched: slot N is save<N+1>.dat. The Vita build lists 75 slots, the 3DS build 10. What neither the port's
 format nor its game state holds is dropped: the room comes from the stage and the position (apply_warp,
-empty map), Maria's place and the radio are not carried over.
+empty map) unless --pack is given, then from the rooms whose bounds hold the position (bg/<area>/<room>.s3m),
+Maria's place and the radio are not carried over.
 """
 import argparse
 import glob
@@ -62,7 +63,44 @@ def decode(d):
     return game if struct.unpack_from('<I', game, 0)[0] == 5 else None
 
 
-def convert(g):
+def room_finder(pack):
+    """(stage, x, y, z) -> the room the position is in, from the pack's rooms of that stage's areas and their
+    bounds (an .s3m's six floats at 8: min x, y, z, max x, y, z). The smallest that holds the position wins, so
+    a floor of a building beats the block round it. None when nothing holds it: the game then picks."""
+    if not pack:
+        return lambda *a: None
+    rooms = [l.split() for l in open(os.path.join(pack, 'events', 'rooms.txt')) if len(l.split()) == 2]
+    areas = sorted(os.listdir(os.path.join(pack, 'bg')))
+    area_of = lambda m: max((a for a in areas if m.startswith(a)), key=len, default=None)
+    bounds = {}
+    for a in areas:
+        d = os.path.join(pack, 'bg', a)
+        for f in os.listdir(d) if os.path.isdir(d) else []:
+            if f.endswith('.s3m'):
+                with open(os.path.join(d, f), 'rb') as h:
+                    b = h.read(32)
+                if b[:4] == b'S3M1':
+                    bounds[f[:-4]] = struct.unpack_from('<6f', b, 8)
+    stage_areas = {}
+    for m, st in rooms:
+        a = area_of(m)
+        if a:
+            stage_areas.setdefault(int(st), set()).add(a)
+
+    def find(stage, x, y, z):
+        best = None
+        for m, b in bounds.items():
+            if area_of(m) not in stage_areas.get(stage, ()):
+                continue
+            if b[0] <= x <= b[3] and b[2] <= z <= b[5] and b[1] - 50 <= y <= b[4] + 50:
+                vol = (b[3] - b[0]) * (b[5] - b[2]) * max(b[4] - b[1], 1.0)
+                if best is None or vol < best[0]:
+                    best = (vol, m)
+        return best[1] if best else None
+    return find
+
+
+def convert(g, find_room=lambda *a: None):
     """0x455220's layout into port/source/main.c's SaveFile: the block from 0x1dbeb80 at 0x2c, gGameFlag
     at 0xc0, the items from 0x1f7d3e0 at 0x560, James' state (0x53aa10) at 0x59c."""
     sysb = lambda addr: 0x2c + addr - 0x1dbeb80
@@ -105,7 +143,8 @@ def convert(g):
     hp = hp if 0 < hp <= 100 else 100.0
     clear = g[sysb(0x1dbeb87)] == 0xff
     weapon = g[0x560 + 0x29] or 0xff     # 0x1f7d409
-    out = b'SH3S' + struct.pack('<II', 7, stage) + bytes(8)       # no map: apply_warp finds the room
+    room = find_room(stage, x, y, z)                              # else apply_warp picks one
+    out = b'SH3S' + struct.pack('<II', 7, stage) + (room or '').encode()[:7].ljust(8, b'\0')
     out += struct.pack('<4f', x, y, z, 0.0 if math.isnan(yaw) else yaw)
     out += bytes(flags) + bytes(items) + bytes(prog)
     out += g[0xc0 + 0x400:0xc0 + 0x440]                           # dead enemies, 0x1f7d9e0
@@ -122,10 +161,14 @@ def main():
     ap.add_argument('dir')
     ap.add_argument('--out', help='where to write (default the same folder)')
     ap.add_argument('--first-slot', type=int, default=10)
+    ap.add_argument('--pack', help='the pack (the folder with bg/ and events/), to find each save\'s room; default the input folder when it is one')
     a = ap.parse_args()
     out = a.out or a.dir
     os.makedirs(out, exist_ok=True)
     slot, bad = a.first_slot, 0
+    pack = a.pack or (a.dir if os.path.exists(os.path.join(a.dir, 'events', 'rooms.txt')) else None)
+    find_room = room_finder(pack)
+    unplaced = 0
     for path in sorted(glob.glob(os.path.join(a.dir, 'sh2pcsave*.dat'))):
         with open(path, 'rb') as f:
             g = decode(f.read())
@@ -133,14 +176,16 @@ def main():
             print('%s: left out, its checks fail' % os.path.basename(path), file=sys.stderr)
             bad += 1
             continue
-        data, stage, place, time, clear = convert(g)
+        data, stage, place, time, clear = convert(g, find_room)
+        room = data[12:20].split(b'\0')[0].decode()
+        unplaced += not room and not clear
         name = 'save.dat' if slot == 0 else 'save%d.dat' % (slot + 1)
         with open(os.path.join(out, name), 'wb') as f:
             f.write(data)
-        print('%s -> %-11s stage %2d, place %3d, %s' % (os.path.basename(path), name, stage, place,
+        print('%s -> %-11s stage %2d, room %-6s place %3d, %s' % (os.path.basename(path), name, stage, room or '?', place,
               'clear data' if clear else '%d:%02d:%02d' % (time // 3600, time % 3600 // 60, time % 60)))
         slot += 1
-    print('%d converted, %d left out; next free slot %d' % (slot - a.first_slot, bad, slot))
+    print('%d converted, %d left out, %d with no room found; next free slot %d' % (slot - a.first_slot, bad, unplaced, slot))
     return 1 if bad else 0
 
 
