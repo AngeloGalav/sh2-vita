@@ -288,8 +288,23 @@ void savescreen_draw_top(void)
 		float b = 0.9f + 0.1f * (0.5f + 0.5f * sinf(tau * t / 7.0f));   // the title logo's breathing
 		u32 c = faded((u32)(255.0f * b) << 24 | (u32)(255.0f * b) << 16 | (u32)(255.0f * b) << 8 | 0xff, in);
 		const u32 pic[4] = { c, c, c, c };
+#ifdef SH2_VITA
+		// As the Enhanced Edition shows it on a wide screen (FullscreenImages, the save picture at one scale
+		// both ways): the picture across the whole width at its own shape, still, its top and bottom past
+		// the screen. The Vita's 400 x 240 layout is 2.4 x 2.27 display pixels a unit.
+		(void)u80, (void)u400, (void)v0, (void)v1;
+		{
+			const float ph = 400.0f * 0.75f * (960.0f / 400.0f) / (544.0f / 240.0f);
+			float t0 = (ph - 240.0f) * 0.5f / ph, t1 = 1.0f - t0;
+			u32 still = faded(0xffffffff, in);
+			const u32 k[4] = { still, still, still, still };
+			font_quad_px(&s_bg, 0.0f, 0.0f, 400.0f, 240.0f, 0.0f, t0, 1.0f, t1, k);
+			(void)pic;
+		}
+#else
 		font_quad_px(&s_bg, 80.0f, 0.0f, 400.0f, 240.0f, u80, v0, u400, v1, pic);
 		font_quad_px(&s_bg, 0.0f, 0.0f, 80.0f, 240.0f, u80 + 80.0f / pw, v0, u80, v1, pic);
+#endif
 	} else {
 		const u32 black[4] = { faded(0x000000ff, in), faded(0x000000ff, in), faded(0x000000ff, in), faded(0x000000ff, in) };
 		font_quad_px(NULL, 0.0f, 0.0f, 400.0f, 240.0f, 0, 0, 0, 0, black);
@@ -308,7 +323,8 @@ void savescreen_draw_top(void)
 		for (int i = first; i < first + PER_PAGE && i < SAVE_SLOTS; i++) {
 			const SaveSlotInfo* f = &s_info[i];
 			bool on = i == s_sel;
-			int d = on ? 2 : 0, y = 0x97 + 0x28 * (i - first);
+			// more room between the rows than the PC's 0x28, for the taller text (port's own)
+			int d = on ? 2 : 0, y = 0x8c + 0x2e * (i - first);
 			u32 c = on ? (f->used ? yellow : white) : 0xa0a0a0ffu;
 			const char* title = !f->used ? (s_mode == SS_LOAD ? card(33, "No file data.") : card(36, "Save to new file.")) : place(f);
 			char line[64];
@@ -321,20 +337,20 @@ void savescreen_draw_top(void)
 					snprintf(line, sizeof line, "%s   Saves %d   Born From a Wish   %s", tm, f->saves, level(3 - f->action));
 				else
 					snprintf(line, sizeof line, "%s   Saves %d   %s / %s", tm, f->saves, level(3 - f->action), level(2 - f->riddle));
-				font_text(FONT_SMALL, 0x34, y + 22, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
+				font_text(FONT_SMALL, 0x34, y + 25, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
 			} else if (f->used) {
 				snprintf(line, sizeof line, "Clears %d", f->clears);
-				font_text(FONT_SMALL, 0x34, y + 22, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
+				font_text(FONT_SMALL, 0x34, y + 25, line, FONT_LEFT, faded(0xc8c8c8ffu, in), faded(0xc8c8c8ffu, in));
 			}
 		}
 		// 0x4537b0's question at (0x100, 0xeb) is in the rows' way here: under them, with Yes and No
 		const char* q = s_state == ST_OVERWRITE ? card(46, "Do you wish to overwrite?") :
 		                s_state == ST_DONE ? (s_ok ? card(40, "Save completed.") : card(41, "Save error occurred.")) : NULL;
 		if (q)
-			font_text(FONT_BIG, 0x24, 0x176, q, FONT_LEFT, yellow, yellow);
+			font_text(FONT_BIG, 0x24, 0x17a, q, FONT_LEFT, yellow, yellow);
 		if (s_state == ST_OVERWRITE) {
-			font_text(FONT_BIG, 0x24 - (s_touch_answer == 0 ? 2 : 0), 0x198 - (s_touch_answer == 0 ? 2 : 0), "Yes", FONT_LEFT, s_touch_answer == 0 ? white : 0xa0a0a0ffu, s_touch_answer == 0 ? white : 0xa0a0a0ffu);
-			font_text(FONT_BIG, 0x80 - (s_touch_answer == 1 ? 2 : 0), 0x198 - (s_touch_answer == 1 ? 2 : 0), "No", FONT_LEFT, s_touch_answer == 1 ? white : 0xa0a0a0ffu, s_touch_answer == 1 ? white : 0xa0a0a0ffu);
+			font_text(FONT_BIG, 0x24 - (s_touch_answer == 0 ? 2 : 0), 0x19c - (s_touch_answer == 0 ? 2 : 0), "Yes", FONT_LEFT, s_touch_answer == 0 ? white : 0xa0a0a0ffu, s_touch_answer == 0 ? white : 0xa0a0a0ffu);
+			font_text(FONT_BIG, 0x80 - (s_touch_answer == 1 ? 2 : 0), 0x19c - (s_touch_answer == 1 ? 2 : 0), "No", FONT_LEFT, s_touch_answer == 1 ? white : 0xa0a0a0ffu, s_touch_answer == 1 ? white : 0xa0a0a0ffu);
 		}
 		return;
 	}
