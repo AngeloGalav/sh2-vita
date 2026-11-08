@@ -372,7 +372,11 @@ bool movie_start(const char* name)
 		if (ok) {
 			memset(s_tex[i].data, 0, s_tex[i].size);         // black outside the picture
 			GSPGPU_FlushDataCache(s_tex[i].data, s_tex[i].size);
+#ifdef SH2_VITA
+			bool scaled = true;                                       // zoomed to the display
+#else
 			bool scaled = s_w * 2 <= 400 && s_h * 2 <= 240;          // a half-size movie
+#endif
 			C3D_TexSetFilter(&s_tex[i], scaled ? GPU_LINEAR : GPU_NEAREST, scaled ? GPU_LINEAR : GPU_NEAREST);
 			C3D_TexSetWrap(&s_tex[i], GPU_CLAMP_TO_BORDER, GPU_CLAMP_TO_BORDER);
 			s_tex[i].border = 0;
@@ -731,6 +735,20 @@ static void draw_frame(float alpha)
 	// one quad over the whole screen; outside the picture the texture is black (cleared texels on
 	// the right and bottom, the black border colour on the left and top)
 	// a half-size movie (Old 3DS profile) is drawn at twice its size, filtered
+#ifdef SH2_VITA
+	// The Enhanced Edition's FullscreenVideos (Auto, which plays as Fill): the picture at its own shape
+	// zoomed to fill the 16:9 display, what is past it cut off. movies.py's frames have square pixels;
+	// the 400 x 240 layout is 2.4 x 2.27 display pixels a unit.
+	float W, H;
+	if ((float)s_w / s_h < 960.0f / 544.0f)
+		W = 400.0f, H = 960.0f * s_h / s_w * (240.0f / 544.0f);
+	else
+		H = 240.0f, W = 544.0f * s_w / s_h * (400.0f / 960.0f);
+	float x0 = (400.0f - W) * 0.5f, y0 = (240.0f - H) * 0.5f;
+	float u0 = (0.0f - x0) / W * s_w / TEX_W, u1 = (400.0f - x0) / W * s_w / TEX_W;
+	float v0 = 1.0f - (0.0f - y0) / H * s_h / TEX_H, v1 = 1.0f - (240.0f - y0) / H * s_h / TEX_H;
+	x0 = x0 > 0.0f ? x0 : 0.0f, y0 = y0 > 0.0f ? y0 : 0.0f;
+#else
 	int k = 1;
 	while ((k + 1) * s_w <= 400 && (k + 1) * s_h <= 240)
 		k++;
@@ -740,6 +758,7 @@ static void draw_frame(float alpha)
 	// Azahar showed screen line k sampling memory row k - 1 with the plain mapping, so it is nudged by
 	// one texel: lines 1..239 now show rows 1..239 exactly and line 0 samples a cleared (black) row.
 	float v0 = 1.0f + (y0 - 1.0f) / k / TEX_H, v1 = 1.0f - (241.0f - y0) / k / TEX_H;
+#endif
 	QuadVertex q[4] = {
 		{ 0.0f, 240.0f, u0, v0 }, { 0.0f, 0.0f, u0, v1 },
 		{ 400.0f, 240.0f, u1, v0 }, { 400.0f, 0.0f, u1, v1 },
