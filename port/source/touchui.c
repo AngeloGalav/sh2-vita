@@ -1295,8 +1295,29 @@ static void txt(int f, float x, float y, const char* s, int align, u32 c)
 }
 
 // The stage programs' panels name the 3DS's buttons: the Vita's take their place
-static void panel_pc(const char* in)
+static void panel_pc(const char* in_)
 {
+	// no lines of keys ("D-pad: floor  A: press  B: leave", "A: next"): the player knows the buttons
+	static char body[sizeof s_panel];
+	snprintf(body, sizeof body, "%s", in_);
+	for (char* ln = body; ln && *ln; ) {
+		char* e = strchr(ln, '\n');
+		int n = e ? (int)(e - ln) : (int)strlen(ln);
+		char one[96];
+		snprintf(one, sizeof one, "%.*s", n < 95 ? n : 95, ln);
+		if (strstr(one, "A: ") || strstr(one, "D-pad: ") || strstr(one, "Left/Right: ") || strstr(one, "Up/Down: ") ||
+		    strstr(one, "Left stick")) {
+			const char* rest = e ? e + 1 : ln + n;
+			memmove(ln, rest, strlen(rest) + 1);
+			continue;
+		}
+		ln = e ? e + 1 : NULL;
+	}
+	for (char* t = body + strlen(body); t > body && (t[-1] == '\n' || t[-1] == ' '); )
+		*--t = 0;
+	const char* in = body;
+	if (!*in)
+		return;
 	static const struct { char from; const char* to; } B[4] = { { 'A', "Cross" }, { 'B', "Circle" }, { 'X', "Triangle" }, { 'Y', "Square" } };
 	static char out[sizeof s_panel + 64];
 	size_t n = 0;
