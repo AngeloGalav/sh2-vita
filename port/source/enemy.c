@@ -1695,6 +1695,18 @@ static void move_exec(Enemy* e, float adv, float dt)
 // 2 and 17 of the Mannequin's) and the idle noises (enSCUSoundLife 0x4c4350, Mannequin 0x4c1490):
 // +0xa0 counts the PC frames up to 300, 10 s, then a noise comes at once while standing and with a
 // chance of 0.2 a second otherwise. The count went by 60 Hz ticks until 2026-10-31, every 5 s.
+// Whether the walk's frame went past the footstep's frame s between a (last frame) and b (now), on a
+// cycle of len frames. Played backward (stepping back after an attack) the frame goes down: that is not
+// a wrap, which had every frame go round the whole cycle and play both footsteps, a burst of them.
+static bool step_passed(float a, float b, float len, float s)
+{
+	if (b >= a)
+		return a < s && b >= s;
+	if (a - b > len * 0.5f)                  // wrapped forward past the end
+		return (a < s && s < len) || b >= s;
+	return b < s && a >= s;                  // backward
+}
+
 static void sounds(Enemy* e, float f0, float dt)
 {
 	if (e->kind == EN_KIND_NSE) {
@@ -1702,8 +1714,8 @@ static void sounds(Enemy* e, float f0, float dt)
 		// second at 0.6 volume (0x4ba090, 0x2f47..0x2f4a)
 		if (e->anim == A_WALK) {
 			float a = f0 - NSE_ANIM[1].start, b = e->frame - NSE_ANIM[1].start;
-			if (b < a) b += NSE_ANIM[1].end - NSE_ANIM[1].start + 1;
-			if ((a < 1.0f && b >= 1.0f) || (a < 18.0f && b >= 18.0f))
+			float len = NSE_ANIM[1].end - NSE_ANIM[1].start + 1;
+			if (step_passed(a, b, len, 1.0f) || step_passed(a, b, len, 18.0f))
 				play_at(e, 12100);
 		}
 		e->sound_wait += dt * 60.0f;
@@ -1718,9 +1730,8 @@ static void sounds(Enemy* e, float f0, float dt)
 	if (e->anim == A_WALK || e->anim == 0) {
 		const ScuAnim* t = &anim_tab(e)[e->anim];
 		float a = f0 - t->start, b = e->frame - t->start;
-		float s1 = 2.0f, s2 = mkn ? 17.0f : 18.0f;
-		if (b < a) b += t->end - t->start + 1;     // wrapped
-		if ((a < s1 && b >= s1) || (a < s2 && b >= s2))
+		float s1 = 2.0f, s2 = mkn ? 17.0f : 18.0f, len = t->end - t->start + 1;
+		if (step_passed(a, b, len, s1) || step_passed(a, b, len, s2))
 			play_at(e, mkn ? 12500 : 12019);
 	}
 	e->sound_wait += pc_frames(dt);
