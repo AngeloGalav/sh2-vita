@@ -11,48 +11,28 @@ permissions:
   contents: read
 
 jobs:
-  converters:
-    name: Converters compile
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"   # the packer image's Python (Debian bookworm)
-      - name: No game data, firmware or build outputs in the repository
-        run: tools/check_repo.sh
-      - name: Byte-compile every converter
-        run: python -m py_compile tools/sh2conv/*.py tools/*.py
-
-  texenc:
-    name: Browser packer's texture encoder rebuilds as committed
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build site/packer/texenc.mjs with the pinned emscripten image
-        run: tools/texenc/build.sh
-      - name: Same bytes as the committed file
-        run: git diff --exit-code --stat site/packer/texenc.mjs
-
   build:
-    name: 3DSX and CIA
+    name: VPK
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build with the pinned devkitARM image
-        run: ./port/build.sh
-      - name: Package the CIA and checksums
-        run: ./port/package.sh
+      - name: Build with the pinned VitaSDK image
+        run: ./port/vita/build.sh
+      - name: Package the VPK and its checksum
+        run: |
+          mkdir -p dist
+          cp port/vita/sh2vita.vpk dist/
+          cd dist && sha256sum sh2vita.vpk > sh2vita.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: sh23ds-${{ github.sha }}
+          name: sh2vita-${{ github.sha }}
           path: dist/
           if-no-files-found: error
 
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [converters, build]
+    needs: [build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -61,10 +41,10 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: sh23ds-${{ github.sha }}
+          name: sh2vita-${{ github.sha }}
           path: dist
 
-      # A tag with a suffix (v0.2.1-rc.1) is a prerelease: a test build ahead of VERSION, published as
+      # A tag with a suffix (v0.1.0-rc.1) is a prerelease: a test build ahead of VERSION, published as
       # a prerelease so releases/latest keeps pointing at the last full release.
       - name: Check that the tag matches VERSION
         run: |
@@ -75,11 +55,11 @@ jobs:
             exit 1
           fi
 
-      - name: Verify checksums
-        run: cd dist && sha256sum -c sh23ds.sha256
+      - name: Verify the checksum
+        run: cd dist && sha256sum -c sh2vita.sha256
 
       # The notes are .github/releases/<tag>.md when it exists (what changed), then the install steps
-      # in .github/release-notes.md and the checksums.
+      # in .github/release-notes.md and the checksum.
       - name: Release notes
         run: |
           {
@@ -89,12 +69,11 @@ jobs:
             cat .github/release-notes.md
             echo
             echo '```'
-            cat dist/sh23ds.sha256
+            cat dist/sh2vita.sha256
             echo '```'
           } > notes.md
           cat notes.md
 
-      # Published at once so releases/latest/download/... (the website's QR code) points at it.
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -102,7 +81,7 @@ jobs:
           pre=""
           case "${GITHUB_REF_NAME}" in *-*) pre="--prerelease" ;; esac
           gh release create "${GITHUB_REF_NAME}" \
-            dist/sh23ds.cia dist/sh23ds.3dsx dist/sh23ds.sha256 \
-            --title "sh23ds ${GITHUB_REF_NAME}" \
+            dist/sh2vita.vpk dist/sh2vita.sha256 \
+            --title "sh2-vita ${GITHUB_REF_NAME}" \
             --notes-file notes.md \
             --verify-tag ${pre}

@@ -1,11 +1,9 @@
-A native 3DS port of Silent Hill 2 (PC Director's Cut). These files contain no game data: you build that from your own copy of the PC game with the packer.
+A native PS Vita port of Silent Hill 2 (PC Director's Cut). This file contains no game data: you convert that from your own copy of the PC game, with the Enhanced Edition installed.
 
 **Install**
 
-1. Build the game data from your `Silent Hill 2` folder with the [packer page](https://ankush.one/sh23ds/#pack) in a desktop browser, or with Docker:
-   `docker run --rm -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/sd:/out" ghcr.io/ankushkun/sh23ds-packer`
-2. Copy the `3ds` folder it makes to the root of the SD card (about 1.3 GB).
-3. Run DSP1 once if `sdmc:/3ds/dspfirm.cdc` doesn't exist yet.
-4. Install `sh23ds.cia` with FBI (or put `sh23ds.3dsx` in `sdmc:/3ds/` for the Homebrew Launcher).
+1. Install `sh2vita.vpk` with VitaShell.
+2. Make sure `ur0:data/libshacccg.suprx` exists (the shader compiler, extracted with ShaRKBR33D).
+3. Convert your game on a computer as the [README](https://github.com/AngeloGalav/sh2-vita#install) says, and copy the contents of `pack-vita/3ds/sh23ds/` to `ux0:data/sh2-vita/` (about 2.6 GB).
 
-Runs on the New 3DS family, and on the original 3DS, 3DS XL and 2DS with a lighter profile that targets 30 fps (tested in Azahar's Old 3DS model, not yet on hardware). The full guide is on the [website](https://ankush.one/sh23ds/) and in the [README](https://github.com/ankushKun/sh23ds#install). Checksums are in `sh23ds.sha256`.
+The first time each shader is needed it is compiled and kept on the card, so the first run has some short pauses. The checksum is in `sh2vita.sha256`.

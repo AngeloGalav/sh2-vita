@@ -1,3 +1,5 @@
+> sh2-vita doesn't publish this site: the fork has no `pages.yml`. Kept as sh23ds left it.
+
 # Website
 
 The static site published at https://ankush.one/sh23ds/ by `.github/workflows/pages.yml` whenever

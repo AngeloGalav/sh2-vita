@@ -119,15 +119,14 @@ the rest as `port/TESTING.md` says. Game data for tests goes in `.lr3ds/save/Aza
 
 ### Releases
 
-GitHub Actions byte-compiles the converters and builds the 3DSX and CIA on every push and pull request,
-keeping `dist/` as an artifact. To release, bump `VERSION`, write the changes in
-`.github/releases/v<version>.md`, commit, and push a matching tag such as `v0.1.3`. CI checks that the
-tag matches `VERSION`, verifies the checksums and publishes the release with those notes, the install
-steps from `.github/release-notes.md` and the checksums. The packer workflow publishes
-`ghcr.io/ankushkun/sh23ds-packer` as that version and `latest`. A tag with a suffix, such as `v0.2.1-rc.1`, skips the `VERSION` check and the packer image
-and is published as a prerelease, for console tests ahead of a release. The website's QR code points at
-`releases/latest/download/sh23ds.cia`, so it never needs changing; the website's version facts do
-(`site/README.md`).
+GitHub Actions (`.github/workflows/ci.yml`) builds
+`sh2vita.vpk` with `port/vita/build.sh` on every push and pull request, keeping it and its checksum as an
+artifact. To release, bump `VERSION`, write the changes in `.github/releases/v<version>.md`, commit, and push
+a matching tag such as `v0.1.1`. CI checks that the tag matches `VERSION`, verifies the checksum and
+publishes the release with the VPK, those notes, the install steps from `.github/release-notes.md` and the
+checksum. A tag with a suffix, such as `v0.1.1-rc.1`, skips the `VERSION` check and is published as a
+prerelease, for console tests ahead of a release. The LiveArea's version (`APP_VER`) comes from `VERSION`
+too (`port/vita/Makefile`: 0.1.0 is 00.10). The fork publishes no packer image and no website.
 
 ## The original game, and what each source is good for
 

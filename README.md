@@ -34,9 +34,7 @@ You need:
 - the PC release of *Silent Hill 2: Director's Cut*, with the [Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) installed: it is required, and the executable has to be the Director's Cut, whose tables the converters read
 - on your computer: Docker, Python 3 with numpy and Pillow, ffmpeg and a C++ compiler
 
-There are no prebuilt releases yet, so build the package yourself:
-
-1. Build the game with `./port/vita/build.sh`, which writes `port/vita/sh2vita.vpk`, and install it with VitaShell.
+1. Install `sh2vita.vpk` from the [latest release](https://github.com/AngeloGalav/sh2-vita/releases/latest) with VitaShell, or build it yourself with `./port/vita/build.sh`, which writes `port/vita/sh2vita.vpk`.
 2. Convert your game:
    ```sh
    tools/texenc/build.sh native

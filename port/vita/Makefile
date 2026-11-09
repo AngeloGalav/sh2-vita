@@ -9,7 +9,8 @@ endif
 TARGET    := sh2vita
 TITLE     := Silent Hill 2
 TITLE_ID  := SHIL00002
-VERSION   := 00.30
+# the LiveArea's APP_VER from the repository's VERSION: 0.1.0 is 00.10, 1.2.3 is 01.23
+VERSION   := $(shell awk -F. '{ printf "%02d.%d%d", $$1, $$2, $$3 }' ../../VERSION)
 
 PREFIX    := arm-vita-eabi
 CC        := $(PREFIX)-gcc
@@ -60,7 +61,7 @@ $(TARGET).velf: $(TARGET).elf
 $(TARGET).elf: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD)/param.sfo:
+$(BUILD)/param.sfo: ../../VERSION
 	@mkdir -p $(BUILD)
 	vita-mksfoex -s TITLE_ID=$(TITLE_ID) -s APP_VER=$(VERSION) -d ATTRIBUTE2=12 "$(TITLE)" $@
 
