@@ -1,30 +1,22 @@
 #!/bin/sh
-# Entry point of the packer image. Mount your game folder at /game (read-only is fine) and an empty
-# folder at /out. The result is /out/3ds/sh23ds/, ready to copy to the root of the SD card.
-# Set KEEP_EXTRAS=1 to keep the inspection files (the png folders and the .json files, about 0.6 GB).
+# Entry point of the packer image. Mount your game folder at /game (read-only is fine; with the Enhanced
+# Edition's sh2e folder in it, which the port needs) and an empty folder at /out. The result is
+# /out/sh2-vita/, whose contents go to ux0:data/sh2-vita/ on the Vita.
 # If a run stops partway, the same command picks up where it stopped; set FRESH=1 to start over.
-# Set HALF_MOVIES=1 to add the half-size movies the Old 3DS profile plays (about 75 MB more).
-# A game folder with the Enhanced Edition's sh2e folder (its Image, FMV and Audio Enhancement Packs
-# and Essential Files) gives the improved files (tools/sh2conv/EE_PACKS.md); SH2EE=0 ignores them.
-# Set VITA=1 for the PS Vita build: the textures are then rewritten in the Vita's form
-# (tools/sh2conv/vitatex.py), which the 3DS cannot read.
 set -e
 if [ ! -f /game/sh2pc.exe ] || [ ! -d /game/data ]; then
 	echo "Mount your Silent Hill 2 folder at /game: it must hold sh2pc.exe and the data folder." >&2
-	echo '  docker run --rm -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/sd:/out" ghcr.io/ankushkun/sh23ds-packer' >&2
+	echo '  docker run --rm -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/out:/out" sh2-vita-packer' >&2
 	exit 2
 fi
-OUT=/out/3ds/sh23ds
-echo "sh23ds packer $(cat /opt/sh23ds/VERSION), writing $OUT"
-if [ "${KEEP_EXTRAS:-0}" = "1" ]; then
-	/opt/sh23ds/tools/make_pack.sh /game "$OUT"
-else
-	/opt/sh23ds/tools/make_pack.sh /game "$OUT" --strip-extras
+if [ ! -d /game/sh2e ]; then
+	echo "warning: no sh2e folder in the game folder: the Enhanced Edition is required (README.md)" >&2
 fi
-if [ "${VITA:-0}" = "1" ]; then
-	echo "== textures in the PS Vita's form"
-	python3 /opt/sh23ds/tools/sh2conv/vitatex.py "$OUT"
-fi
+OUT=/out/sh2-vita
+echo "sh2-vita packer $(cat /opt/sh2-vita/VERSION), writing $OUT"
+/opt/sh2-vita/tools/make_pack.sh /game "$OUT" --strip-extras
+echo "== textures in the PS Vita's form"
+python3 /opt/sh2-vita/tools/sh2conv/vitatex.py "$OUT"
 echo
-echo "Done. Copy the 3ds folder inside your output folder to the root of the SD card."
+echo "Done. Copy the contents of sh2-vita/ in your output folder to ux0:data/sh2-vita/ on the Vita."
 du -sh "$OUT" 2>/dev/null || true

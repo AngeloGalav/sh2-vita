@@ -16,7 +16,7 @@ port/vita/build.sh check    # syntax-check every game source against the layer
 
 1. Install `sh2vita.vpk` with VitaShell.
 2. Copy the pack to `ux0:data/sh2-vita/`, so that `ux0:data/sh2-vita/ui/font.t3x` exists. Make it with
-   the packer and `-e VITA=1`, or convert a 3DS pack with
+   the packer (`tools/packer/README.md`, Docker or by hand), or convert a 3DS pack with
    `python3 tools/sh2conv/vitatex.py <pack>/3ds/sh23ds` (10 seconds; the 3DS cannot read it after).
    This writes the textures in the Vita's form, so they are not untiled or decoded as they load, and
    makes the smaller levels again from level 0 (the ETC1 ones need `tools/texenc/build.sh native`). A 3DS

@@ -32,20 +32,29 @@ You need:
 - a PS Vita with custom firmware (HENkaku or Ensō), and enough room on `ux0:` for about 2.6 GB of game data
 - `ur0:data/libshacccg.suprx`, the system's shader compiler, which the game compiles its shaders with
 - the PC release of *Silent Hill 2: Director's Cut*, with the [Enhanced Edition](https://github.com/elishacloud/Silent-Hill-2-Enhancements) installed: it is required, and the executable has to be the Director's Cut, whose tables the converters read
-- on your computer: Docker, Python 3 with numpy and Pillow, ffmpeg and a C++ compiler
+- on your computer: Docker (or, without it, Python 3 with numpy, Pillow and pefile, ffmpeg and a C++ compiler)
 
-1. Install `sh2vita.vpk` from the [latest release](https://github.com/AngeloGalav/sh2-vita/releases/latest) with VitaShell, or build it yourself with `./port/vita/build.sh`, which writes `port/vita/sh2vita.vpk`.
-2. Convert your game:
+1. Install `sh2vita.vpk` from the [latest release](https://github.com/AngeloGalav/sh2-vita/releases) with VitaShell, or build it yourself with `./port/vita/build.sh`, which writes `port/vita/sh2vita.vpk`.
+2. Convert your game with the packer image, which you build from this repository (it holds only the converters, never game data):
    ```sh
-   tools/texenc/build.sh native
-   SH2_VITA_TEX=1 SH2_TEXENC=native tools/make_pack.sh "/path/to/Silent Hill 2" pack-vita/3ds/sh23ds --strip-extras
-   python3 tools/sh2conv/vitatex.py pack-vita/3ds/sh23ds
+   git clone https://github.com/AngeloGalav/sh2-vita && cd sh2-vita
+   docker build -f tools/packer/Dockerfile -t sh2-vita-packer .
+   mkdir -p out
+   docker run --rm --user "$(id -u):$(id -g)" -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/out:/out" sh2-vita-packer
    ```
-3. Copy the contents of `pack-vita/3ds/sh23ds/` to `ux0:data/sh2-vita/`.
+   The game folder is the one with `sh2pc.exe`, `data/` and the Enhanced Edition's `sh2e/`. On Windows leave out `--user ...` and write the paths as `"C:\Games\Silent Hill 2:/game:ro"` and `"${PWD}\out:/out"`. It takes an hour or more; if it stops, the same command picks up where it stopped (`-e FRESH=1` starts over).
+3. Copy the contents of `out/sh2-vita/` to `ux0:data/sh2-vita/` on the Vita (about 2.6 GB).
+
+Without Docker, the same steps by hand:
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install numpy pillow pefile
+tools/texenc/build.sh native
+SH2_VITA_TEX=1 SH2_TEXENC=native tools/make_pack.sh "/path/to/Silent Hill 2" out/sh2-vita --strip-extras
+.venv/bin/python tools/sh2conv/vitatex.py out/sh2-vita
+```
 
 The first time each shader is needed it is compiled and kept on the card, so the first run has some short pauses.
-
-The browser packer and the packer image in this repository do not make this pack.
 
 ## Controls
 
