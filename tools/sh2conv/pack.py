@@ -115,7 +115,18 @@ class Packer:
             print(n, flush=True)
         if exe:
             self.exe, self.exe_found = exe, True
-        return problem
+        if problem:
+            return problem
+        # sh2-vita is made for the Enhanced Edition's files (its font, art, maps and movies): no pack
+        # from the game's own files alone
+        import ee
+        root = ee.mod_root(self.game) if ee.enabled() else None
+        if not root or not os.listdir(root):
+            return ('No Silent Hill 2: Enhanced Edition in this game folder (no %s folder next to sh2pc.exe). '
+                    'sh2-vita needs it: install the Enhanced Edition into the game folder '
+                    '(https://github.com/elishacloud/Silent-Hill-2-Enhancements) and run the packer again.'
+                    % (os.environ.get('SH2EE_DIR') or 'sh2e'))
+        return None
 
     def check(self):
         """The game folder holds the Director's Cut exe and its data folder."""

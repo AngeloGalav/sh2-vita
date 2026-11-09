@@ -11,10 +11,10 @@
 # Copy the result to the SD card as sdmc:/3ds/sh23ds/ (the png/ folders and *.json files are not
 # needed on the card). Real consoles also need sdmc:/3ds/dspfirm.cdc (dump it with DSP1) for sound.
 #
-# Silent Hill 2: Enhanced Edition: when the game folder has the EE's sh2e folder (its Essential Files,
+# Silent Hill 2: Enhanced Edition, required: without the EE's sh2e folder the packer stops. With it (its Essential Files,
 # Image, FMV and Audio Enhancement Packs), every converter reads the files there in place of data/'s,
-# file by file, as the EE does in the PC game (tools/sh2conv/ee.py, EE_PACKS.md). SH2EE=0 ignores the
-# folder, SH2EE_SKIP=images,fmv,audio,essentials leaves out a part. The files used are listed in
+# file by file, as the EE does in the PC game (tools/sh2conv/ee.py, EE_PACKS.md). SH2EE=0 (ignore the
+# folder) stops it too; SH2EE_SKIP=images,fmv,audio,essentials leaves out a part. The files used are listed in
 # ee_used.txt in the output folder. Build into an empty folder after adding or removing packs.
 # The step list itself is tools/sh2conv/pack.py, which the browser packer runs too.
 set -e

@@ -5,6 +5,9 @@ Edition's `sh2e/`) and converts every room, texture, character, animation, event
 sound and movie into the formats the port reads, with the textures in the PS Vita's form. It writes a
 `sh2-vita` folder, whose contents go to `ux0:data/sh2-vita/`, and never changes the game folder.
 
+The Enhanced Edition is required: without the `sh2e` folder in the game folder the packer stops before
+converting anything and says so.
+
 ## With Docker
 
 The image holds the converters from this repository and nothing from the game. Build it from a clone:

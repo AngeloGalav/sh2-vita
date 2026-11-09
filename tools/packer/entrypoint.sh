@@ -9,9 +9,6 @@ if [ ! -f /game/sh2pc.exe ] || [ ! -d /game/data ]; then
 	echo '  docker run --rm -v "/path/to/Silent Hill 2:/game:ro" -v "$PWD/out:/out" sh2-vita-packer' >&2
 	exit 2
 fi
-if [ ! -d /game/sh2e ]; then
-	echo "warning: no sh2e folder in the game folder: the Enhanced Edition is required (README.md)" >&2
-fi
 OUT=/out/sh2-vita
 echo "sh2-vita packer $(cat /opt/sh2-vita/VERSION), writing $OUT"
 /opt/sh2-vita/tools/make_pack.sh /game "$OUT" --strip-extras
