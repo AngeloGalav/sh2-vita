@@ -19,6 +19,9 @@ static C3D_Tex s_bg, s_glow, s_boot[2];
 static bool s_bg_ok, s_glow_ok, s_boot_ok[2], s_saves;
 static float s_glow_t;           // 0x88ead4: the logo's pulse, 15.5 s round
 static int s_boot_pic;
+// sh2-vita's own: after the PC's two start-up pictures, a page of the same timing that says who made the
+// port and what it is built on (drawn in the game's font, boot_credits)
+#define BOOT_CREDITS 2
 static float s_boot_t, s_boot_b, s_boot_speed;   // time on the picture; its brightness; 0 fading in
 static int s_screen, s_sel, s_step;      // s_step: levels 0 action, 1 riddle
 static bool s_wish;
@@ -110,10 +113,8 @@ static bool listed(int it) { return shown(it) || (it == IT_VIEWER && s_viewer); 
 void titlemenu_boot(void)
 {
 	s_screen = SC_BOOT;
-	s_boot_pic = s_boot_ok[0] ? 0 : 1;
+	s_boot_pic = s_boot_ok[0] ? 0 : s_boot_ok[1] ? 1 : BOOT_CREDITS;
 	s_boot_t = s_boot_b = s_boot_speed = 0.0f;
-	if (!s_boot_ok[s_boot_pic])
-		s_screen = SC_MENU;
 }
 
 void titlemenu_no_boot(void)
@@ -253,14 +254,16 @@ int titlemenu_update(u32 down, float dt, int* action, int* riddle, const char** 
 			s_boot_b = s_boot_t < 1.0f ? s_boot_t : 1.0f;
 			if (down & (KEY_A | KEY_B | KEY_START | KEY_TOUCH))
 				s_boot_speed = 2.0f;
-			else if (s_boot_t >= 2.0f)
+			else if (s_boot_t >= (s_boot_pic == BOOT_CREDITS ? 5.0f : 2.0f))   // the credits: 4 s to read
 				s_boot_speed = 1.0f;
 		} else {
 			s_boot_b -= dt * s_boot_speed;
 		}
 		if (s_boot_speed > 0.0f && s_boot_b <= 0.0f) {
 			s_boot_t = s_boot_b = s_boot_speed = 0.0f;
-			if (++s_boot_pic > 1 || !s_boot_ok[s_boot_pic]) {
+			if (++s_boot_pic == 1 && !s_boot_ok[1])
+				s_boot_pic = BOOT_CREDITS;
+			if (s_boot_pic > BOOT_CREDITS) {
 				touchui_movie(false);
 				s_screen = SC_MENU;
 				s_idle = 0.0f;
@@ -527,13 +530,35 @@ static void draw_vita(float bright)
 }
 #endif
 
+// The credits page (BOOT_CREDITS), on the PC's 512 x 448 screen, white at brightness c over black
+static void boot_credits(u32 c)
+{
+	if (!font_ready())
+		return;
+	u32 w = c << 24 | c << 16 | c << 8 | 0xff;
+	u32 g = (c * 160 / 255) << 24 | (c * 160 / 255) << 16 | (c * 160 / 255) << 8 | 0xff;
+	font_text(FONT_BIG, 256, 100, "AI-assisted port by AngeloGalav", FONT_CENTER, w, w);
+	font_text(FONT_SMALL, 256, 132, "github.com/AngeloGalav", FONT_CENTER, g, g);
+	font_text(FONT_BIG, 256, 186, "Based on the work of:", FONT_CENTER, w, w);
+	font_text(FONT_BIG, 256, 224, "ankushKun's SH2 3DS port", FONT_CENTER, w, w);
+	font_text(FONT_SMALL, 256, 252, "github.com/ankushKun/sh23ds", FONT_CENTER, g, g);
+	font_text(FONT_BIG, 256, 286, "Silent Hill 2: Enhanced Edition", FONT_CENTER, w, w);
+	font_text(FONT_SMALL, 256, 314, "github.com/elishacloud/Silent-Hill-2-Enhancements", FONT_CENTER, g, g);
+	font_text(FONT_BIG, 256, 348, "Rinnegatamante's vitaGL", FONT_CENTER, w, w);
+	font_text(FONT_SMALL, 256, 376, "github.com/Rinnegatamante/vitaGL", FONT_CENTER, g, g);
+}
+
 bool titlemenu_draw_top(MapDrawFn draw, float bright)
 {
 	if (s_screen == SC_BOOT) {
-		if (!draw || !s_boot_ok[s_boot_pic])
-			return true;
 		float b = s_boot_b < 0.0f ? 0.0f : s_boot_b > 1.0f ? 1.0f : s_boot_b;
 		u32 c = (u32)(b * 255.0f) & 0xff;
+		if (s_boot_pic == BOOT_CREDITS) {
+			boot_credits(c);
+			return true;
+		}
+		if (!draw || !s_boot_ok[s_boot_pic])
+			return true;
 		MapVert v[6] = { { 40, 0, 0, 0 }, { 360, 0, 1, 0 }, { 360, 240, 1, 1 },
 		                 { 40, 0, 0, 0 }, { 360, 240, 1, 1 }, { 40, 240, 0, 1 } };
 		draw(&s_boot[s_boot_pic], v, 6, c << 24 | c << 16 | c << 8 | 0xff);
