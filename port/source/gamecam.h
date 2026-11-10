@@ -43,5 +43,8 @@ float gamecam_fov(void);       // radians
 // stage program placed (user camera or watch). The port's behind camera leaves those to it.
 bool gamecam_scripted(void);
 
+// Writes the last minute of the camera's inputs and outputs to camtrace.txt in the data folder (testing).
+void gamecam_trace_dump(void);
+
 // James rows the boat (his status bit 0x20000): the camera takes the PC's boat parameters.
 void gamecam_on_boat(bool on);

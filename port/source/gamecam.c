@@ -134,6 +134,68 @@ static void yaw_matrix(float m[4][4], float yaw, const float t[3])
 static bool s_on_boat;
 void gamecam_on_boat(bool on) { s_on_boat = on; }
 
+// A record of the last minute of what the camera was given and what it gave, written out on request
+// (SELECT + D-pad up on the Vita, compat/ctru.c) so a run on a console can be played again on a PC.
+// Port's own, for testing.
+#define TRACE_N 1800
+typedef struct {
+	float dt, pos[3], yaw, vel[2], turn, head[2], eye[3], watch[3], scr_z, slot[4][3], look[3], up[3];
+	int stage, glb, control, anim, far_view, mv, nslots;
+	unsigned slot_st[4];
+} TraceRow;
+static TraceRow* s_trace;
+static unsigned s_trace_n;
+
+void gamecam_trace_dump(void)
+{
+#ifdef SH2_VITA
+	FILE* f = s_trace ? fopen("ux0:data/sh2-vita/camtrace.txt", "w") : NULL;
+#else
+	FILE* f = s_trace ? fopen("sdmc:/3ds/sh23ds/camtrace.txt", "w") : NULL;
+#endif
+	if (!f)
+		return;
+	fprintf(f, "area %s roads %d\n", s_area, s_nroads);
+	unsigned n = s_trace_n < TRACE_N ? s_trace_n : TRACE_N;
+	for (unsigned k = s_trace_n - n; k < s_trace_n; k++) {
+		const TraceRow* r = &s_trace[k % TRACE_N];
+		fprintf(f, "%.6f %.3f %.3f %.3f %.6f %.3f %.3f %.6f %.6f %.6f %d %d %d %d %d | %d %.3f %.3f %.3f %.3f %.3f %.3f %.3f | %d",
+		        r->dt, r->pos[0], r->pos[1], r->pos[2], r->yaw, r->vel[0], r->vel[1], r->turn, r->head[0], r->head[1],
+		        r->stage, r->glb, r->control, r->anim, r->far_view, r->mv, r->eye[0], r->eye[1], r->eye[2],
+		        r->watch[0], r->watch[1], r->watch[2], r->scr_z, r->nslots);
+		for (int i = 0; i < r->nslots && i < 4; i++)
+			fprintf(f, " %.1f %.1f %.1f %x", r->slot[i][0], r->slot[i][1], r->slot[i][2], r->slot_st[i]);
+		fprintf(f, " | %.5f %.5f %.5f %.5f %.5f %.5f", r->look[0], r->look[1], r->look[2], r->up[0], r->up[1], r->up[2]);
+		fputc('\n', f);
+	}
+	fclose(f);
+}
+
+static void trace_row(const GameCamPlayer* p, float dt, bool far_view, const SH2CamOutput* out, float scr_z)
+{
+	if (dt <= 0.0f || (!s_trace && !(s_trace = calloc(TRACE_N, sizeof *s_trace))))
+		return;
+	TraceRow* r = &s_trace[s_trace_n++ % TRACE_N];
+	memset(r, 0, sizeof *r);
+	r->dt = dt;
+	memcpy(r->pos, p->pos, sizeof r->pos);
+	r->yaw = p->yaw, r->vel[0] = p->vel[0], r->vel[1] = p->vel[1], r->turn = p->turn_speed;
+	r->head[0] = p->head_yaw, r->head[1] = p->head_pitch;
+	r->stage = p->stage, r->glb = p->glb_crd, r->control = p->control_type, r->anim = p->anim_status;
+	r->far_view = far_view, r->mv = out->cam_mv_type, r->scr_z = scr_z;
+	memcpy(r->eye, &out->view_mat[3][0], sizeof r->eye);
+	memcpy(r->watch, out->watch_tgt_pos, sizeof r->watch);
+	memcpy(r->look, &out->view_mat[2][0], sizeof r->look);
+	memcpy(r->up, &out->view_mat[1][0], sizeof r->up);
+	for (int i = 0; p->chara && i < SH2CAM_CHARA_SLOTS && p->chara[i].kind; i++) {
+		if (i < 4) {
+			memcpy(r->slot[i], p->chara[i].pos, sizeof r->slot[i]);
+			r->slot_st[i] = p->chara[i].battle_status | (p->chara[i].is_lock_target ? 0x10000u : 0u);
+		}
+		r->nslots = i + 1;
+	}
+}
+
 bool gamecam_scripted(void)
 {
 	const _VC_WORK* w = sh2cam_work();
@@ -199,6 +261,7 @@ void gamecam_update(const GameCamPlayer* p, float dt, bool far_view, C3D_Mtx* vi
 	C3D_FVec up = FVec3_New(-out.view_mat[1][0], -out.view_mat[1][1], -out.view_mat[1][2]);
 	Mtx_LookAt(view, eye, at, up, false);
 	float scr_z = out.scr_z > 1.0f ? out.scr_z : SCREEN_SY;
+	trace_row(p, dt, far_view, &out, scr_z);
 	*fovy = 2.0f * atanf(SCREEN_SY * 0.5f / scr_z);
 	s_fov = *fovy;
 	memcpy(s_eye, &out.view_mat[3][0], sizeof s_eye);

@@ -290,27 +290,40 @@ Ordered by weight. Each line names where the work starts.
 - Examine on the item screen (0x46a850, 0x46c300, 0x472e80) and the screen 15% larger (`MENU_ZOOM`, not the PC's) work on a
   console; the coins' backs on the top riddle level are still to be seen. Examine on the letters, books, boards and the birthday
   card (kind 9) shows them full screen with their text, then the item screen again (0x471590 0x472266..0x4723e0); Mary's
-  letter is blank from flag 626 on. Not run on a console.
+  letter is blank from flag 626 on. Works on a console.
 - Game over as on the PC (0x498780, 0x496ee0, the 0x496c90 table), on black; on the 3DS the port's own version stays. Works on a console.
-- FMV subtitles: taken from sh23ds upstream (8b0de2f): the PC's tables (`movsubs.c`, 0x43de10), drawn with the game's message text; the stage's music goes on under a movie and keeps real time under the pause menu. Not run on a console.
-- Levels sometimes jitter: the hospital, and the labyrinth's rooms with the water. Later.
-- Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Not run on a console.
+- FMV subtitles: taken from sh23ds upstream (8b0de2f): the PC's tables (`movsubs.c`, 0x43de10), drawn with the game's message text; the stage's music goes on under a movie and keeps real time under the pause menu. Works on a console.
+- Levels jitter (the picture shakes while the camera turns; the hospital, the labyrinth; Original camera, 30 fps). Open.
+  Ruled out: the frame time (steady 33 ms in two console traces), the collision, and the camera module, whose eye, look
+  and up vectors are smooth frame by frame in the traces (`gamecam_trace_dump`: SELECT + D-pad up writes the last minute
+  to `camtrace.txt`, `tools/console/vita.sh pull` fetches it). The traces show pans of up to 57 mrad a frame, about 45
+  pixels, in rooms whose fixed cameras follow James: either that is the shake, a 30 fps pan (to try: Frame Rate 60), or
+  it comes after the camera, in the drawing. View Control is Normal on the Vita now, the PC's default (options version
+  4): Switch, the 3DS's, left the search view on from one press of Look.
+- Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
 - Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.
 - Input: the flashlight switch now waits while a message, a question, a stage program or a scene holds James (it took Circle presses meant for those). Not run on a console.
 - Memos: the text's position is wrong while reading them. Later.
-- Sound events missing: the bark at the start in the forest, the whisper on entering a room, among others. Later.
-- Firing a gun doesn't light the level up a little. Later.
-- Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Not run on a console.
-- Font: on the Vita the glyphs have the Enhanced Edition's shape (its 20 x 32 cell on a 4:3 picture), about 29% taller than the 16:9 layout made them, about their cell's middle (`GLYPH_TALL`), and all of it 10% smaller (`GLYPH_SIZE`, the pen's steps too); line spacing stays the PC's. Not run on a console.
+- Sound events: the stages' sounds at a room's load (Stage_Data +0x3c: 0x59fe40, 0x59d1b0, 0x593c90, 0x58bff0, 0x582ee0,
+  0x57e840, 0x57dab0, the endings') and the forest's and the hospital's timed ones (0x59fec0, 0x58c040) are in
+  (`prog_stagefn.c`). Still missing from the per-frame code: stages 12, 25, 26, 28 (0x9c73), 30, 32, 41, 42. Not run on a console.
+- A gunshot lights the room and the characters for five frames (0x509f40, 0x47a540, 0x508060; `combat_shot_light`), with
+  the port's own row Gunshot Light to turn it off. Not run on a console.
+- Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Works on a console.
+- Font: on the Vita the glyphs have the Enhanced Edition's shape (its 20 x 32 cell on a 4:3 picture), about 29% taller than the 16:9 layout made them, about their cell's middle (`GLYPH_TALL`), and all of it 10% smaller (`GLYPH_SIZE`, the pen's steps too); line spacing stays the PC's. Works on a console.
 - Light shadows are sometimes corrupted until James moves a little. Later.
 - Lying Figure, Mannequin, Nurse: stepping back after an attack played a burst of footsteps (the walk played backward counted as a wrap every frame); `step_passed` tells the two apart. Not run on a console.
 - Enemy hit sounds as 0x543210 picks them, by attack and kind (Eddie had the Lying Figure's; most had a subset of their set). Not run on a console.
-- Pyramid Head's knife is hidden in the apartment closet scene (sankaku; red.mdl part 3), from the console test; the PC's own way isn't traced. Not run on a console.
-- NPCs missing in play (not in scenes): the PC's stage and room functions place characters with 0x48fcc0 and a looping
-  motion, as Angela's 0x59fd30 (done). Not drawn yet: Maria behind the labyrinth bars (0x582bd0, 0x106, motion 0xd4b),
-  Laura (0x593d70, 0x104, 0xb55), Maria (0x593fa0, 0x106, 0xd4d), Eddie (0x57f480 0x12c3, 0x591dd0 0x12c2, 0x59d120
-  0x12c1). One table in stagemdl.c (stage, room, flags, model, motion from motion.py, place, facing) would cover them all.
+- Pyramid Head's knife is hidden in the apartment closet scene (sankaku; red.mdl part 3), from the console test; the PC's own way isn't traced. Works on a console.
+- NPCs in play (not in scenes): one table in `stagemdl.c` places Maria in the day room and behind the labyrinth bars
+  (0x582bd0), Angela at the grave (her flag is 512, it was read as 320), Laura on the wall with the letter (0x593d70), Maria
+  at the park's rail (0x592830), Eddie by the toilet, with the pizza and dead (0x59d120, 0x591dd0, 0x57f480); eight new
+  motions in the pack (motion.py). Eddie with the pizza works on a console, the others are not run. A scene that switches
+  such a character off (0x49fb20 case 2) leaves it to the motion the stage gave it, taken from the bowling alley's talk,
+  where Eddie went missing while James spoke; not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
+  (the script shows them 3 s in; what draws them before on the PC isn't traced). 0x593fa0 and the two props 0x591a40
+  puts down after its scene (0x431, 0x42f) are not ported.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
 - The light is wrong in some levels. Later.

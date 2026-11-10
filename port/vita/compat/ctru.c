@@ -466,8 +466,13 @@ void hidScanInput(void)
 			c3d_gpu_test_next();
 		if (raw_down & KEY_L)
 			c3d_half_fog_toggle();
-		combo |= (raw_down & (KEY_X | KEY_Y | KEY_R | KEY_L)) != 0;
-		k &= ~(KEY_SELECT | KEY_X | KEY_Y | KEY_R | KEY_L);
+		if (raw_down & KEY_DUP) {
+			extern void gamecam_trace_dump(void);   // gamecam.c: the camera's last minute, to camtrace.txt
+			gamecam_trace_dump();
+			vita_log("camera trace written");
+		}
+		combo |= (raw_down & (KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP)) != 0;
+		k &= ~(KEY_SELECT | KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP);
 	} else if (raw_up & KEY_SELECT) {
 		if (!combo)
 			k |= KEY_SELECT;
