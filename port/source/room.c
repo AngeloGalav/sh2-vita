@@ -138,7 +138,16 @@ static void tex_setup(TexEntry* e)
 	// blends wider than it did then (debug.txt "mapmips 1" puts the whole chain back)
 	if (!s_map_mips) {
 		int top = e->tex.width > e->tex.height ? e->tex.width : e->tex.height, lv = 0;
-		while (lv < e->tex.maxLevel && top >> (lv + 1) >= 256)
+#ifdef SH2_VITA
+		// The Vita, from a console test: at 960 x 544 the corridors' walls, seen far off and at a slant, are
+		// drawn many texels to the pixel, and with 256 as the smallest level they shimmered all over as the
+		// camera turned (the hospital, the labyrinth). Two more levels, down to 64; the port's own, with the
+		// cells' blending that comes with them (the lines on the ground showed with the whole chain, to 8).
+		const int smallest = 64;
+#else
+		const int smallest = 256;
+#endif
+		while (lv < e->tex.maxLevel && top >> (lv + 1) >= smallest)
 			lv++;
 		e->tex.maxLevel = lv;
 	}
