@@ -313,7 +313,7 @@ Ordered by weight. Each line names where the work starts.
     leaves far and slanted walls many texels to the pixel: shimmer whenever the camera moves, faster at 60 fps. The Vita
     now samples down to 64. Not run on a console. To check on one: SELECT + square (level 0 only) should make it worse,
     and Texture Filter trilinear (System) softer.
-  - Not looked at: the 1.3 x walk turn of the 0x8bcce0 rooms (0x52e110's zones) frame by frame while it is held, and the 1.3 x walk, which these are.
+  - Not looked at: the 1.3 x walk turn of the 0x8bcce0 rooms, which these are.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
 - Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.
