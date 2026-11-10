@@ -22,7 +22,7 @@ PACK=ux0:/data/sh2-vita
 BUILD=$ROOT/port/vita
 IP_FILE=$ROOT/.lr3ds/vita_ip
 PORT=${VITA_FTP_PORT:-1337}
-LOGS="vita_log.txt perf.txt stall.txt mem.txt movie_log.txt ptlog.txt enemylog.txt autotest.txt options.txt debug.txt camtrace.txt"
+LOGS="vita_log.txt perf.txt stall.txt mem.txt movie_log.txt ptlog.txt enemylog.txt autotest.txt options.txt debug.txt camtrace.txt frames.raw"
 
 usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 case "$1" in

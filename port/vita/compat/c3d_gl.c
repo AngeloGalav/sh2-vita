@@ -288,6 +288,63 @@ static void vbo_frame(void);
 // draws per second for the log: issued, skipped with no shader bound, skipped with a failed program
 static unsigned s_draws[3];
 
+// A burst of frames for a console test: SELECT + D-pad down (ctru.c) arms it, three seconds later the next
+// CAP_N frames as they are shown go, at half size, to frames.raw in the data folder ("FRM1", width, height,
+// count, then RGB rows), and the camera's trace with them (gamecam.c). What changes from one frame to the
+// next can then be looked at on a PC.
+#define CAP_N 16
+#define CAP_W 480
+#define CAP_H 272
+static u64 s_cap_at;
+static int s_cap_n = -1;
+static u8 *s_cap, *s_cap_row;
+
+void c3d_capture_arm(void)
+{
+	if (s_cap_n >= 0)
+		return;
+	if (!s_cap)
+		s_cap = malloc(CAP_N * CAP_W * CAP_H * 3);
+	if (!s_cap_row)
+		s_cap_row = malloc(960 * 544 * 4);
+	if (!s_cap || !s_cap_row) {
+		vita_log("frame burst: no memory");
+		return;
+	}
+	s_cap_at = sceKernelGetProcessTimeWide() + 3000000;
+	s_cap_n = 0;
+	vita_log("frame burst armed");
+}
+
+static void capture_frame(void)
+{
+	if (s_cap_n < 0 || sceKernelGetProcessTimeWide() < s_cap_at)
+		return;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glReadPixels(0, 0, 960, 544, GL_RGBA, GL_UNSIGNED_BYTE, s_cap_row);
+	u8* d = s_cap + s_cap_n * CAP_W * CAP_H * 3;
+	for (int y = 0; y < CAP_H; y++)
+		for (int x = 0; x < CAP_W; x++) {
+			const u8* a = s_cap_row + ((y * 2) * 960 + x * 2) * 4;
+			for (int k = 0; k < 3; k++)
+				*d++ = (u8)((a[k] + a[4 + k] + a[960 * 4 + k] + a[960 * 4 + 4 + k] + 2) >> 2);
+		}
+	if (++s_cap_n < CAP_N)
+		return;
+	FILE* f = fopen(VITA_DATA_DIR "/frames.raw", "wb");
+	if (f) {
+		const u32 h[3] = { CAP_W, CAP_H, CAP_N };
+		fwrite("FRM1", 1, 4, f);
+		fwrite(h, 4, 3, f);
+		fwrite(s_cap, 1, CAP_N * CAP_W * CAP_H * 3, f);
+		fclose(f);
+	}
+	extern void gamecam_trace_dump(void);
+	gamecam_trace_dump();
+	s_cap_n = -1;
+	vita_log("frame burst written");
+}
+
 void C3D_FrameEnd(u8 flags)
 {
 	(void)flags;
@@ -328,6 +385,7 @@ void C3D_FrameEnd(u8 flags)
 		last = G.frame_start;
 	}
 	present();
+	capture_frame();
 	// r_end in parts for perf.txt's slow frame lines: r_pres the frame's last draws and the once a
 	// second log line, r_pace the wait for the 30 fps beat, r_swap vitaGL's swap (a full display queue,
 	// its garbage collector), r_swap1 the swap before this one, which sets this frame's beat through

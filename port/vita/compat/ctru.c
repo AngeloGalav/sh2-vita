@@ -471,8 +471,12 @@ void hidScanInput(void)
 			gamecam_trace_dump();
 			vita_log("camera trace written");
 		}
-		combo |= (raw_down & (KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP)) != 0;
-		k &= ~(KEY_SELECT | KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP);
+		if (raw_down & KEY_DDOWN) {
+			extern void c3d_capture_arm(void);       // c3d_gl.c: 16 frames to frames.raw, three seconds from now
+			c3d_capture_arm();
+		}
+		combo |= (raw_down & (KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP | KEY_DDOWN)) != 0;
+		k &= ~(KEY_SELECT | KEY_X | KEY_Y | KEY_R | KEY_L | KEY_DUP | KEY_DDOWN);
 	} else if (raw_up & KEY_SELECT) {
 		if (!combo)
 			k |= KEY_SELECT;
