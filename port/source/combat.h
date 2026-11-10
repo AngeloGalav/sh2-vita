@@ -124,6 +124,7 @@ float combat_dying_time(void);
 float combat_hit_time(void);
 
 float combat_hp(void);
+float combat_shot_light(void);          // 0x8a2b88 as 0x509f80 reads it: the light of the last gunshot, 0.75 down to 0
 float combat_low_health_alpha(float dt);   // per frame: the PC red cross's alpha, 0 when hidden
 void combat_set_hp(float hp);         // continue from a save
 void combat_test_god(bool on);        // playtest: blows take no health

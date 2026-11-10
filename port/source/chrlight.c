@@ -322,6 +322,18 @@ static int by_influence(const void* a, const void* b)
 
 static float max3(const float* c) { return c[0] > c[1] ? (c[0] > c[2] ? c[0] : c[2]) : (c[1] > c[2] ? c[1] : c[2]); }
 
+// A gunshot on the characters. With James' lamp lit the PC adds 7 x the shot's light (0x509f60 less its 0.075)
+// to the lamp's colour on them (0x5083f0, 0x508690), which is at its ceiling here already; James himself gets a
+// parallel light of that colour against the lamp's direction (0x508060, light 1), with the lamp or without.
+// Port's own: the others get the same parallel light, along his facing, when no lamp lights them.
+static float s_shot, s_shot_dir[3];
+
+void chrlight_shot(float light, const float facing[3])
+{
+	s_shot = light;
+	memcpy(s_shot_dir, facing, sizeof s_shot_dir);
+}
+
 void chrlight_at(const float pos[3], bool james)
 {
 	if (!L.active)
@@ -342,6 +354,13 @@ void chrlight_at(const float pos[3], bool james)
 			memcpy(pcol[g], s->col, sizeof pcol[g]);
 			g++;
 		}
+	}
+	bool lamp = L.flash.on && (!james || L.flash.room);
+	if (s_shot > 0.001f && g < CL_PAR && (james || !lamp)) {   // 0x63cfd0
+		float sg = james ? -1.0f : 1.0f;
+		pdir[g][0] = sg * s_shot_dir[0], pdir[g][1] = sg * s_shot_dir[1], pdir[g][2] = sg * s_shot_dir[2];
+		pcol[g][0] = pcol[g][1] = pcol[g][2] = 7.0f * s_shot;
+		g++;
 	}
 	// points and spots by influence (0x50c3d0 with the character radius 800, 0x50ce10)
 	Pick pick[NSLOT];

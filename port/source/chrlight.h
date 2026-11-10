@@ -25,6 +25,9 @@ void chrlight_load(const char* pack_dir, const char* map, const char* variant);
 // Before drawing characters: view matrix, the record Ambient (rgb), the flashlight level
 // (0x8a2ba8), the brightness factor and the flashlight.
 void chrlight_begin(const C3D_Mtx* view, const float ambient[3], float level, float bright, const ChrFlash* fl);
+// The light of a gunshot (combat_shot_light, 0 for none) and the way James faces, for the characters drawn
+// from the next chrlight_begin on.
+void chrlight_shot(float light, const float facing[3]);
 // Before each character's chr_draw: its root position. James does not light himself with his own
 // flashlight.
 void chrlight_at(const float pos[3], bool james);

@@ -56,6 +56,7 @@ typedef struct {
 	u8 trilinear;        // the Vita: 0 bilinear within a level, 1 trilinear between levels
 	u8 fog_size;         // the Vita: the fog's target, a half, a third or a quarter of the view each way
 	u8 filters;          // the Vita: the PC's 2D filters in the scenes that use them (main.c filters_frame)
+	u8 shot_light;       // the room lit by a gunshot (0x509f40), on as the PC has it; the row is the port's
 	u8 vita_cam;         // the Vita: 2, the camera was put back on Original after a build moved it
 	u8 ctrllayout;       // Control Options "Layout"
 	u8 camera;           // Control Options "Camera": 0 the PC's, 1 the port's behind camera (tpcam.c)

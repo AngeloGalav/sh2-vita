@@ -30,7 +30,7 @@ typedef struct {
 // Finds the line for a bg map ("ap38") and variant ("-" default, "night", "flag251", "bfaw").
 // Falls back to the default variant, then to a lit default when the map is unknown.
 bool env_load(const char* pack_dir, const char* map, const char* variant, RoomEnv* out);
-void env_constants(const RoomEnv* e, float level, RoomEnvConst* out);
+void env_constants(const RoomEnv* e, float level, float shot, RoomEnvConst* out);
 // Enhanced Edition PS2 flashlight brightness for the rooms loaded after this (on by default).
 void env_set_ps2_flashlight(bool on);
 

@@ -327,6 +327,7 @@ static const AttackInfo* s_stomp_atk;   // ATK_KICK or ATK_STOMP while M_STOMP
 static float s_hold;                    // grab meter (DAT_01fbacd4): frame times of struggling left
 static int s_stick_dir;                 // last circle pad direction (0 centre, 1..4), for flicks
 static float s_invuln, s_dead_t, s_flash;
+static float s_shot_t = -1.0f;         // seconds since the last shot, < 0 once its light is out
 static float s_die_t;                    // since the killing blow (combat_dying_time)
 static float s_hit_t = 99.0f;            // since the last blow that hurt (combat_hit_time)
 static float s_tip[3], s_root[3];       // melee weapon's grip and far end in James' bind space
@@ -740,6 +741,7 @@ void combat_reset(void)
 	s_mode = M_FREE;
 	s_side = 0;
 	s_invuln = s_dead_t = s_flash = 0.0f;
+	s_shot_t = -1.0f;
 	s_target = NULL;
 	s_ncand = 0;
 	s_vis = s_stompable = s_stomp_e = NULL;
@@ -1626,6 +1628,21 @@ static void fire(const CombatBody* b)
 		ev_give_item(w->item, -1);       // Infinite Ammo (Cheats): the round stays in the gun
 	sfx_play(w->snd_shot, 1.0f, 0.0f);
 	s_flash = 0.06f;
+	s_shot_t = 0.0f;                  // 0x509f40
+}
+
+// The light of a shot. Every gunshot (0x543600, the shotgun's 0x543810, 0x545810) calls 0x509f40, which sets
+// 0x8a2b88 to 0.75 and the latch 0x8a2b68; the light set-up 0x508a90 runs 0x509ef0 once a frame, which takes the
+// latch off on the first frame and 0.15 (0x69f3c8) off the value on each one after, and the readers 0x509f60 /
+// 0x509f80 give 0 while the latch is on. So a frame of nothing, then 0.75, 0.6 .. 0.15 over five of the PC's 30
+// frames a second.
+float combat_shot_light(void)
+{
+	if (s_shot_t < 0.0f)
+		return 0.0f;
+	int n = (int)(s_shot_t * 30.0f);
+	float v = n < 1 ? 0.0f : 0.75f - 0.15f * (float)(n - 1);
+	return v > 0.0f ? v : 0.0f;
 }
 
 // Downed enemy at James' feet (the PC stomps instead of shooting or swinging bare-handed).
@@ -1910,6 +1927,8 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		s_invuln -= dt;
 	if (s_flash > 0.0f)
 		s_flash -= dt;
+	if (s_shot_t >= 0.0f && (s_shot_t += dt) > 7.0f / 30.0f)
+		s_shot_t = -1.0f;
 	step(dt);
 	s_body_pos[0] = *b->x, s_body_pos[1] = *b->y, s_body_pos[2] = *b->z;
 	s_body_yaw = *b->yaw;

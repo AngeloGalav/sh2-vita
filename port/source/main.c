@@ -1938,7 +1938,12 @@ static void lighting_frame(const C3D_Mtx* view, bool player)
 			env_ee_room_level(room, ev_stage() >= 53, &s_env, &s_flash_level);
 		}
 	}
-	env_constants(&s_env, s_flash_level, &s_envc);
+	float shot = player && s_opt.shot_light ? combat_shot_light() : 0.0f;   // a gunshot lights the room for a moment (0x509f40)
+	env_constants(&s_env, s_flash_level, shot, &s_envc);
+	{
+		float fwd[3] = { sinf(s_yaw), 0.0f, cosf(s_yaw) };
+		chrlight_shot(shot, fwd);
+	}
 	memcpy(s_slot_dir, s_env.ldir, sizeof s_slot_dir);
 	memcpy(s_slot_col, s_env.lcol, sizeof s_slot_col);
 	// 0x50a7d0 -> 0x47b6c0(&0x8a2c00, 0.3 * level, 1): with the flashlight off a dark room gets a grey

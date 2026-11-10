@@ -68,6 +68,7 @@ void opt_defaults(Options* o)
 	o->bright = 3;
 	o->shadows = o->fog = 1;
 	o->lens_flare = 1;           // 0x4f6ae0
+	o->shot_light = 1;
 	o->bullet = 1;
 	o->ps2_flash = o->noise_ps2 = o->ps2_camera = o->cutscene_fov = 1;
 #ifdef SH2_VITA
@@ -78,7 +79,11 @@ void opt_defaults(Options* o)
 	o->msg_top = 1;              // messages are the top screen's (port/UI.md)
 	o->stereo = 1;               // 3D follows the slider
 	o->control_type = 1;         // Directional Style: the stick points where James goes
+#ifdef SH2_VITA
+	o->view = 0;                 // View Control Normal, the PC's default (0x4f6ae0): held, not switched on
+#else
 	o->view = 1;                 // View Control Switch: Look is on the D-Pad, under the thumb that steers
+#endif
 	o->inf_stamina = 1;
 	o->lang = (u8)ev_system_language();   // 0x4f6cc0 when there is no language.ini
 }
@@ -89,7 +94,7 @@ static const Key s_keys[] = {
 	K("controls", control_type, 0, 1), K("language", lang, 1, 5), K("subtitles", subtitles, 0, 1),
 	K("speaker", speaker, 0, 2),
 	K("bgmvol", bgm, 0, 15), K("sevol", se, 0, 15), K("brightness", bright, 0, 7), K("noise", noise, 0, 1),
-	K("shadows", shadows, 0, 1), K("fog", fog, 0, 1), K("lensflare", lens_flare, 0, 1),
+	K("shadows", shadows, 0, 1), K("fog", fog, 0, 1), K("lensflare", lens_flare, 0, 1), K("shotlight", shot_light, 0, 1),
 	K("weaponcontrol", weapon, 0, 1),
 	K("mapzoom", map_zoom, 0, 1), K("walkrun", walk_run, 0, 2), K("viewcontrol", view, 0, 1),
 	K("bloodcolor", blood, 0, 3), K("bulletadjust", bullet, 1, 3), K("messagestop", msg_top, 0, 1),
@@ -104,7 +109,7 @@ static const Key s_keys[] = {
 // options.txt files written before these defaults (no "optver" line) take the new defaults of the
 // settings that changed: Directional Style and messages on the top screen; before version 3, View
 // Control's Switch (2026-10-31: Look moved to the D-Pad, so holding it left no thumb for the pad).
-#define OPT_VERSION 3
+#define OPT_VERSION 4
 
 void opt_load(Options* o, const char* path)
 {
@@ -125,7 +130,7 @@ void opt_load(Options* o, const char* path)
 		if (!strcmp(key, "soundvol")) sound = val;
 	}
 	fclose(f);
-	if (version < OPT_VERSION) {
+	if (version < 3) {
 		Options d;
 		opt_defaults(&d);
 		o->control_type = d.control_type;
@@ -136,6 +141,12 @@ void opt_load(Options* o, const char* path)
 		opt_defaults(&d);
 		o->view = d.view;
 	}
+#ifdef SH2_VITA
+	// Version 4, the Vita: View Control back to Normal once. Switch, the 3DS's default, left the search view
+	// on from the first press of Look, and the camera swinging ahead of James in every room that lets it.
+	if (version < 4)
+		o->view = 0;
+#endif
 	if (!bgm && music >= 0)
 		o->bgm = music > 10 ? 15 : (music * 15 + 5) / 10;
 	if (!se && sound >= 0)
@@ -219,6 +230,7 @@ static const char* const SHADOWS_L[2] = { "No character shadows. Lighter for the
                                           "Characters cast shadows, softened as in the Enhanced Edition." };
 static const char* const FOG_L[2] = { "Fog without drifting particles. Lighter for the console.",
                                       "Drifting fog particles, as on the PC." };
+static const char* const SHOT_L[2] = { "Shots light nothing.", "The room and whoever is near flash with each shot, as in the original." };
 static const char* const FLARE_L[2] = { "Lamps show no glow.",
                                         "A lamp facing the camera glows and throws streaks, as on the PC." };
 static const char* const SUBS_L[2] = { "Voices only.", "Spoken lines are written out as they play." };
@@ -347,6 +359,8 @@ static const Setting SETTINGS[] = {
 #endif
 	{ .tab = TAB_DISPLAY, .label = 192, .name = "Lens Flare", AT(lens_flare), .hi = 1, .names = OFF_ON,
 	  .what = "The glow round a lamp that faces the camera.", .lines = FLARE_L },
+	{ .tab = TAB_DISPLAY, .label = -1, .name = "Gunshot Light", AT(shot_light), .hi = 1, .names = OFF_ON,
+	  .what = "A shot lights the room for a moment.", .lines = SHOT_L },
 	// Sound
 	{ .tab = TAB_SOUND, .label = 74, .name = "Subtitles", AT(subtitles), .hi = 1, .names = OFF_ON,
 	  .what = "Spoken lines written out on screen.", .lines = SUBS_L },

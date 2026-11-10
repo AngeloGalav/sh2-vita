@@ -135,12 +135,14 @@ bool env_load(const char* pack_dir, const char* map, const char* variant, RoomEn
 // 0x47a540 / 0x5b2560: c19 = Ambient * (0.5 + 0.25 * level), c20 = BaseColor / 16,
 // c21 = BaseAmbient * (1 + 2 * level) / 16, c22 = VertexAmbient / 4. The level is 0x8a2ba8: 0 with
 // the flashlight on, env_flash_off_level() with it off, and left as it was in lit rooms.
-void env_constants(const RoomEnv* e, float level, RoomEnvConst* out)
+// shot is the light of a gunshot (0x509f80, combat_shot_light): 0x47a540 adds twice it to Ambient x 4 and to
+// BaseAmbient before the level's share, which is a quarter and an eighth of it here, on every channel.
+void env_constants(const RoomEnv* e, float level, float shot, RoomEnvConst* out)
 {
 	for (int i = 0; i < 3; i++) {
-		out->c19[i] = e->amb[i] * (0.5f + 0.25f * level);
+		out->c19[i] = e->amb[i] * (0.5f + 0.25f * level) + 0.25f * shot;
 		out->c20[i] = e->bcol[i] / 16.0f;
-		out->c21[i] = e->bamb[i] * (1.0f + 2.0f * level) / 16.0f;
+		out->c21[i] = e->bamb[i] * (1.0f + 2.0f * level) / 16.0f + 0.125f * shot;
 		out->c22[i] = e->vamb[i] / 4.0f;
 	}
 }
