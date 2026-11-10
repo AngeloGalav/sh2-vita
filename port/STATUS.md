@@ -293,14 +293,21 @@ Ordered by weight. Each line names where the work starts.
   letter is blank from flag 626 on. Works on a console.
 - Game over as on the PC (0x498780, 0x496ee0, the 0x496c90 table), on black; on the 3DS the port's own version stays. Works on a console.
 - FMV subtitles: taken from sh23ds upstream (8b0de2f): the PC's tables (`movsubs.c`, 0x43de10), drawn with the game's message text; the stage's music goes on under a movie and keeps real time under the pause menu. Works on a console.
-- Levels jitter (the picture shakes while the camera turns; the hospital, the labyrinth; Original camera, 30 fps). Open.
-  Ruled out: the frame time (steady 33 ms in two console traces), the collision, and the camera module, whose eye, look
-  and up vectors are smooth frame by frame in the traces (`gamecam_trace_dump`: SELECT + D-pad up writes the last minute
-  to `camtrace.txt`, `tools/console/vita.sh pull` fetches it). The traces show pans of up to 57 mrad a frame, about 45
-  pixels, in rooms whose fixed cameras follow James; a 30 fps pan was the other guess, or
-  it comes after the camera, in the drawing. At 60 fps it shakes twice as fast (console), so it changes frame by frame
-  and is not the pan: the drawing is where to look next (Picture, Filters, Shadows, the fog's target, one at a time). View Control is Normal on the Vita now, the PC's default (options version
-  4): Switch, the 3DS's, left the search view on from one press of Look.
+- Levels jitter (the picture shakes while the camera turns; the hospital, the labyrinth; Original camera). Open; what is
+  known, from console traces and a burst of shown frames (`gamecam_trace_dump`, SELECT + D-pad up, `camtrace.txt`;
+  SELECT + D-pad down, 16 frames to `frames.raw`; `tools/console/vita.sh pull` fetches both):
+  - The camera module is smooth for smooth input: its eye, look and up vectors in the traces, and every room of both
+    areas walked on a PC with the rooms' collision. Not the collision, not the search view (View Control is Normal on
+    the Vita now, the PC's default; Switch left it on from one press of Look).
+  - The rooms that shake have cameras whose yaw follows James' facing with little easing (the labyrinth's corridors seen
+    from above and behind), so every unevenness in his turning shows as the whole picture moving.
+  - Found in his turning: going from a walk to the turn on the spot he stood one frame without turning (`move.c`'s
+    table has no walk to round); he now turns through it at 2.4 rad/s. Not run on a console, and it happens only at
+    that change, so it may not be all of it.
+  - At Frame Rate 60 the trace has frames of one and two refreshes mixed (1338 and 427 of 1800) and each step is the
+    time of the frame before, so the picture shakes faster there; at 30 the frame time was a steady 33 ms.
+  - Not looked at: his turn rate from the stick (0x52e110's zones) frame by frame while it is held, and the 1.3 x walk
+    turn of the 0x8bcce0 rooms, which these are.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
 - Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.
@@ -323,7 +330,9 @@ Ordered by weight. Each line names where the work starts.
   motions in the pack (motion.py). Eddie with the pizza works on a console, the others are not run. A scene that switches
   such a character off (0x49fb20 case 2) leaves it to the motion the stage gave it, taken from the bowling alley's talk,
   where Eddie went missing while James spoke; works on a console. They all run on one clock, so a pair stays in step
-  (Eddie's pizza drifted out of his hands after a scene had held one of the two); not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
+  (Eddie's pizza drifted out of his hands after a scene had held one of the two). Stand-in: while a scene moves one of
+  a room's placed characters the others wait on their first frame (the pizza went on looping in the air under the
+  scene's Eddie). Not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
   (the script shows them 3 s in; what draws them before on the PC isn't traced). 0x593fa0 and the two props 0x591a40
   puts down after its scene (0x431, 0x42f) are not ported.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).

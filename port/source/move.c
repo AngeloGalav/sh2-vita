@@ -440,6 +440,12 @@ void move_update(const MoveInput* in, float* yaw, float dt, MoveOut* out)
 		M.spd -= (running(M.prev) ? 20.0f : 10.0f) * dt;      // 0x5567b0
 		if (M.spd < 0.0f) M.spd = 0.0f;
 		off_to = M.off;
+		// The port's own, from a console trace: a walk can't go straight to the turn on the spot (the
+		// table above), so with the stick pushed to the side he stood for a frame without turning, and
+		// the cameras that follow his facing (the labyrinth's corridors, the hospital's) jerked with
+		// him. He turns through that frame at the spot turn's rate.
+		if (turn && !back && !in->aim)
+			rate = 2.4f * tx;
 		break;
 	}
 	case MV_HOLD:
