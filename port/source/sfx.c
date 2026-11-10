@@ -535,6 +535,31 @@ void sfx_mix(int id, float gain, float pan)
 		ndspChnWaveBufAdd(FIRST_CH + (v - s_voices), &v->wb);
 }
 
+void sfx_set_volume(int id, float volume)
+{
+	for (int i = 0; i < NVOICES; i++) {
+		Voice* v = &s_voices[i];
+		if (!v->active || v->id != id)
+			continue;
+		v->volume = volume;
+		if (v->positional)
+			positional_mix(v);
+		else
+			voice_mix(v, level_gain(volume), 0.0f);
+	}
+}
+
+void sfx_move(int id, const float pos[3])
+{
+	for (int i = 0; i < NVOICES; i++) {
+		Voice* v = &s_voices[i];
+		if (!v->active || v->id != id || !v->positional)
+			continue;
+		memcpy(v->pos, pos, sizeof v->pos);
+		positional_mix(v);
+	}
+}
+
 float sfx_distance_at(const float pos[3])
 {
 	return s_have_listener ? distance_factor(pos, s_player) * distance_factor(s_eye, s_player) : 1.0f;

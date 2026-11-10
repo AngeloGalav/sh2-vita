@@ -9,6 +9,7 @@
 #include "bgm.h"
 #include "chr.h"
 #include "events.h"
+#include "stagemdl.h"
 #include "movie.h"
 #include "prog.h"
 #include "stereo.h"
@@ -874,6 +875,12 @@ static bool scene_start(const char* pack_dir, const char* key)
 		S.chars[i].rec = &recs[i];
 		S.chars[i].model = load_model(pack_dir, i, &recs[i], &S.chars[i].own_model, &S.chars[i].morph);
 		S.chars[i].dec_frame = -1;
+		// Stand-in, from a console test: in the bowling alley's first scene (bp_edi_a, 0x591860) the script
+		// shows Eddie and Laura only after the first shot, about 3 s in, yet the game has them in it. What
+		// keeps them drawn on the PC before the show command isn't traced (0x49fb20 sets 0x950be4, its
+		// reader is not found); here the two start shown in that scene.
+		if (!strcmp(key, "bp_edi_a") && (recs[i].kind == 0x108 || recs[i].kind == 0x104))
+			S.next.visible[i] = true;
 	}
 	// DramaDemoInit: names were matched by the converter; the first record is read now
 	S.p = dds + 0x19 + 16 * S.n_chars;
@@ -1685,6 +1692,19 @@ bool demo_has_kind(int kind)
 		return false;
 	for (int i = 0; i < S.n_chars; i++)
 		if (S.chars[i].model && S.chars[i].rec->kind == kind)
+			return true;
+	return false;
+}
+
+// Whether the scene has that character under its own motion now. While its flag is off (0x49fb20 case 2,
+// 0x950be4) the scene leaves it alone, and one the stage's code placed (stagemdl.c) goes on with the motion it
+// was given: Eddie eating in the bowling alley while James speaks (0x591a40, console test).
+bool demo_shows_kind(int kind)
+{
+	if (!S.active)
+		return false;
+	for (int i = 0; i < S.n_chars; i++)
+		if (S.chars[i].model && S.chars[i].rec->kind == kind && S.next.visible[i])
 			return true;
 	return false;
 }

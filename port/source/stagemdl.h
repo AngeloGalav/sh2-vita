@@ -13,6 +13,8 @@ void stagemdl_prefetch(int stage, float x, float z, void (*want)(const char* pat
 // The room load, behind the fade: loads the models in range of James there, from what the read
 // ahead brought, so none has to load in a frame of play.
 void stagemdl_preload(int stage, float x, float z);
+// Whether the stage code has a character of that kind standing where James is now (the table in stagemdl.c).
+bool stagemdl_npc_placed(int kind);
 void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones);   // skin program and lights bound
 // 0x57b5c0 FUN(1, 15.0): one frame of the tune that opens the box (the right order); seconds is
 // the time since it started, or < 0 to put the parts back.
@@ -23,5 +25,3 @@ void stagemdl_turn(int kind, float rx, float ry, float rz);
 // Stage code moving one bone of a placed model (the labyrinth lift's gates, 0x5831aa): the offset is
 // added to the bone's own place, until set again.
 void stagemdl_bone_move(int kind, int bone, float dx, float dy, float dz);
-// Maria lying in the day room S3 (stage 20, the room code 0x58ef90 places character 0x106).
-void stagemdl_maria_bed(bool on);

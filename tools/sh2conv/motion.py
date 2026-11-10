@@ -36,12 +36,27 @@ import sh2mdl  # noqa: E402
 from demos import DEFAULT_DATA, DEFAULT_EXE, DEFAULT_OUT, anm_frames  # noqa: E402
 from sound import Exe  # noqa: E402
 
-# (motion id, record table, first id, model, anm, output folder, output name)
+# (motion id, record table, the table's first id, the first motion in the .anm, model, anm, output folder, output name)
 MOTIONS = [
-    (0xd49, 0x6e7728, 3400, 'chr/mar/hhh_mar.mdl', 'demo/mar_hagureru/hhh_mar.anm', 'mar', 'hhh_mar_s3'),
+    (0xd49, 0x6e7728, 3400, 0xd49, 'chr/mar/hhh_mar.mdl', 'demo/mar_hagureru/hhh_mar.anm', 'mar', 'hhh_mar_s3'),
     # Angela at the grave: 0x59fd30 with the file list 0x8ea4a4, 0x5407c0 (first id 0xf3c: the records' first is empty)
-    (0xf3d, 0x6e5c20, 0xf3c, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_1'),
-    (0xf3e, 0x6e5c20, 0xf3c, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_2'),
+    (0xf3d, 0x6e5c20, 0xf3c, 0xf3d, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_1'),
+    (0xf3e, 0x6e5c20, 0xf3c, 0xf3d, 'chr/agl/agl.mdl', 'demo/haka_agl/agl.anm', 'agl', 'agl_grave_2'),
+    # Maria in the labyrinth cell: 0x582bd0 (stage 34, room 0x89) with the file list 0x8d4380, 0x540cf0; the
+    # file starts at 0xd4a, the scene's own motion
+    (0xd4b, 0x6e7728, 3400, 0xd4a, 'chr/mar/hhh_mar.mdl', 'demo/mar_ikiteruka/hhh_mar.anm', 'mar', 'hhh_mar_cell'),
+    # Maria waiting in the park: EvProgMariaMeetingStandby 0x592830 with the file list 0x8e0938, 0x540cf0
+    (0xd4d, 0x6e7728, 3400, 0xd4d, 'chr/mar/hhh_mar.mdl', 'demo/mar_deai/hhh_mar.anm', 'mar', 'hhh_mar_park'),
+    # Laura on the wall with the letter: 0x593d70 (stage 14) with the file list 0x8e0ff8, 0x540ab0 and 0x53b8a0
+    (0xb55, 0x6e696c, 0xb54, 0xb55, 'chr/lau/lau.mdl', 'demo/hei_lau/lau.anm', 'lau', 'lau_wall'),
+    (0x282b, 0x6db230, 0x282a, 0x282b, 'chr/item/i_letter.mdl', 'demo/hei_lau/i_letter.anm', 'item', 'i_letter_wall'),
+    # Eddie, 0x540650: by the toilet (0x59d120, stage 6 room 0x1e, list 0x8e674c), with the pizza in the bowling
+    # alley (0x591dd0, stage 15 room 0xb, list 0x8ddb58, the pizza by 0x53b8a0), and dead (0x57f480, stage 37
+    # room 0x90, list 0x8d0128)
+    (0x12c1, 0x6e4f58, 0x12c0, 0x12c1, 'chr/edi/hhh_edi.mdl', 'demo/gero_edi/hhh_edi.anm', 'edi', 'hhh_edi_toilet'),
+    (0x12c2, 0x6e4f58, 0x12c0, 0x12c2, 'chr/edi/hhh_edi.mdl', 'demo/bp_edi_2/hhh_edi.anm', 'edi', 'hhh_edi_bowl'),
+    (0x282d, 0x6db230, 0x282a, 0x282d, 'chr/item/b_piz.mdl', 'demo/bp_edi_2/b_piz.anm', 'item', 'b_piz_bowl'),
+    (0x12c3, 0x6e4f58, 0x12c0, 0x12c3, 'chr/edi/hhh_edi.mdl', 'demo/killer_edi_e/hhh_edi.anm', 'edi', 'hhh_edi_dead'),
 ]
 
 # (model, anm, output folder, output name): the whole .anm
@@ -64,12 +79,12 @@ def write_s3a(m, frames, path):
         f.write(b''.join(out))
 
 
-def convert(exe, data, pack, anim, table, base, mdl, anm, folder, name):
+def convert(exe, data, pack, anim, table, base, first, mdl, anm, folder, name):
     m = sh2mdl.load_mdl(os.path.join(data, mdl))
     d = ee.read(os.path.join(data, anm))
     roots = list(m.parents == 255)
     off, rec = 0, None
-    for i in range(1, anim - base + 1):          # the motions before it, back to back from 0
+    for i in range(first - base, anim - base + 1):   # the file's motions before it, back to back from 0
         rec = struct.unpack('<6h', exe.read(table + 12 * i, 12))
         if rec[0] != base + i or rec[1] <= 0:
             print('%s: no motion record for %#x' % (name, base + i))
@@ -114,8 +129,8 @@ def main():
     ap.add_argument('--out', default=DEFAULT_OUT)
     a = ap.parse_args()
     exe = Exe(a.exe)
-    for anim, table, base, mdl, anm, folder, name in MOTIONS:
-        convert(exe, a.data, a.out, anim, table, base, mdl, anm, folder, name)
+    for anim, table, base, first, mdl, anm, folder, name in MOTIONS:
+        convert(exe, a.data, a.out, anim, table, base, first, mdl, anm, folder, name)
     for mdl, anm, folder, name in WHOLE:
         convert_whole(a.data, a.out, mdl, anm, folder, name)
 

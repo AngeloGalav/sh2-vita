@@ -38,6 +38,10 @@ void sfx_mix(int id, float gain, float pan);
 float sfx_distance_at(const float pos[3]);
 float sfx_pan_at(const float pos[3]);    // 0x515ab0, as the voices use it
 
+// 0x5169a0: the volume of a sound that is playing; 0x515560: where a positional one is now.
+void sfx_set_volume(int id, float volume);
+void sfx_move(int id, const float pos[3]);
+
 void sfx_stop(int id);
 void sfx_stop_all(void);
 bool sfx_playing(int id);

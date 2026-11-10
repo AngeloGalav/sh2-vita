@@ -8,6 +8,7 @@
 #include "playtest.h"
 #include "perf.h"
 #include "stereo.h"
+#include "bgm.h"
 #include "stream.h"
 #include <math.h>
 #include <stdio.h>
@@ -62,45 +63,66 @@ static int s_stage = -1;
 static u32 s_frame;
 static float s_play = -1.0f;      // seconds into the music box's tune, < 0 when it is not playing
 
-// Maria lying in the day room S3 (stage 20, 0x58ef90): the PC places character 0x106 (hhh Maria) at
-// 0x8db2cc facing pi with motion 0xd49 (72 frames, looping), pack/chr/mar/hhh_mar_s3.s3a (motion.py).
-static struct {
-	bool on, loaded, failed;
-	Character chr;
-	Anim anim;
-	float t;
-} s_bed;
+// Characters the stages' room functions put in play themselves, outside any scene: CharaCreate (0x48fcc0) at a
+// fixed place and a motion setter with an id, whose record (frames, speed, loop) the setter's table holds. The
+// motions are cut from the scenes' own .anm files by tools/sh2conv/motion.py. The PC creates them when the room
+// loads; here each shows while its stage, room and flags hold and no scene moves its own copy.
+//   0x58ef90 (stage 20, room 0x41): Maria (0x106) lying in the day room S3, 0x540cf0 motion 0xd49
+//   0x59fd30 (stage 4, flag 512 off, 0x1f7d620 bit 0): Angela (0x107) at the grave, before the scene (36 off)
+//     with 0x5407c0 motion 0xf3d, after it at her second place with 0xf3e
+//   0x582bd0 (stage 34, room 0x89, 327 on and 368 off): Maria behind the bars, 0x540cf0 motion 0xd4b
+//   0x593d70 (stage 14, 510 and 150 off): Laura (0x104) on the wall, 0x540ab0 motion 0xb55, and the letter
+//     (0x408) with 0x53b8a0 motion 0x282b
+//   0x592830 EvProgMariaMeetingStandby, run by 0x594e10 while 150 is on and 152 off: Maria at the park's
+//     rail, 0x540cf0 motion 0xd4d (0x593fa0 puts her back for tiles 0x82 and 0xa2; not ported)
+//   0x59d120 (stage 6, room 0x1e, 85 on and 88 off): Eddie (0x108) by the toilet, 0x540650 motion 0x12c1
+//   0x591dd0 (stage 15, room 0xb, 159 on and 251 off): Eddie with the pizza (0x42e, 0x53b8a0 motion 0x282d),
+//     0x540650 motion 0x12c2
+//   0x57f480 (stage 37, room 0x90, 378 on): Eddie dead, 0x540650 motion 0x12c3, and his revolver (0x42a)
+// The rate is the record's speed (2048 is 30 frames a second, as boat.c). A model with a motion keeps the
+// turn the room function gives it; the revolver, which has none, is a stay object (stay_turned).
+typedef struct {
+	u8 stage;
+	s16 room;                         // the PC room id, -1 for the whole stage
+	u16 kind;
+	s16 on, off, off2;                // flags that must be set / clear, 0 for none
+	const char *folder, *model, *anim;   // anim NULL: the model as it is
+	float fps;
+	float pos[3], yaw;
+} Npc;
 
-static void bed_free(void)
-{
-	if (s_bed.loaded) {
-		chr_free(&s_bed.chr);
-		anim_free(&s_bed.anim);
-	}
-	s_bed.loaded = s_bed.failed = false;
-}
+static const Npc k_npc[] = {
+	{ 20, 0x41, 0x106, 0, 0, 0, "mar", "hhh_mar", "hhh_mar_s3", 30.0f, { 99742.5625f, 203.282562f, 58623.1211f }, 3.1415927f },   // 0x8db2cc
+	{ 4, -1, 0x107, 0, 512, 36, "agl", "agl", "agl_grave_1", 30.0f, { 2430.61646f, 2636.63135f, -1708.84473f }, 3.1415927f },      // 0x8ea24c
+	{ 4, -1, 0x107, 36, 512, 0, "agl", "agl", "agl_grave_2", 30.0f, { 781.121277f, 2505.67407f, -394.283203f }, 3.1415927f },      // 0x8ea26c
+	{ 34, 0x89, 0x106, 327, 368, 0, "mar", "hhh_mar", "hhh_mar_cell", 11.25f, { 19558.5098f, 161.695007f, 21320.5f }, 3.1415927f }, // 0x8d43a8, speed 768
+	{ 14, -1, 0x104, 0, 510, 150, "lau", "lau", "lau_wall", 30.0f, { 21431.5254f, 639.424255f, 49436.8984f }, 3.1415927f },        // 0x8e1048
+	{ 14, -1, 0x408, 0, 510, 150, "item", "i_letter", "i_letter_wall", 30.0f, { 21570.7109f, 600.974976f, 49437.6016f }, 0.0f },   // 0x8e1068, 0x8e1078
+	{ 14, -1, 0x106, 150, 152, 0, "mar", "hhh_mar", "hhh_mar_park", 30.0f, { 10726.6533f, 3024.75488f, 104300.0f }, 0.0f },        // 0x8e09d8
+	{ 6, 0x1e, 0x108, 85, 88, 0, "edi", "hhh_edi", "hhh_edi_toilet", 7.5f, { 19376.4316f, 357.80011f, 101908.867f }, 3.1415927f },  // 0x8e6614, 0x8e6788, speed 512
+	{ 15, 0xb, 0x108, 159, 251, 0, "edi", "hhh_edi", "hhh_edi_bowl", 7.5f, { 15148.0098f, 167.173523f, 17269.3691f }, 3.1415927f }, // 0x8dd8f4
+	{ 15, 0xb, 0x42e, 159, 251, 0, "item", "b_piz", "b_piz_bowl", 7.5f, { 15094.127f, -441.493835f, 17609.9648f }, 3.1415927f },    // 0x8dd934
+	{ 37, 0x90, 0x108, 378, 0, 0, "edi", "hhh_edi", "hhh_edi_dead", 30.0f, { 140814.766f, 424.165009f, -100284.82f }, 3.1415927f }, // 0x8cfd0c
+	{ 37, 0x90, 0x42a, 378, 0, 0, "item", "i_colt", NULL, 30.0f, { 140490.766f, -7.18504620f, -100389.664f }, 0.0f },               // 0x8cfd2c
+};
+#define N_NPC ((int)(sizeof k_npc / sizeof k_npc[0]))
 
-void stagemdl_maria_bed(bool on) { s_bed.on = on; }
-
-// Angela at the grave (stage 4, 0x59fd30, which each visit runs while flag 320 is off): character 0x107 facing
-// pi, before the scene (flag 36 off) at 0x8ea24c with motion 0xf3d, after it at 0x8ea26c with 0xf3e, both
-// looping (0x5407c0); pack/chr/agl/agl_grave_1.s3a and _2.s3a (motion.py). Stage 4's events 18 and 19 are the
-// talks. The scenes move their own copy.
 static struct {
 	bool loaded, failed;
 	Character chr;
-	Anim anim[2];
+	Anim anim;
 	float t;
-} s_grave;
+} s_npc[N_NPC];
+static u64 s_npc_ms;
 
-static void grave_free(void)
+static void npc_free(int i)
 {
-	if (s_grave.loaded) {
-		chr_free(&s_grave.chr);
-		anim_free(&s_grave.anim[0]);
-		anim_free(&s_grave.anim[1]);
+	if (s_npc[i].loaded) {
+		chr_free(&s_npc[i].chr);
+		if (k_npc[i].anim)
+			anim_free(&s_npc[i].anim);
 	}
-	s_grave.loaded = s_grave.failed = false;
+	s_npc[i].loaded = false;
 }
 
 // Bones the stage code moves (the labyrinth lift's gates, 0x5831aa; the endings' falling stairs,
@@ -125,8 +147,10 @@ static void free_models(void)
 		}
 	memset(s_models, 0, sizeof s_models);
 	s_nmodels = 0;
-	bed_free();
-	grave_free();
+	for (int i = 0; i < N_NPC; i++) {
+		npc_free(i);
+		s_npc[i].failed = false;
+	}
 }
 
 static Line* s_all;
@@ -387,82 +411,6 @@ static void pose(Character* c, int kind, float t)
 	}
 }
 
-static void bed_draw(const C3D_Mtx* view, int uModelView, int uBones)
-{
-	if (!s_bed.on || ev_stage() != 20 || s_bed.failed)
-		return;
-	if (!s_bed.loaded) {
-		char err[64];
-		if (!chr_load(&s_bed.chr, PACK_DIR "/chr/mar", "hhh_mar", err, sizeof err)) {
-			s_bed.failed = true;
-			return;
-		}
-		if (!anim_load(&s_bed.anim, PACK_DIR "/chr/mar/hhh_mar_s3.s3a")) {
-			chr_free(&s_bed.chr);
-			s_bed.failed = true;
-			return;
-		}
-		s_bed.loaded = true;
-		s_bed.t = 0.0f;
-		if (playtest_active())
-			playtest_log("S3: Maria in the bed (%lu frames)", (unsigned long)s_bed.anim.frames);
-	}
-	static const float pos[3] = { 99742.5625f, 203.282562f, 58623.1211f };   // 0x8db2cc
-	if (!stereo_eye())               // once a frame, not once an eye (stereo.h)
-		s_bed.t += 1.0f / 30.0f;
-	float frame = fmodf(s_bed.t * 30.0f, (float)(s_bed.anim.frames ? s_bed.anim.frames : 1));
-	C3D_Mtx model, mv;
-	Mtx_Identity(&model);
-	Mtx_Translate(&model, pos[0], pos[1], pos[2], true);
-	Mtx_RotateY(&model, 3.1415927f, true);
-	Mtx_Multiply(&mv, view, &model);
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
-	chr_pose_loop(&s_bed.chr, &s_bed.anim, frame, 0, (int)s_bed.anim.frames - 1);
-	chrlight_at(pos, false);
-	chr_draw(&s_bed.chr, uBones);
-}
-
-static void grave_draw(const C3D_Mtx* view, int uModelView, int uBones)
-{
-	if (ev_stage() != 4 || s_grave.failed || ev_flag(320) || demo_has_kind(0x107))
-		return;
-	if (!s_grave.loaded) {
-		char err[64];
-		if (!chr_load(&s_grave.chr, PACK_DIR "/chr/agl", "agl", err, sizeof err)) {
-			s_grave.failed = true;
-			return;
-		}
-		if (!anim_load(&s_grave.anim[0], PACK_DIR "/chr/agl/agl_grave_1.s3a")) {
-			chr_free(&s_grave.chr);
-			s_grave.failed = true;
-			return;
-		}
-		if (!anim_load(&s_grave.anim[1], PACK_DIR "/chr/agl/agl_grave_2.s3a")) {
-			anim_free(&s_grave.anim[0]);
-			chr_free(&s_grave.chr);
-			s_grave.failed = true;
-			return;
-		}
-		s_grave.loaded = true;
-		s_grave.t = 0.0f;
-	}
-	static const float POS[2][3] = { { 2430.61646f, 2636.63135f, -1708.84473f }, { 781.121277f, 2505.67407f, -394.283203f } };
-	int k = ev_flag(36) ? 1 : 0;
-	const Anim* a = &s_grave.anim[k];
-	if (!stereo_eye())               // once a frame, not once an eye (stereo.h)
-		s_grave.t += 1.0f / 30.0f;
-	float frame = fmodf(s_grave.t * 30.0f, (float)(a->frames ? a->frames : 1));
-	C3D_Mtx model, mv;
-	Mtx_Identity(&model);
-	Mtx_Translate(&model, POS[k][0], POS[k][1], POS[k][2], true);
-	Mtx_RotateY(&model, 3.1415927f, true);
-	Mtx_Multiply(&mv, view, &model);
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
-	chr_pose_loop(&s_grave.chr, a, frame, 0, (int)a->frames - 1);
-	chrlight_at(POS[k], false);
-	chr_draw(&s_grave.chr, uBones);
-}
-
 // The PC sets placed models up as "stay objects" (0x537cf0 picks the handler by kind): the 0x3xx and
 // 0x5xx kinds (0x555120), the 0x4xx ones but for 0x421 and the mirrored copies 0x443, 0x444 and 0x460
 // (0x53b780), and the items, 0x7xx (0x554840), go through 0x554710, which multiplies every bone's bind
@@ -486,6 +434,103 @@ static float stay_scale(int kind)
 	case 0x73e: return 3.0f;
 	}
 	return 1.0f;
+}
+
+// Whether the stage code has the character there now, with James at x, z.
+static bool npc_shown(int i, int stage, float x, float z)
+{
+	const Npc* n = &k_npc[i];
+	if (n->stage != stage)
+		return false;
+	if ((n->on && !ev_flag(n->on)) || (n->off && ev_flag(n->off)) || (n->off2 && ev_flag(n->off2)))
+		return false;
+	if (n->room >= 0 && bgm_room_id(ev_glb_crd(), x, z) != n->room)
+		return false;
+	float dx = n->pos[0] - x, dz = n->pos[2] - z;
+	return dx * dx + dz * dz <= SM_RANGE * SM_RANGE;
+}
+
+bool stagemdl_npc_placed(int kind)
+{
+	float me[3], yaw;
+	p_player(me, &yaw);
+	for (int i = 0; i < N_NPC; i++)
+		if (k_npc[i].kind == kind && npc_shown(i, ev_stage(), me[0], me[2]))
+			return true;
+	return false;
+}
+
+static bool npc_load(int i)
+{
+	const Npc* n = &k_npc[i];
+	if (s_npc[i].loaded)
+		return true;
+	if (s_npc[i].failed)
+		return false;
+	char dir[64], path[96], err[64];
+	snprintf(dir, sizeof dir, PACK_DIR "/chr/%s", n->folder);
+	if (!chr_load(&s_npc[i].chr, dir, n->model, err, sizeof err)) {
+		s_npc[i].failed = true;
+		return false;
+	}
+	if (n->anim) {
+		snprintf(path, sizeof path, "%s/%s.s3a", dir, n->anim);
+		if (!anim_load(&s_npc[i].anim, path)) {       // a pack from before motion.py cut this one
+			chr_free(&s_npc[i].chr);
+			s_npc[i].failed = true;
+			return false;
+		}
+	}
+	s_npc[i].loaded = true;
+	s_npc[i].t = 0.0f;
+	if (playtest_active())
+		playtest_log("stage %d: %s placed (%s)", n->stage, n->model, n->anim ? n->anim : "still");
+	return true;
+}
+
+static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
+{
+	float me[3], yaw;
+	p_player(me, &yaw);
+	int stage = ev_stage();
+	float dt = 0.0f;
+	if (!stereo_eye()) {             // once a frame, not once an eye (stereo.h)
+		u64 now = osGetTime();
+		dt = (float)(now - s_npc_ms) / 1000.0f;
+		if (dt > 0.1f)
+			dt = 1.0f / 30.0f;       // the first frame, or one after a menu
+		s_npc_ms = now;
+	}
+	for (int i = 0; i < N_NPC; i++) {
+		const Npc* n = &k_npc[i];
+		if (!npc_shown(i, stage, me[0], me[2])) {
+			if (s_npc[i].loaded)
+				npc_free(i);
+			if (n->stage != stage)
+				s_npc[i].failed = false;   // a missing file is asked for once a stage, not once a frame
+			continue;
+		}
+		if (demo_shows_kind(n->kind) || !npc_load(i))
+			continue;                // the scene moves its own copy while it has it shown
+		C3D_Mtx model, mv;
+		Mtx_Identity(&model);
+		Mtx_Translate(&model, n->pos[0], n->pos[1], n->pos[2], true);
+		Mtx_RotateY(&model, n->yaw, true);
+		if (!n->anim && stay_turned(n->kind))
+			Mtx_RotateY(&model, 3.1415927f, true);
+		Mtx_Multiply(&mv, view, &model);
+		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
+		if (n->anim) {
+			const Anim* a = &s_npc[i].anim;
+			float len = (float)(a->frames ? a->frames : 1);
+			s_npc[i].t = fmodf(s_npc[i].t + dt * n->fps, len);
+			chr_pose_loop(&s_npc[i].chr, a, s_npc[i].t, 0, (int)a->frames - 1);
+		} else {
+			pose(&s_npc[i].chr, n->kind, -1.0f);
+		}
+		chrlight_at(n->pos, false);
+		chr_draw(&s_npc[i].chr, uBones);
+	}
 }
 
 // Whether a place shows a model now (its flags, the cutscene), and its squared distance from x, z.
@@ -513,6 +558,9 @@ static bool shown(const Place* p, float x, float z, float* d2)
 void stagemdl_preload(int stage, float x, float z)
 {
 	stagemdl_update(stage);
+	for (int i = 0; i < N_NPC; i++)      // the stage's own characters there, behind the fade too
+		if (npc_shown(i, stage, x, z))
+			npc_load(i);
 	for (int i = 0; i < s_nplaces; i++) {
 		const Place* p = &s_places[i];
 		Model* m = &s_models[p->model];
@@ -531,8 +579,7 @@ void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones)
 	bool second = stereo_eye() != 0;
 	if (!second)
 		stagemdl_update(ev_stage());
-	bed_draw(view, uModelView, uBones);
-	grave_draw(view, uModelView, uBones);
+	npc_draw(view, uModelView, uBones);
 	if (!s_nplaces)
 		return;
 	if (!second)

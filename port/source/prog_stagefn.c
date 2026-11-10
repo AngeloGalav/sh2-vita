@@ -10,6 +10,7 @@
 #include "stagewalls.h"
 #include "bgm.h"
 #include "combat.h"
+#include "enemy.h"
 #include "collide.h"
 #include "stagemdl.h"
 #include "sfx.h"
@@ -111,11 +112,115 @@ static float frand(void) { return (float)p_rand() * 4.656612873e-10f; }   // 0x4
 // PC's sounds that move or fade after they start are kept where they start.
 static float s_thr;                      // a room's threshold (picked by its room function)
 static bool s_armed;
-static int s_after_load_sfx;             // a room's looping sound, stopped when James leaves it
+static int s_after_load_sfx[2];          // a room's looping sounds, stopped when James leaves it
 
-static void frame_sounds(int stage, int room, const float* me)
+// A stage's sound_call_after_load (Stage_Data +0x3c) calls 0x516ae0 with the keep bit (8): the sound belongs
+// to the room that started it. at NULL: not placed.
+static void after_load(int id, float volume, const float* at)
 {
+	int k = s_after_load_sfx[0] ? 1 : 0;
+	s_after_load_sfx[k] = id;
+	if (at)
+		sfx_play_at(id, volume, at);
+	else
+		sfx_play(id, volume, 0.0f);
+}
+
+// Stage 4, 0x59fec0 with the timers 0x59fd30 and 0x59fe40 set: the wind, something in the bushes ahead, the
+// steps behind James that stop when he does, and once the cry that runs past him.
+static float s_wind_a, s_wind_b, s_wind_ph;        // 0x1d8673c, 0x1d86740, 0x1d86744
+static float s_bush_t, s_steps_t, s_cry_t;         // 0x1d86754, 0x1d86758, 0x1d86760
+static float s_steps_ang, s_cry_at[3], s_prev[3];  // 0x1d86774, 0x1d86764
+static bool s_prev_ok;
+
+static void forest_sounds(const float* me, float yaw, float dt)
+{
+	float speed = 0.0f;                  // +0xa8, metres a second
+	if (s_prev_ok && dt > 0.0f)
+		speed = sqrtf((me[0] - s_prev[0]) * (me[0] - s_prev[0]) + (me[2] - s_prev[2]) * (me[2] - s_prev[2])) / dt / 1000.0f;
+	s_prev[0] = me[0], s_prev[1] = me[1], s_prev[2] = me[2];
+	s_prev_ok = true;
+	if (!p_flag(512)) {
+		s_wind_ph += (s_wind_a * 1.5f + 0.5f) * dt * 1.5707964f;
+		if (s_wind_ph > 6.2831855f) {
+			s_wind_ph -= 6.2831855f;
+			s_wind_a = frand(), s_wind_b = frand();
+		}
+		float v = sinf(s_wind_ph) * s_wind_b * 0.2f + 0.8f;
+		if (me[0] > -20000.0f && me[2] > -20000.0f) {
+			v *= 1.0f - ((me[0] < me[2] ? me[0] : me[2]) + 20000.0f) * 0.00005f;
+			if (v <= 0.0f)
+				v = 0.001f;
+		}
+		sfx_set_volume(0x2742, v);
+	}
+	if ((s_bush_t -= dt) < 0.0f) {
+		s_bush_t = frand() * 25.0f + 3.0f;
+		if (!sfx_playing(0x9c87) && me[0] > 0.0f && me[2] < -30000.0f && me[2] > -90000.0f) {
+			float at[3] = { me[0] + 2000.0f, me[1], me[2] + frand() * 2000.0f - 1000.0f };
+			sfx_play_at(0x9c88, 1.0f, at);
+		}
+	}
+	bool turned = yaw < -0.7853982f && yaw > -2.3561945f;
+	if ((s_steps_t -= dt) < 0.0f) {
+		s_steps_t = frand() * 15.0f + 5.0f;
+		if (me[0] < -20000.0f && turned) {
+			s_steps_ang = frand() * 0.3926988f + yaw + 3.1415927f - 0.19634938f;
+			float at[3] = { me[0] + cosf(s_steps_ang) * 1500.0f, me[1], me[2] + sinf(s_steps_ang) * 1500.0f };
+			sfx_play_at(0x9c86, 1.0f, at);
+		}
+	}
+	if (sfx_playing(0x9c86)) {
+		float at[3] = { me[0] + cosf(s_steps_ang) * 1500.0f, me[1], me[2] + sinf(s_steps_ang) * 1500.0f };
+		sfx_move(0x9c86, at);
+		if (speed < 1.2f || !turned)
+			sfx_stop(0x9c86);
+	}
+	if (!sfx_playing(0x9c88) && s_cry_t > 0.0f && me[0] > 0.0f && me[2] < -25000.0f && (s_cry_t -= dt) < 0.0f) {
+		s_cry_at[0] = me[0] - 1000.0f, s_cry_at[1] = me[1], s_cry_at[2] = me[2] - 2000.0f;
+		sfx_play_at(0x9c87, 1.0f, s_cry_at);
+	}
+	if (sfx_playing(0x9c87)) {
+		s_cry_at[0] += dt * 1500.0f;
+		sfx_move(0x9c87, s_cry_at);
+	}
+}
+
+// Stage 22, 0x58c040: the room 0x49's sound comes up a 32nd every half second once 214 is set (0x1d864a4), and
+// in room 0x4c, with no enemy about, a sound comes from somewhere 2000 round James every 1 to 40 seconds.
+static float s_h22_t, s_h22_next;
+static int s_h22_steps;
+
+static void hospital_sounds(int room, const float* me, float dt)
+{
+	if (room == 0x49) {
+		if (p_flag(214) && s_h22_steps < 0x20 && (s_h22_t += dt) > 0.5f) {
+			sfx_set_volume(0x4db8, (float)s_h22_steps * 0.03125f);
+			s_h22_t = 0.0f;
+			s_h22_steps++;
+		}
+	} else if (room == 0x4c && enemy_count() == 0 && (s_h22_next -= dt) < 0.0f) {
+		float a = frand() * 6.2831855f;
+		float at[3] = { me[0] + cosf(a) * 2000.0f, me[1] - 750.0f, me[2] + sinf(a) * 2000.0f };
+		sfx_play_at(0x9c8a, 1.0f, at);
+		float r = frand() * 20.0f;
+		s_h22_next = r < 4.0f ? r + 1.0f : r < 18.0f ? r + 8.0f : r + r;
+	}
+}
+
+static void frame_sounds(int stage, int room, const float* me, float yaw, float dt)
+{
+	static float s_boiler_t;
 	switch (stage) {
+	case 4:
+		forest_sounds(me, yaw, dt);
+		break;
+	case 22:
+		hospital_sounds(room, me, dt);
+		break;
+	case 38:                             // 0x57eeb0: the lake's sound fades towards the far shore
+		sfx_set_volume(0x3cf0, me[1] <= 10000.0f ? 1.0f - (me[2] + 10000.0f) * 0.000025f : 1.0f);
+		break;
 	case 9:                              // 0x5994f0, room 0x1f: steps in the hallway west of James
 		if (room == 0x1f && !p_flag(552) && me[2] < 17000.0f) {
 			static const float at[3] = { 60000.0f, 0.0f, 11350.0f };
@@ -164,6 +269,12 @@ static void frame_sounds(int stage, int room, const float* me)
 		}
 		break;
 	case 39:                             // 0x57db00, room 0xa8
+		if (room == 0xa7) {              // the sound of room 0xa7 swells with its own time (0x515510)
+			s_boiler_t += dt;
+			sfx_set_volume(0x44c6, cosf(s_boiler_t) * 0.15f + 0.85f);
+		} else {
+			s_boiler_t = 0.0f;
+		}
 		if (room == 0xa8 && me[0] > -15455.0f) {
 			p_set(2070);
 			if (!p_flag(549) && !p_flag(384)) {
@@ -186,11 +297,71 @@ static void frame_sounds(int stage, int room, const float* me)
 
 static void room_enter(int stage, int room)
 {
-	stagemdl_maria_bed(stage == 20 && room == 0x41);   // 0x58ef90 places her there (character 0x106)
 	s_armed = false;
-	if (s_after_load_sfx) {             // the PC's keep sounds belong to the room that started them
-		sfx_stop(s_after_load_sfx);
-		s_after_load_sfx = 0;
+	for (int k = 0; k < 2; k++)         // the PC's keep sounds belong to the room that started them
+		if (s_after_load_sfx[k]) {
+			sfx_stop(s_after_load_sfx[k]);
+			s_after_load_sfx[k] = 0;
+		}
+	switch (stage) {
+	case 4:
+		// 0x59fd30 sets the timers while 512 is off; 0x59fe40, the sound_call_after_load: the wind (its
+		// volume is the per-frame code's) and, with 12 on and 38 off, a sound at 0x8ea28c, both until 618
+		if (!p_flag(512)) {
+			s_bush_t = s_steps_t = -1.0f;
+			s_cry_t = frand() * 120.0f + 30.0f;
+		}
+		s_prev_ok = false;
+		if (!p_flag(618)) {
+			after_load(0x2742, 0.0f, NULL);
+			s_wind_a = frand(), s_wind_b = frand(), s_wind_ph = 0.0f;
+			if (p_flag(12) && !p_flag(38)) {
+				static const float at[3] = { -61271.492f, -508.48743f, -577.02716f };
+				after_load(0x4268, 1.0f, at);
+			}
+		}
+		break;
+	case 6:                              // 0x59d1b0: room 0x1d before the scene with Eddie (85), from his room
+		if (room == 0x1d && !p_flag(85)) {
+			static const float at[3] = { -20250.0f, -250.0f, 101550.0f };   // 0x8e6798
+			after_load(0x3e90, 0.8f, at);
+		}
+		break;
+	case 14:                             // 0x593c90, until 168
+		if (!p_flag(168)) {
+			static const float at[3] = { -70640.0f, -250.0f, 61850.0f };    // 0x8e09f8
+			after_load(0x4269, 1.0f, at);
+		}
+		break;
+	case 22:                             // 0x58bff0: room 0x49's sound, silent the first time (216)
+		if (room == 0x49) {
+			after_load(0x4db8, p_flag(216) ? 1.0f : 0.0f, NULL);
+			p_set(216);
+			s_h22_steps = 0, s_h22_t = 0.0f;
+		}
+		break;
+	case 34:                             // the +0x3c part of 0x582ee0: room 0x88, and the cube room once 327 is on
+		if (room == 0x88) {
+			static const float at[3] = { 20000.0f, -2500.0f, -100000.0f };  // 0x8d43c8
+			after_load(0x465a, 1.0f, at);
+		} else if (room == 0x87 && p_flag(327)) {
+			static const float at[3] = { 19656.1f, -602.5f, -25420.5f };    // 0x8d43d8
+			after_load(0x42cb, 1.0f, at);
+		}
+		break;
+	case 38:                             // 0x57e840
+		after_load(0x3cf0, 1.0f, NULL);
+		break;
+	case 39:                             // 0x57dab0
+		if (room == 0xa7) {
+			static const float at[3] = { -100000.0f, -500.0f, -60500.0f };  // 0x8cf3b8
+			after_load(0x44c6, 1.0f, at);
+		}
+		break;
+	case 48: case 49: case 50: case 51:  // 0x440410, 0x441190, 0x43f5c0, 0x574d40: until the stairs fall (505)
+		if (!p_flag(505))
+			after_load(0x4db8, 1.0f, NULL);
+		break;
 	}
 	switch (stage) {
 	case 7:
@@ -201,8 +372,7 @@ static void room_enter(int stage, int room)
 		// volume by where James stands in the room; the port leaves that to the distance curve.
 		if (room == 0x18 && p_flag(69)) {
 			static const float at[3] = { -58082.375f, -356.5f, 19011.39f };
-			s_after_load_sfx = 16000;
-			sfx_play_at(16000, 0.3f, at);
+			after_load(16000, 0.3f, at);
 			p_set(70);
 		}
 		break;
@@ -467,7 +637,7 @@ void prog_stagefn_tick(int stage, float dt)
 	stagewalls_tick(stage, room, pos);  // the walls the PC adds with clAddDynamicWall (stagewalls.c)
 	if (dt <= 0.0f)
 		return;
-	frame_sounds(stage, room, pos);
+	frame_sounds(stage, room, pos, yaw, dt);
 	stageparts_tick(stage, room, dt);   // the map part switches (stageparts.c)
 	switch (stage) {
 	case 30: well_wall_tick(room); break;
