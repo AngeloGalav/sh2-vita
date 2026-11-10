@@ -297,8 +297,9 @@ Ordered by weight. Each line names where the work starts.
   Ruled out: the frame time (steady 33 ms in two console traces), the collision, and the camera module, whose eye, look
   and up vectors are smooth frame by frame in the traces (`gamecam_trace_dump`: SELECT + D-pad up writes the last minute
   to `camtrace.txt`, `tools/console/vita.sh pull` fetches it). The traces show pans of up to 57 mrad a frame, about 45
-  pixels, in rooms whose fixed cameras follow James: either that is the shake, a 30 fps pan (to try: Frame Rate 60), or
-  it comes after the camera, in the drawing. View Control is Normal on the Vita now, the PC's default (options version
+  pixels, in rooms whose fixed cameras follow James; a 30 fps pan was the other guess, or
+  it comes after the camera, in the drawing. At 60 fps it shakes twice as fast (console), so it changes frame by frame
+  and is not the pan: the drawing is where to look next (Picture, Filters, Shadows, the fog's target, one at a time). View Control is Normal on the Vita now, the PC's default (options version
   4): Switch, the 3DS's, left the search view on from one press of Look.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
@@ -321,7 +322,8 @@ Ordered by weight. Each line names where the work starts.
   at the park's rail (0x592830), Eddie by the toilet, with the pizza and dead (0x59d120, 0x591dd0, 0x57f480); eight new
   motions in the pack (motion.py). Eddie with the pizza works on a console, the others are not run. A scene that switches
   such a character off (0x49fb20 case 2) leaves it to the motion the stage gave it, taken from the bowling alley's talk,
-  where Eddie went missing while James spoke; not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
+  where Eddie went missing while James spoke; works on a console. They all run on one clock, so a pair stays in step
+  (Eddie's pizza drifted out of his hands after a scene had held one of the two); not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
   (the script shows them 3 s in; what draws them before on the PC isn't traced). 0x593fa0 and the two props 0x591a40
   puts down after its scene (0x431, 0x42f) are not ported.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).

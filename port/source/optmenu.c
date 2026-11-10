@@ -142,6 +142,7 @@ void opt_load(Options* o, const char* path)
 		o->view = d.view;
 	}
 #ifdef SH2_VITA
+	o->ps2_flash = o->cutscene_fov = 1;   // no rows for these on the Vita: always the Enhanced Edition's
 	// Version 4, the Vita: View Control back to Normal once. Switch, the 3DS's default, left the search view
 	// on from the first press of Look, and the camera swinging ahead of James in every room that lets it.
 	if (version < 4)
@@ -347,10 +348,13 @@ static const Setting SETTINGS[] = {
 	{ .tab = TAB_DISPLAY, .label = 97, .name = "Noise Effect", .hi = 2, .names = NOISE, .texts = NOISE_T,
 	  .get = noise_get, .set = noise_set_v, .what = "Film grain over the picture.", .lines = NOISE_L,
 	  .note = noise_note },
+#ifndef SH2_VITA
+	// (not on the Vita: both stay as the Enhanced Edition has them, opt_load sets them)
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Flashlight", AT(ps2_flash), .hi = 1, .texts = PC_PS2, .fig = FIG_BEAM,
 	  .what = "How James' flashlight lights a room.", .lines = FLASH_L },
 	{ .tab = TAB_DISPLAY, .label = -1, .name = "Cutscene View", AT(cutscene_fov), .hi = 1, .texts = FRAMING,
 	  .fig = FIG_FRAMING, .what = "How scenes fill the wide screen.", .lines = CUTFOV_L },
+#endif
 	{ .tab = TAB_DISPLAY, .label = 175, .name = "Shadows", AT(shadows), .hi = 1, .names = OFF_ON,
 	  .what = "Shadows that characters cast from the lights.", .lines = SHADOWS_L, .dim = low, .note = shadows_note },
 #ifndef SH2_VITA

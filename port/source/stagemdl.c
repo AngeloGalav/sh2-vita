@@ -114,6 +114,10 @@ static struct {
 	float t;
 } s_npc[N_NPC];
 static u64 s_npc_ms;
+// One clock for all of them: the motions the PC starts together (Eddie's and his pizza's, Laura's and the
+// letter's, 0x591dd0, 0x593d70) have the same length and rate and must stay in step, whichever of them a
+// scene takes over for a while.
+static float s_npc_clock;
 
 static void npc_free(int i)
 {
@@ -501,6 +505,7 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 			dt = 1.0f / 30.0f;       // the first frame, or one after a menu
 		s_npc_ms = now;
 	}
+	s_npc_clock = fmodf(s_npc_clock + dt, 3600.0f);
 	for (int i = 0; i < N_NPC; i++) {
 		const Npc* n = &k_npc[i];
 		if (!npc_shown(i, stage, me[0], me[2])) {
@@ -523,7 +528,7 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		if (n->anim) {
 			const Anim* a = &s_npc[i].anim;
 			float len = (float)(a->frames ? a->frames : 1);
-			s_npc[i].t = fmodf(s_npc[i].t + dt * n->fps, len);
+			s_npc[i].t = fmodf(s_npc_clock * n->fps, len);
 			chr_pose_loop(&s_npc[i].chr, a, s_npc[i].t, 0, (int)a->frames - 1);
 		} else {
 			pose(&s_npc[i].chr, n->kind, -1.0f);
