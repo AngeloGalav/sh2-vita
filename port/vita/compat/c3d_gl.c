@@ -394,14 +394,59 @@ void C3D_FrameEnd(u8 flags)
 	perf_part("r_pres", tp);
 	perf_part("r_swap1", svcGetSystemTick() - swap_ticks);
 	tp = svcGetSystemTick();
-	// 30 fps: swaps at least two refreshes apart, each flipped at the next refresh (vsync). A frame
-	// that takes longer goes out at the next refresh, a 20 fps frame; vitaGL's own swap interval 2
-	// waits two refreshes after the frame is ready (its display callback, gxm.c), so a frame a
-	// little over 33 ms (the scenes' close-ups) was held to the fourth, 15 fps
+	// 30 fps: swaps at least two refreshes apart, sent after a refresh. vitaGL shows each frame at the first
+	// refresh after the GPU has finished it (its display callback), while the swap returns at once and the
+	// CPU goes on with the next frame. Measured on a console with the frame end made to wait for that
+	// (sceGxmDisplayQueueFinish, which cost a third of the frame rate and is gone again): the GPU's work
+	// after a swap runs to 20 and 30 ms in the heavy rooms, so where it comes to about one refresh, or two,
+	// frames reach the screen a refresh early or late in turn while the game's own times stay even.
+	// So the screen is watched: after each refresh of the wait, whether the frame shown has changed tells at
+	// which refresh after its swap the last frame came up. When two answers both come often, the swaps are
+	// sent half a refresh later (or no longer so), which puts the GPU's finish in the middle of a refresh
+	// instead of on its edge. Port's own; vita_log has the counts every 4 seconds.
 	static unsigned last_vc;
-	if (G.fps <= 30.5f)
-		while ((int)(sceDisplayGetVcount() - last_vc) < 2)
+	static void* seen_base;
+	static unsigned came[4], sum[4], frames_k, cool;
+	static bool half;
+	static u64 t_log;
+	if (G.fps <= 30.5f) {
+		int k = 0;
+		while ((int)(sceDisplayGetVcount() - last_vc) < 2) {
 			sceDisplayWaitVblankStart();
+			SceDisplayFrameBuf fb = { .size = sizeof fb };
+			if (!k && sceDisplayGetFrameBuf(&fb, SCE_DISPLAY_SETBUF_IMMEDIATE) >= 0 && fb.base != seen_base) {
+				seen_base = fb.base;
+				k = (int)(sceDisplayGetVcount() - last_vc);
+			}
+		}
+		k = k < 1 || k > 2 ? 3 : k;      // 3: not up yet when the next one goes
+		came[k]++, sum[k]++;
+		if (cool)
+			cool--;
+		if (++frames_k >= 30) {
+			unsigned hi = came[1] > came[2] ? 1 : 2, lo = 3 - hi;
+			if (came[3] > came[hi])
+				lo = hi, hi = 3;
+			else if (came[3] > came[lo])
+				lo = 3;
+			if (came[lo] >= 5 && !cool) {
+				half = !half;
+				cool = 90;
+				vita_log("frame beat: swaps %s (frames came up after 1, 2, 3+ refreshes: %u %u %u)",
+				         half ? "half a refresh later" : "on the refresh", came[1], came[2], came[3]);
+			}
+			memset(came, 0, sizeof came);
+			frames_k = 0;
+		}
+		if (half)
+			sceKernelDelayThread(8300);
+		u64 now = sceKernelGetProcessTimeWide();
+		if (now - t_log > 4000000) {
+			vita_log("frames came up after 1, 2, 3+ refreshes: %u %u %u%s", sum[1], sum[2], sum[3], half ? " (swaps half a refresh later)" : "");
+			memset(sum, 0, sizeof sum);
+			t_log = now;
+		}
+	}
 	perf_part("r_pace", tp);
 	tp = svcGetSystemTick();
 	u64 ts = sceKernelGetProcessTimeWide();

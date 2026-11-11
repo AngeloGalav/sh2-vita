@@ -313,6 +313,15 @@ Ordered by weight. Each line names where the work starts.
     leaves far and slanted walls many texels to the pixel: shimmer whenever the camera moves, faster at 60 fps. The Vita
     now samples down to 64. Not run on a console. To check on one: SELECT + square (level 0 only) should make it worse,
     and Texture Filter trilinear (System) softer.
+  - The textures were not it (console: the same with level 0 only and with the levels down to 64, which did take the
+    lines off the far ground and stays).
+  - Measured on a console with the frame end made to wait for the frame to be shown (`sceGxmDisplayQueueFinish`; it cost
+    a third of the frame rate and is gone again): the GPU's work after a swap runs to 20 and 30 ms in the heavy rooms.
+    vitaGL shows a frame at the first refresh after that work ends, so where it comes to about one refresh, or two,
+    frames can reach the screen a refresh early or late in turn while the game's own times stay even: the best guess
+    left for the shake. Now tried (`c3d_gl.c` `C3D_FrameEnd`): the swap stays as it was, the frame shown is read after
+    each refresh of the wait, and when frames come up after one and after two refreshes both often the swaps go half a
+    refresh later. `vita_log.txt` has the counts every 4 s. Not run on a console.
   - Not looked at: the 1.3 x walk turn of the 0x8bcce0 rooms, which these are.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
