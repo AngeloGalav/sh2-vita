@@ -852,6 +852,7 @@ static void warp_area_tile(void)
 	    (s_warp.pos[0] == 0.0f && s_warp.pos[2] == 0.0f))
 		return;
 	char path[96], line[32];
+	bool found = false;
 	snprintf(path, sizeof path, PACK_DIR "/bg/%s/rooms.txt", f);
 	FILE* rf = fopen(path, "r");
 	if (!rf)
@@ -867,8 +868,23 @@ static void warp_area_tile(void)
 		if (mf)
 			fclose(mf);
 		if (ok && s_warp.pos[0] >= bb[0] && s_warp.pos[0] <= bb[3] && s_warp.pos[2] >= bb[2] && s_warp.pos[2] <= bb[5]) {
-			snprintf(s_warp.map, sizeof s_warp.map, "%.7s", line);
-			break;
+			// The tiles' boxes overlap at their edges: Wood Side's gate (stage 5 event 14, to stage 13) arrives
+			// 250 past the gate, inside the boxes of both the street's cb45 and the courtyard's cb46, and the
+			// first one listed, the street, put James back outside and further down (console). The tile that
+			// has floor under the point is the one; the first whose box holds it stays the answer when none has.
+			Collision c;
+			float fy;
+			snprintf(path, sizeof path, PACK_DIR "/bg/%s/%.15s.s3l", f, line);
+			bool floor = col_load(&c, path);
+			if (floor) {
+				floor = col_floor(&c, s_warp.pos[0], s_warp.pos[2], s_warp.pos[1], 3000.0f, &fy);
+				col_free(&c);
+			}
+			if (floor || !found)
+				snprintf(s_warp.map, sizeof s_warp.map, "%.7s", line);
+			found = true;
+			if (floor)
+				break;
 		}
 	}
 	fclose(rf);
