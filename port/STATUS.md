@@ -314,6 +314,7 @@ Ordered by weight. Each line names where the work starts.
   the port's own row Gunshot Light to turn it off. Works on a console.
 - Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Works on a console.
 - Font: on the Vita the glyphs have the Enhanced Edition's shape (its 20 x 32 cell on a 4:3 picture), about 29% taller than the 16:9 layout made them, about their cell's middle (`GLYPH_TALL`), and all of it 10% smaller (`GLYPH_SIZE`, the pen's steps too); line spacing stays the PC's. Works on a console.
+- James' head does not turn to the things of interest as the original's does (reported from play; the port turns it in `main.c` `s_look_yaw` / `s_look_pitch` and `chr.c`, which STATUS above counts as done). What picks the target, how far and how fast the PC turns it is not compared yet. Later.
 - Light shadows are sometimes corrupted until James moves a little. Later.
 - Lying Figure, Mannequin, Nurse: stepping back after an attack played a burst of footsteps (the walk played backward counted as a wrap every frame); `step_passed` tells the two apart. Not run on a console.
 - Enemy hit sounds as 0x543210 picks them, by attack and kind (Eddie had the Lying Figure's; most had a subset of their set). Works on a console.
