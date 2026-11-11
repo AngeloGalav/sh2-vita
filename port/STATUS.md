@@ -329,6 +329,7 @@ Ordered by weight. Each line names where the work starts.
   scene's Eddie). Not run on a console. Stand-in: in `bp_edi_a` Eddie and Laura start shown
   (the script shows them 3 s in; what draws them before on the PC isn't traced). 0x593fa0 and the two props 0x591a40
   puts down after its scene (0x431, 0x42f) are not ported.
+- Door arrivals, all 570 checked on the host (each destination through the open-area tile choice of `warp_area_tile`, then `col_floor` of the chosen room within 600): all land on floor but stage 22 event 4 (the scripted hospital warp, `col_spawn` moves James 7000 units, as `tools/sh2conv/EVENTS.md` already lists) and the two lake-boat warps' 255 to 315 unit steps (stairs or slopes, taken as the PC's). No other Wood Side-like case is left. Not run on a console.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
 - The light is wrong in some levels. Later.
