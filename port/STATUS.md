@@ -283,7 +283,7 @@ Ordered by weight. Each line names where the work starts.
 
 ### To do on the Vita, from console tests
 
-- Movies: fill the 16:9 display at their own shape, the rest cut off, as the EE's FullscreenVideos (Auto, which plays as Fill). Not run on a console.
+- Movies: fill the 16:9 display at their own shape, the rest cut off, as the EE's FullscreenVideos (Auto, which plays as Fill). Works on a console.
 - Attacks: every attack came out heavy. The plank forced the heavy swing on a target on the floor within 1400
   units, the port's own choice, which also caught Lying Figures crawling; taken out (0x533ff0 goes by the press
   alone). Works on a console.
@@ -299,24 +299,24 @@ Ordered by weight. Each line names where the work starts.
   of 2 mrad a frame stood still in 109 frames of 199, measured on a PC). The view is made from the camera's axes now.
   The camera's own values were smooth all along, which is why the traces (`gamecam_trace_dump`, SELECT + D-pad up;
   the frame burst, SELECT + D-pad down) showed nothing; the frame times, the collision, the textures and the swap's
-  timing were all tried and are not it. Not run on a console. Kept from the hunt: View Control Normal on the Vita, the
+  timing were all tried and are not it. Works on a console: the jitter is gone. Kept from the hunt: View Control Normal on the Vita, the
   map's textures down to 64 (no more lines on the far ground), James turning through the frame between a walk and the
   turn on the spot.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
-- Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.
+- Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Works on a console.
 - Input: the flashlight switch now waits while a message, a question, a stage program or a scene holds James (it took Circle presses meant for those). Not run on a console.
 - Memos: the text's position is wrong while reading them. Later.
 - Sound events: the stages' sounds at a room's load (Stage_Data +0x3c: 0x59fe40, 0x59d1b0, 0x593c90, 0x58bff0, 0x582ee0,
   0x57e840, 0x57dab0, the endings') and the forest's and the hospital's timed ones (0x59fec0, 0x58c040) are in
-  (`prog_stagefn.c`). Still missing from the per-frame code: stages 12, 25, 26, 28 (0x9c73), 30, 32, 41, 42. Not run on a console.
+  (`prog_stagefn.c`). Still missing from the per-frame code: stages 12, 25, 26, 28 (0x9c73), 30, 32, 41, 42. Some already heard on a console (the dog's bark); the rest not checked.
 - A gunshot lights the room and the characters for five frames (0x509f40, 0x47a540, 0x508060; `combat_shot_light`), with
-  the port's own row Gunshot Light to turn it off. Not run on a console.
+  the port's own row Gunshot Light to turn it off. Works on a console.
 - Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Works on a console.
 - Font: on the Vita the glyphs have the Enhanced Edition's shape (its 20 x 32 cell on a 4:3 picture), about 29% taller than the 16:9 layout made them, about their cell's middle (`GLYPH_TALL`), and all of it 10% smaller (`GLYPH_SIZE`, the pen's steps too); line spacing stays the PC's. Works on a console.
 - Light shadows are sometimes corrupted until James moves a little. Later.
 - Lying Figure, Mannequin, Nurse: stepping back after an attack played a burst of footsteps (the walk played backward counted as a wrap every frame); `step_passed` tells the two apart. Not run on a console.
-- Enemy hit sounds as 0x543210 picks them, by attack and kind (Eddie had the Lying Figure's; most had a subset of their set). Not run on a console.
+- Enemy hit sounds as 0x543210 picks them, by attack and kind (Eddie had the Lying Figure's; most had a subset of their set). Works on a console.
 - Pyramid Head's knife is hidden in the apartment closet scene (sankaku; red.mdl part 3), from the console test; the PC's own way isn't traced. Works on a console.
 - NPCs in play (not in scenes): one table in `stagemdl.c` places Maria in the day room and behind the labyrinth bars
   (0x582bd0), Angela at the grave (her flag is 512, it was read as 320), Laura on the wall with the letter (0x593d70), Maria
@@ -332,7 +332,7 @@ Ordered by weight. Each line names where the work starts.
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
 - The light is wrong in some levels. Later.
-- Map screen: a change of map goes to black and back over 0.2 s each way (`MAP_XFADE`, asked for). Not run on a console.
+- Map screen: a change of map goes to black and back over 0.2 s each way (`MAP_XFADE`, asked for). Works on a console.
 - Map screen: the arrows to the other maps and James' own from the PC's sheet (0x49ce40, 0x49d9d0; `map/carsol.t3x`, new in
   Vita packs), the D-pad's presses change maps, the stick only moves the view (the PC's stick also changes maps; asked for on the Vita). Works on a console.
 - Flashlight and character spots: the layer's spot direction was negated, so the beam lit behind the lamp (`C3D_LightSpotDir`). Fixed; the flashlight's direction confirmed on a console.
