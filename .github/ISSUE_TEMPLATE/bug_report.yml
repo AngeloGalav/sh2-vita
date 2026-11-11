@@ -1,0 +1,53 @@
+name: Bug report
+description: Something looks or plays differently from the PC game, crashes, or runs badly on the Vita
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please don't attach game files, converted assets or the pack. Screenshots, photos and `vita_log.txt` are fine.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release you installed, e.g. v0.1.0-alpha.2
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options: [PS Vita 1000 (OLED), PS Vita 2000 (LCD), PS TV, Other]
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware and homebrew setup
+      description: Firmware version, and whether you use overclock or other plugins
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what the PC game does instead if you know
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where in the game
+      description: Area or room, whether you started a new game or loaded a save, and what you were doing
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: log
+    attributes:
+      label: vita_log.txt
+      description: From `ux0:data/sh2-vita/`. It starts over at every launch, so copy it before starting the game again. Paste it or drag the file in.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or other notes
