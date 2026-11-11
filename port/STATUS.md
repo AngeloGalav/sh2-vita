@@ -293,36 +293,15 @@ Ordered by weight. Each line names where the work starts.
   letter is blank from flag 626 on. Works on a console.
 - Game over as on the PC (0x498780, 0x496ee0, the 0x496c90 table), on black; on the 3DS the port's own version stays. Works on a console.
 - FMV subtitles: taken from sh23ds upstream (8b0de2f): the PC's tables (`movsubs.c`, 0x43de10), drawn with the game's message text; the stage's music goes on under a movie and keeps real time under the pause menu. Works on a console.
-- Levels jitter (the picture shakes while the camera turns; the hospital, the labyrinth; Original camera). Open; what is
-  known, from console traces and a burst of shown frames (`gamecam_trace_dump`, SELECT + D-pad up, `camtrace.txt`;
-  SELECT + D-pad down, 16 frames to `frames.raw`; `tools/console/vita.sh pull` fetches both):
-  - The camera module is smooth for smooth input: its eye, look and up vectors in the traces, and every room of both
-    areas walked on a PC with the rooms' collision. Not the collision, not the search view (View Control is Normal on
-    the Vita now, the PC's default; Switch left it on from one press of Look).
-  - The rooms that shake have cameras whose yaw follows James' facing with little easing (the labyrinth's corridors seen
-    from above and behind), so every unevenness in his turning shows as the whole picture moving.
-  - Found in his turning: going from a walk to the turn on the spot he stood one frame without turning (`move.c`'s
-    table has no walk to round); he now turns through it at 2.4 rad/s. Not run on a console, and it happens only at
-    that change, so it may not be all of it.
-  - At Frame Rate 60 the trace has frames of one and two refreshes mixed (1338 and 427 of 1800) and each step is the
-    time of the frame before, so the picture shakes faster there; at 30 the frame time was a steady 33 ms.
-  - His turn rate from the stick is smooth in the trace (it ramps with the tilt, no frame-to-frame noise), and so are the
-    eye's and the camera's rates: 7 zigzag frames of 1800. So the shake is not in what the game computes.
-  - Best guess now, from the burst: the frames differ all over the walls in a fine speckle. The map's textures were
-    sampled no smaller than 256 (`room.c` `tex_setup`, the 3DS's limit against the atlases' bleeding), which at 960 x 544
-    leaves far and slanted walls many texels to the pixel: shimmer whenever the camera moves, faster at 60 fps. The Vita
-    now samples down to 64. Not run on a console. To check on one: SELECT + square (level 0 only) should make it worse,
-    and Texture Filter trilinear (System) softer.
-  - The textures were not it (console: the same with level 0 only and with the levels down to 64, which did take the
-    lines off the far ground and stays).
-  - Measured on a console with the frame end made to wait for the frame to be shown (`sceGxmDisplayQueueFinish`; it cost
-    a third of the frame rate and is gone again): the GPU's work after a swap runs to 20 and 30 ms in the heavy rooms.
-    vitaGL shows a frame at the first refresh after that work ends, so where it comes to about one refresh, or two,
-    frames can reach the screen a refresh early or late in turn while the game's own times stay even: the best guess
-    left for the shake. Now tried (`c3d_gl.c` `C3D_FrameEnd`): the swap stays as it was, the frame shown is read after
-    each refresh of the wait, and when frames come up after one and after two refreshes both often the swaps go half a
-    refresh later. `vita_log.txt` has the counts every 4 s. Not run on a console.
-  - Not looked at: the 1.3 x walk turn of the 0x8bcce0 rooms, which these are.
+- Levels jittered (the picture turned in jerks; the hospital, the labyrinth most, the town a little): `gamecam_update`
+  made the view with a look-at from the eye to the eye plus the look direction, and a unit vector added to a
+  coordinate of 140,000 keeps 1/64 of itself in a float, so the direction came back in steps of up to a degree (a turn
+  of 2 mrad a frame stood still in 109 frames of 199, measured on a PC). The view is made from the camera's axes now.
+  The camera's own values were smooth all along, which is why the traces (`gamecam_trace_dump`, SELECT + D-pad up;
+  the frame burst, SELECT + D-pad down) showed nothing; the frame times, the collision, the textures and the swap's
+  timing were all tried and are not it. Not run on a console. Kept from the hunt: View Control Normal on the Vita, the
+  map's textures down to 64 (no more lines on the far ground), James turning through the frame between a walk and the
+  turn on the spot.
 - Finishing blow: Action alone on one lying on the floor kicks or stomps it (the EE's tap and hold), as the game plays; the port had wanted Aim held. Works on a console.
 - Button hints: the Vita drops the lines of keys from stage programs' panels and legends ("D-pad: floor  A: press"). Not run on a console.
 - Save screen: on the Vita the picture fills the width at its own shape, still, as the Enhanced Edition shows it on a wide screen (it was spread over the width with a mirrored strip and a slow drift). Not run on a console.

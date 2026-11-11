@@ -255,11 +255,21 @@ void gamecam_update(const GameCamPlayer* p, float dt, bool far_view, C3D_Mtx* vi
 	sh2cam_exec(&in, &out);
 	s_mv_type = out.cam_mv_type;
 
-	// row 0 right, row 1 screen down, row 2 look direction, row 3 eye position
+	// row 0 right, row 1 screen down, row 2 look direction, row 3 eye position.
+	// The view is made from the camera's own axes. It used to go through a look-at with the eye and the eye
+	// plus the look direction: a unit vector added to a coordinate of 140,000 keeps 1/64 of it (a float's
+	// step there), so the direction came back in steps of up to a degree and the picture turned in jerks,
+	// worst in the rooms furthest from the origin (the hospital, the labyrinth), while the camera's own
+	// values, and every trace of them, were smooth.
 	C3D_FVec eye = FVec3_New(out.view_mat[3][0], out.view_mat[3][1], out.view_mat[3][2]);
-	C3D_FVec at = FVec3_New(eye.x + out.view_mat[2][0], eye.y + out.view_mat[2][1], eye.z + out.view_mat[2][2]);
 	C3D_FVec up = FVec3_New(-out.view_mat[1][0], -out.view_mat[1][1], -out.view_mat[1][2]);
-	Mtx_LookAt(view, eye, at, up, false);
+	C3D_FVec z = FVec3_Normalize(FVec3_New(-out.view_mat[2][0], -out.view_mat[2][1], -out.view_mat[2][2]));
+	C3D_FVec x = FVec3_Normalize(FVec3_Cross(up, z));
+	C3D_FVec y = FVec3_Cross(z, x);
+	view->r[0] = FVec4_New(x.x, x.y, x.z, -FVec3_Dot(x, eye));
+	view->r[1] = FVec4_New(y.x, y.y, y.z, -FVec3_Dot(y, eye));
+	view->r[2] = FVec4_New(z.x, z.y, z.z, -FVec3_Dot(z, eye));
+	view->r[3] = FVec4_New(0.0f, 0.0f, 0.0f, 1.0f);
 	float scr_z = out.scr_z > 1.0f ? out.scr_z : SCREEN_SY;
 	trace_row(p, dt, far_view, &out, scr_z);
 	*fovy = 2.0f * atanf(SCREEN_SY * 0.5f / scr_z);
