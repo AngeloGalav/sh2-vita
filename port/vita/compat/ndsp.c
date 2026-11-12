@@ -25,7 +25,15 @@ typedef struct {
 	u16 format;
 	bool paused;
 	u16 seq_next, seq_playing;
+	float last[2];              // the channel's last output sample, gain applied
+	float tail[2];              // what it fades down from once it stops (start_tail)
+	int tail_n;                 // samples of the fade left
 } Chn;
+
+// A channel that stops (its last buffer played out, cleared or reset) fades from its last sample to
+// silence over DECLICK samples (2.7 ms) instead of dropping to 0 at once: the cut was a click at
+// the end of many effects (reported from play). The port's own, not the 3DS DSP's.
+#define DECLICK 128
 
 static Chn s_ch[NCH];
 static pthread_mutex_t s_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -75,6 +83,23 @@ static void cap_write(void)
 	s_cap_mix = s_cap_mus = NULL;
 	s_cap_on = false;
 	s_cap_done = true;
+}
+
+static void start_tail(Chn* c)
+{
+	c->tail[0] = c->last[0];
+	c->tail[1] = c->last[1];
+	c->tail_n = (c->last[0] != 0.0f || c->last[1] != 0.0f) ? DECLICK : 0;
+	c->last[0] = c->last[1] = 0.0f;
+}
+
+static void tail_mix(Chn* c, float* out, int from, int frames)
+{
+	for (int f = from; f < frames && c->tail_n > 0; f++, c->tail_n--) {
+		float k = (float)c->tail_n / DECLICK;
+		out[2 * f] += c->tail[0] * k;
+		out[2 * f + 1] += c->tail[1] * k;
+	}
 }
 
 // for the log, per second: channels that ran dry while playing, samples past full scale
@@ -130,7 +155,10 @@ static void mix(float* out, int frames)
 		float g0 = c->gain[0], g1 = c->gain[1];
 		float d0 = (c->target[0] - g0) / frames, d1 = (c->target[1] - g1) / frames;
 		c->gain[0] = c->target[0], c->gain[1] = c->target[1];
-		for (int f = 0; f < frames && c->head; f++, g0 += d0, g1 += d1) {
+		int stop_at = 0;                // where this grain's fade starts (a stop in this grain)
+		bool had = c->head != NULL;
+		int f = 0;
+		for (; f < frames && c->head; f++, g0 += d0, g1 += d1) {
 			ndspWaveBuf* b = c->head;
 			u32 n = b->nsamples;
 			u32 i = (u32)c->pos;
@@ -147,12 +175,19 @@ static void mix(float* out, int frames)
 				sample_at(c, b->next, 0, &l1, &r1);    // across into the next buffer
 			else
 				l1 = l0, r1 = r0;
-			out[2 * f] += (l0 + (l1 - l0) * t) * g0;
-			out[2 * f + 1] += (r0 + (r1 - r0) * t) * g1;
+			float vl = (l0 + (l1 - l0) * t) * g0, vr = (r0 + (r1 - r0) * t) * g1;
+			out[2 * f] += vl;
+			out[2 * f + 1] += vr;
+			c->last[0] = vl, c->last[1] = vr;
 			c->pos += c->step;
 			if (!c->head->next && c->pos >= c->head->nsamples && !c->head->looping)
 				s_starved[k]++;
 		}
+		if (had && !c->head) {
+			start_tail(c);              // played out in this grain, at sample f
+			stop_at = f;
+		}
+		tail_mix(c, out, stop_at, frames);
 	}
 }
 
@@ -185,6 +220,32 @@ static void* audio_thread(void* arg)
 		pthread_mutex_lock(&s_lock);
 		mix(acc, GRAIN);
 		pthread_mutex_unlock(&s_lock);
+		// The limiter (the port's own): the grain's peak is known before it goes out, so when the sum
+		// would pass LIMIT the whole mix is turned down smoothly across the grain, and back up over
+		// about half a second. Shaping each sample alone past the knee (soft_clip, kept as the last
+		// guard) bent loud bass waves into a crackle (reported from play; the log counted up to 86
+		// samples a second past full scale).
+		static float s_lim = 1.0f;
+		const float LIMIT = 24000.0f, RELEASE = 1.0f / (0.5f * OUT_RATE / GRAIN);
+		float peak = 0.0f;
+		for (int i = 0; i < GRAIN * 2; i++) {
+			float a = acc[i] < 0 ? -acc[i] : acc[i];
+			if (a > peak)
+				peak = a;
+		}
+		float want = peak > LIMIT ? LIMIT / peak : 1.0f;
+		float g_to = want < s_lim ? want : (s_lim + RELEASE < want ? s_lim + RELEASE : want);
+		// down over the grain's first 64 samples (a step would click; soft_clip takes the overshoot
+		// meanwhile), up across the whole grain
+		int ramp = want < s_lim ? 64 : GRAIN;
+		float g = s_lim, dg = (g_to - s_lim) / ramp;
+		s_lim = g_to;
+		for (int i = 0; i < GRAIN; i++) {
+			acc[2 * i] *= g;
+			acc[2 * i + 1] *= g;
+			if (i < ramp)
+				g += dg;
+		}
 		for (int i = 0; i < GRAIN; i++) {
 			float l = acc[2 * i], r = acc[2 * i + 1];
 			if (s_mode == NDSP_OUTPUT_MONO)
@@ -199,7 +260,7 @@ static void* audio_thread(void* arg)
 			for (int k = 0; k < NCH; k++)
 				if (s_starved[k])
 					n += snprintf(b + n, sizeof b - n, " ch%d:%u", k, s_starved[k]);
-			if (n || s_clipped || s_late)
+			if (vita_diag_log && (n || s_clipped || s_late))
 				vita_log("audio: clipped %u, late grains %u, ran dry%s", s_clipped, s_late, n ? b : " none");
 			memset(s_starved, 0, sizeof s_starved);
 			s_clipped = s_late = 0;
@@ -265,7 +326,12 @@ void ndspChnReset(int id)
 	Chn* c = &s_ch[id];
 	for (ndspWaveBuf* b = c->head; b; b = b->next)
 		b->status = NDSP_WBUF_DONE;
+	float tail[2] = { c->last[0], c->last[1] };
+	if (c->head)
+		start_tail(c), tail[0] = c->tail[0], tail[1] = c->tail[1];
+	int tail_n = c->tail_n;
 	memset(c, 0, sizeof *c);
+	c->tail[0] = tail[0], c->tail[1] = tail[1], c->tail_n = tail_n;   // a reset mid-sound fades too
 	c->step = 1.0f;
 	c->gain[0] = c->gain[1] = c->target[0] = c->target[1] = 1.0f;
 	c->format = NDSP_FORMAT_STEREO_PCM16;
@@ -341,6 +407,8 @@ void ndspChnWaveBufClear(int id)
 	Chn* c = &s_ch[id];
 	for (ndspWaveBuf* b = c->head; b; b = b->next)
 		b->status = NDSP_WBUF_DONE;
+	if (c->head)
+		start_tail(c);                  // a stop mid-sound fades out (DECLICK)
 	c->head = NULL;
 	c->pos = 0;
 	pthread_mutex_unlock(&s_lock);
