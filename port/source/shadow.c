@@ -225,6 +225,30 @@ static V3 pull_from(V3* p, V3 L)
 }
 
 static V3 s16v(const s16* s) { return v3(s[0], s[1], s[2]); }
+
+// Map and prop volumes (S.back): one length for every corner of the volume. pull_from takes a corner
+// farther from the light than S.len only a unit past itself (where the PC's volume would fold back),
+// so a prop that reaches past the room's length (SHADOW_ENV leng, 2500..10000) had its near corners
+// stretched and its far ones not: a shadow of the right darkness with a cut, slanted shape that
+// changed as the lamp moved and stayed while James stood (reported from play). The port's own: the
+// length is raised to just past the farthest corner, as long as that stays inside the far plane
+// (far_room, which keeps the depth-fail count right); past it the old way stands. Returns the length
+// to put back.
+static float uniform_len(const V3* p, int n, V3 Lw)
+{
+	float keep = S.len;
+	if (!S.back || S.parallel)
+		return keep;
+	float far = 0.0f;
+	for (int i = 0; i < n; i++) {
+		V3 d = sub(p[i], Lw);
+		far = fmaxf(far, sqrtf(dot(d, d)));
+	}
+	float want = far + 1.0f;
+	if (want > S.len && want <= far_room(Lw))
+		S.len = want;
+	return keep;
+}
 static void maps_release(void);
 
 // The side wall of one silhouette edge (vertices i, j) of a lit triangle whose third corner is k.
@@ -258,10 +282,12 @@ static void strip(const Mtx34* w, const s16* g, int nv, V3 L, V3 Lw)
 	}
 	if (!any)
 		return;
-	for (int i = 0; i < nv; i++) {
+	for (int i = 0; i < nv; i++)
 		p[i] = xf(w, v[i]);
+	float len = uniform_len(p, nv, Lw);
+	for (int i = 0; i < nv; i++)
 		q[i] = pull_from(&p[i], Lw);
-	}
+	S.len = len;
 	int nt = nv - 2;
 	for (int t = 0; t < nt; t++) {
 		if (!lit[t])
@@ -880,10 +906,12 @@ static void kg2_mtx(Mtx34* w, const float* M)
 static void poly_volume(V3* p, int n, V3 Lw)
 {
 	V3 q[16], ctr = v3(0, 0, 0);
+	float len = uniform_len(p, n, Lw);
 	for (int i = 0; i < n; i++) {
 		q[i] = pull_from(&p[i], Lw);
 		ctr = add(ctr, p[i]);
 	}
+	S.len = len;
 	ctr = scl(ctr, 1.0f / n);
 	V3 toL = sub(Lw, ctr), fromL = sub(ctr, Lw);
 	for (int i = 1; i + 1 < n; i++) {
