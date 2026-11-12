@@ -166,6 +166,8 @@ static bool s_save_prompt;
 static int s_slot;               // the save file Continue loads and saves go to (savescreen.c)
 static int s_save_place = -1;    // the save point last used (its place name in the file list)
 static bool s_debug_hud;
+static bool s_dbg_txt_hud;       // debug.txt's debughud (the Debug tab's row is the other way on)
+static int s_dbg_txt_shadow;      // debug.txt's shadowdebug
 #define SAVE_PATH PACK_DIR "/save.dat"
 static void* s_fadequad;         // linear memory, 6 ROOM_VERTEX_SIZE vertices
 static char s_panel[512];        // stage program panel (choices, puzzles), empty when none
@@ -4418,8 +4420,11 @@ static void options_load(void)
 }
 
 // s_opt into the game's settings
+static void debug_apply(void);
+
 static void options_apply(void)
 {
+	debug_apply();
 	s_bright = s_opt.bright;
 	s_controls = s_opt.control_type;
 	s_toggle_run = s_opt.toggle_run;
@@ -4467,6 +4472,28 @@ static void options_apply(void)
 
 // The options screens' host: every change goes into the game at once (the flashlight's look and
 // the light scale want the room's lights rebuilt), the file is written when the changes are kept.
+// The Debug tab (optmenu.c): debug.txt's switches from the menu; either one turns a switch on
+static void debug_apply(void)
+{
+	s_debug_hud = s_opt.dbg_hud || s_dbg_txt_hud;
+	perf_set_log(s_opt.dbg_perflog || s_perflog, s_memlog || s_memtest);
+	shadow_debug(s_opt.dbg_shadows ? 1 : s_dbg_txt_shadow);
+	int map_test = s_opt.dbg_maptest < MAP_TESTS ? s_opt.dbg_maptest : 0;
+	if (map_test != s_map_test)
+		perf_event("maptest", "mode %d: %s", map_test, MAP_TEST_NAME[map_test]);
+	s_map_test = map_test;
+	fog_debug_set(s_opt.dbg_fogtest);
+	if (s_opt.dbg_camtrace) {        // the camera's last minute (gamecam.c) to camtrace.txt, once
+		gamecam_trace_dump();
+		perf_event("camtrace", "written");
+		s_opt.dbg_camtrace = 0;
+	}
+#ifdef SH2_VITA
+	extern bool vita_diag_log;      // port/vita/compat/c3d_gl.c
+	vita_diag_log = s_opt.dbg_log != 0;
+#endif
+}
+
 static void opt_changed(const Options* o)
 {
 	(void)o;
@@ -5666,7 +5693,7 @@ int main(void)
 				sdsim_set(kb, open_ms < 0 ? 8 : open_ms);
 			}
 			if (!strcmp(key, "sdlegacy")) sdsim_legacy = val != 0;   // reads as before the read-ahead, for A/B tests
-			if (!strcmp(key, "shadowdebug")) shadow_debug(val);
+			if (!strcmp(key, "shadowdebug")) s_dbg_txt_shadow = val, shadow_debug(val);
 			if (!strcmp(key, "fogdebug")) fog_debug(val);
 			if (!strcmp(key, "fogsprites") || !strcmp(key, "shadows") || !strcmp(key, "framecap") ||
 			    !strcmp(key, "tiledist") || !strcmp(key, "fogfill") || !strcmp(key, "supersample")) {
@@ -5689,7 +5716,7 @@ int main(void)
 				s_debug_die = 0;
 			if (!strcmp(key, "batch")) s_only_batch = val;
 			if (!strcmp(key, "freeze") && val) s_orbit_speed = 0.0f;
-			if (!strcmp(key, "debughud")) s_debug_hud = val != 0;
+			if (!strcmp(key, "debughud")) s_dbg_txt_hud = s_debug_hud = val != 0;
 			if (!strcmp(key, "god")) combat_set_god(val != 0);   // enemy blows do not reach James
 			if (!strcmp(key, "logos") && !val) titlemenu_no_boot(), s_logos_off = true;   // no start-up screens
 			if (!strcmp(key, "setup")) s_setup_debug = val != 0;      // the first run: 0 never, 1 always
@@ -5786,7 +5813,7 @@ int main(void)
 	} else {
 		enter_title();
 	}
-	perf_set_log(s_perflog, s_memlog || s_memtest);
+	perf_set_log(s_perflog || s_opt.dbg_perflog, s_memlog || s_memtest);
 	perf_watchdog_start();
 	mem_log("boot");
 	{
@@ -5855,20 +5882,8 @@ int main(void)
 		down = menu_keys(down, held, dt, menu_frame());
 		if (s_debug_die && frame == s_debug_die && s_state == ST_GAME)
 			combat_damage_james(0x3e, JAMES_HP_MAX * (float)s_debug_die_pct / 100.0f, s_px, s_pz);
-		// console tests, with the debug HUD on only (debug.txt "debughud 1"): players hit them by
-		// accident. SELECT held with R steps the fog test (fog.c); the R press goes no further
-		if (s_debug_hud && (held & KEY_SELECT) && (down & KEY_R)) {
-			s_test_shown = fog_debug_cycle() >= 0 ? 3.0f : 0.0f;
-			down &= ~(KEY_R | KEY_SELECT);
-			held &= ~KEY_R;
-		}
-		// and SELECT held with L steps the map test (s_map_test)
-		if (s_debug_hud && (held & KEY_SELECT) && (down & KEY_L)) {
-			s_map_test = (s_map_test + 1) % MAP_TESTS;
-			perf_event("maptest", "mode %d: %s", s_map_test, MAP_TEST_NAME[s_map_test]);
-			down &= ~(KEY_L | KEY_SELECT);
-			held &= ~KEY_L;
-		}
+		// the fog and map tests and the camera trace are Options rows now (Debug tab, debug_apply), not
+		// SELECT combinations
 		u32 gdown, gheld;                    // the game keys (controls.c): actions, not buttons
 		if (playtest_active())
 			gdown = down, gheld = held;      // the scripts press game keys (R aims), whatever is bound
@@ -6016,12 +6031,30 @@ int main(void)
 		// flashlight switch (0x48f078) does nothing in hotel room 312 while James has the videotape
 		// the switch does nothing until James has the flashlight (the PC's 0x48f078 tests item 18)
 		// and only while James is free to act: not under a message, a question or a stage program holding him
-		if (s_cam.mode == CAM_PLAYER && (gdown & KEY_X) && !screens_open() && !s_inv_open && ev_have_item(18) &&
-		    !s_msg_page && !s_save_prompt && !prog_choice_waiting() && !prog_player_locked() && !demo_active() &&
-		    !s_warp_pending && !savescreen_active() &&
-		    !(bgm_room_id(ev_glb_crd(), s_px, s_pz) == 0xa2 && ev_have_item(0x17))) {
-			s_flash_on = !s_flash_on;
-			sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
+		if (s_cam.mode == CAM_PLAYER && (gdown & KEY_X)) {
+			// a press the switch leaves alone says why in the log (console reports: Circle did nothing)
+			const char* why = !ev_have_item(18) ? "James has no flashlight (item 18)"
+			                : screens_open() ? "a screen is open"
+			                : s_inv_open ? "the item screen is open"
+			                : s_msg_page ? "a message is up"
+			                : s_save_prompt ? "the save prompt is up"
+			                : prog_choice_waiting() ? "a question waits"
+			                : prog_player_locked() ? "a stage program holds James"
+			                : demo_active() ? (demo_scene_shown() ? "a scene plays" : "a scene's voice track runs")
+			                : s_warp_pending ? "a door is pending"
+			                : savescreen_active() ? "the save screen is up"
+			                : (bgm_room_id(ev_glb_crd(), s_px, s_pz) == 0xa2 && ev_have_item(0x17)) ? "room 312 with the videotape"
+			                : NULL;
+			if (why) {
+				perf_event("flashlight", "press ignored: %s", why);
+			} else {
+				s_flash_on = !s_flash_on;
+				sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
+			}
+		} else if (s_cam.mode == CAM_PLAYER && (down & KEY_B) && !(controls_keys(ACT_FLASHLIGHT) & KEY_B)) {
+			// the Vita's default is Circle (KEY_B with Cross confirming); a saved binding can take it
+			perf_event("flashlight", "the Back button is not bound to the flashlight (its keys %#lx)",
+			           (unsigned long)controls_keys(ACT_FLASHLIGHT));
 		}
 #ifndef SH2_VITA
 		if (!viewer && (down & KEY_SELECT) && touchui_select()) {     // SELECT twice: the debug page

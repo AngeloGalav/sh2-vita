@@ -55,6 +55,8 @@ void vita_log(const char* fmt, ...)
 	}
 }
 
+bool vita_diag_log;
+
 bool vita_quit_requested(void) { return false; }   // the PS button suspends; the Vita has no "close" event
 
 // ---------------------------------------------------------------- state
@@ -357,6 +359,7 @@ void C3D_FrameEnd(u8 flags)
 	frames++;
 	if (G.frame_start - last >= 1000000) {
 		C3dStats* st = &c3d_stats;
+		if (vita_diag_log)
 		vita_log("frames %u: draws %u, no shader %u, no program %u; vitaGL %u KB free; textures %u (%u KB, %u ms, "
 		         "untile %u ms), buffers %u (%u KB, %u ms; %u new, %u marked by %u flushes of %u KB), draw calls %u "
 		         "(%u ms), swap %u ms", frames, s_draws[0],
@@ -364,7 +367,7 @@ void C3D_FrameEnd(u8 flags)
 		         (unsigned)(st->tex_us / 1000), (unsigned)(st->untile_us / 1000), st->buf_n, st->buf_kb,
 		         (unsigned)(st->buf_us / 1000), st->buf_new, st->dirtied, st->flush_n, st->flush_kb, st->draw_n,
 		         (unsigned)(st->draw_us / 1000), (unsigned)(st->swap_us / 1000));
-		if (HF.on) {
+		if (HF.on && vita_diag_log) {
 			// the depth the half-size fog reads, three samples (stored a frame or two ago): a float in
 			// 0..1 is a stored depth, 80808080 vitaGL's untouched fill
 			u32 z[3] = { 0, 0, 0 };

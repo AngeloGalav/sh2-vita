@@ -5,6 +5,10 @@
 #define VITA_DATA_DIR "ux0:data/sh2-vita"
 
 void vita_log(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+// Options, Debug, "Diagnostic Log": the once-a-second statistics (draws, memory, fog, audio). Off,
+// nothing is written to the card during play: each line is flushed, which can take milliseconds, and
+// the audio thread's report could hold the sound output that long.
+extern bool vita_diag_log;
 bool vita_quit_requested(void);
 bool vita_cross_confirms(void);   // the system's confirm button: Cross (KEY_A is Cross) or Circle
 const char* vita_path(const char* in, char* buf, size_t n);

@@ -38,3 +38,4 @@ void fog_debug(int mode);
 int fog_debug_mode(void);
 const char* fog_debug_name(void);
 int fog_debug_cycle(void);
+void fog_debug_set(int mode);      // a fog test view by number (Options, Debug)

@@ -66,6 +66,11 @@ typedef struct {
 	u8 setup;            // the first run's choices were made (setup.c)
 	u8 ctl_seen;         // the first run's Controls page was shown (setup.c; once more for players
 	                     // from before the 2026-10-31 layout)
+	// Debug tab (the port's): what debug.txt's debughud, perflog and shadowdebug turn on, from the menu,
+	// and the Vita's periodic diagnostics in vita_log.txt (off: nothing written to the card in play)
+	u8 dbg_hud, dbg_perflog, dbg_shadows, dbg_log;
+	u8 dbg_maptest, dbg_fogtest;   // the map and fog test views; not saved
+	u8 dbg_camtrace;               // On writes the camera's last minute to camtrace.txt, then goes Off
 } Options;
 
 typedef struct {

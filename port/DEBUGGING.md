@@ -24,6 +24,7 @@ it to play normally.
 | `newgame 1` | run New Game without pressing anything |
 | `results 1` / `itemget <id>` | open the results screen, after counting these item pickups |
 | `debughud 1` | start with the debug page on the bottom screen (SELECT twice shows or hides it in game) |
+| (Options, Debug tab) | the same switches from the menu, no file needed: Debug HUD, Performance Log (`perflog`), Shadow Volumes (`shadowdebug 1`), Diagnostic Log (the Vita's statistics in `vita_log.txt`, off by default), Map Test and Fog Test (the views the SELECT + L and SELECT + R combinations used to step through; those combinations are gone), and Save Camera Trace (On writes the camera's last minute to `camtrace.txt` and goes back to Off). A switch is on when either the menu or `debug.txt` turns it on |
 | `viewer 1` | add the room viewer to the title's touch list |
 | `logos 0` | skip the start-up screens |
 | `setup 0` / `setup 1` | never or always show the first run (`setup.c`). Without the key it shows once, while `options.txt` has no `setup 1`, unless `debug.txt` skips the logos or starts a test (`spawn`, `demo`, `movie`, `newgame`, `autotest`, `pt` lines). With `setup 1` in `options.txt` but no `ctlseen 1`, the Controls page shows alone, once |

@@ -1345,6 +1345,7 @@ static const char* const TEST_NAME[FOG_DEBUG_MODES] = {
 };
 int fog_debug_mode(void) { return s_test; }
 const char* fog_debug_name(void) { return TEST_NAME[s_test]; }
+void fog_debug_set(int mode) { s_test = mode >= 0 && mode < FOG_DEBUG_MODES ? mode : 0; }   // the Debug tab
 int fog_debug_cycle(void)
 {
 	s_test = (s_test + 1) % FOG_DEBUG_MODES;
