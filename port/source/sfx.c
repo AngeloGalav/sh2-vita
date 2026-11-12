@@ -1,5 +1,7 @@
 #include "sfx.h"
 #include "sdsim.h"
+#include "bgm.h"
+#include "events.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -799,19 +801,39 @@ int sfx_floor_material(float x, float y, float z)
 	return best;
 }
 
-// 0x54a9a0: floor material -> footstep SE. Some rooms override a material (room 0x78 uses 18803
-// for 0, rooms 0x2a and 0x46 use 19908 for 5, room 0x3e uses 11054 for 8, room 0xb8 and a few
-// boxes in rooms 0x92..0xa3 swap in 18807 / 19907); the port has no PC room ids yet.
-static int step_id(int material)
+// 0x54a9a0: floor material -> footstep SE, with its room overrides (the PC room, DAT_01fba9ac, as
+// 0x495220 gives it: bgm_room_id). Room 0x78 uses 18803 for 0, rooms 0x2a and 0x46 19908 for 5,
+// room 0xb8 18807 for 6 once flag 502 is on (0x1f7d61c bit 0x400000), room 0x3e 11054 for 8, and
+// boxes of rooms 0x92, 0x99, 0xa0, 0xa3 19907 for 8 (0x54a900: James' x and z inside min..max).
+// Not ported: material 6 elsewhere takes 18807 while James walks in water (0x534530, sh2jms
+// water_road 0x1fbab0b), which the port does not track.
+static bool in_box(float x, float z, float x0, float z0, float x1, float z1)
 {
+	return x0 < x && x < x1 && z0 < z && z < z1;
+}
+
+static int step_id(int material, const float pos[3])
+{
+	int room = bgm_room_id(ev_glb_crd(), pos[0], pos[2]);
+	float x = pos[0], z = pos[2];
 	switch (material) {
+	case 0: return room == 0x78 ? 18803 : 11001;
 	case 1: case 4: return 11004;
 	case 2: return 11002;
 	case 3: return 11007;
-	case 5: case 11: return 11000;
-	case 6: return 11003;
+	case 5: return room == 0x2a || room == 0x46 ? 19908 : 11000;
+	case 11: return 11000;
+	case 6: return room == 0xb8 ? (ev_flag(502) ? 18807 : 11009) : 11003;
 	case 7: return 11005;
-	case 8: return 11009;
+	case 8: {
+		if (room == 0x3e)
+			return 11054;
+		bool box = (room == 0x92 && in_box(x, z, -20900.0f, 18500.0f, -19200.0f, 22740.0f)) ||
+		           (room == 0x99 && in_box(x, z, -64000.0f, 20730.0f, -63000.0f, 22000.0f)) ||
+		           (room == 0xa0 && in_box(x, z, 60000.0f, -19420.0f, 62000.0f, -18000.0f)) ||
+		           (room == 0xa3 && in_box(x, z, 16000.0f, 20000.0f, 16800.0f, 21500.0f));
+		return box ? 19907 : 11009;
+	}
 	case 9: return 11006;
 	case 10: return 11008;
 	default: return 11001;
@@ -858,14 +880,14 @@ void sfx_footsteps(const char* clip, int first, int last, float f0, float f1, bo
 		if (s_step_gap < MIN_STEP_GAP)
 			continue;
 		s_step_gap = 0.0f;
-		sfx_play_at(step_id(sfx_floor_material(pos[0], pos[1], pos[2])), volume, pos);
+		sfx_play_at(step_id(sfx_floor_material(pos[0], pos[1], pos[2]), pos), volume, pos);
 	}
 }
 
 void sfx_footstep(float volume, const float pos[3])
 {
 	if (s_ok)
-		sfx_play_at(step_id(sfx_floor_material(pos[0], pos[1], pos[2])), volume, pos);
+		sfx_play_at(step_id(sfx_floor_material(pos[0], pos[1], pos[2]), pos), volume, pos);
 }
 
 const char* sfx_status(void)
