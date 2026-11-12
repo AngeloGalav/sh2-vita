@@ -1065,7 +1065,13 @@ static void scu_chase(Enemy* e, const EnPlayer* p, float dt)
 {
 	if (check_damage(e)) { go(e, SCU_DAMAGE); return; }
 	if (e->slv == 0) {
+		// 0x4c5070: a walk already playing (from the wander) goes on, but its loop count (+10) starts
+		// again at 0, so the figure walks one whole cycle before it may spit (the attack wants
+		// +10 != 0); the port had kept the wander's count and spat at once (reported: too eager)
+		bool walking = e->anim == A_WALK;
 		pose(e, A_WALK);
+		if (walking)
+			e->loops = 0;
 		e->path_angle = e->yaw;
 		if (s_diff > 0)
 			comm_add(p->x, p->z, 4000.0f, 120, 1);
@@ -1092,7 +1098,10 @@ static void scu_backward(Enemy* e, const EnPlayer* p, float dt)
 {
 	if (check_damage(e)) { go(e, SCU_DAMAGE); return; }
 	if (e->slv == 0) {
+		bool walking = e->anim == A_WALK;   // as the chase: the walk goes on, its count from 0
 		pose(e, A_WALK);
+		if (walking)
+			e->loops = 0;
 		e->path_angle = e->yaw;
 		e->slv = 1;
 	}
