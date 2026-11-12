@@ -1021,6 +1021,49 @@ void combat_hold_damage(float ap, float dt)
 
 void combat_set_god(bool on) { s_god = on; }
 
+// The push of a blow. The PC's damage states (0x547900 2D, 0x54db90 3D) give James a backward speed
+// (direction -pi, +0xb4) for the damage motion's first 10 frames: the frame time (0x4479d0, kept in
+// 0x1d82494 / 0x1d824a8 by 0x548f30 / 0x54f0b0) times sh2jms.shock (0x1fbacec). Nothing ever writes
+// that field (0x533ab0 clears the player block; no store in the DC or v1.0), so the PC's push is 0;
+// the blow's own shock, the attack's sp in sh2_attack_list (0x6ec568), lands in jms + 0x120 and is
+// cleared unread by 0x5350d0. Stand-in, asked for from play (STATUS section 3): for those 10 frames
+// (1/3 s) James slides away from the attacker at PUSH_PER_SP units a second per point of sp,
+// through the room's walls. The sp of the enemies' attacks 42..65, from 0x6ec568 (36-byte
+// shAttackInfo: u16 id, u16 kind, f32 ap, sp, min_range, max_range, ...).
+static const float ENEMY_ATK_SP[24] = {
+	5.0f, 5.0f, 10.0f, 10.0f, 10.0f, 12.5f, 12.5f, 15.0f, 0.5f, 0.0f, 12.5f, 0.0f,   // 42..53
+	0.0f, 15.0f, 17.5f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 7.5f, 0.0f, 0.0f, 0.0f,      // 54..65
+};
+#define PUSH_PER_SP 45.0f       // port's own: sp 10 moves James 150 units, 17.5 about 260
+#define PUSH_TIME (10.0f / 30.0f)
+static float s_push_t, s_push_dx, s_push_dz, s_push_v;
+
+static void push_start(int attack_id, float from_x, float from_z)
+{
+	s_push_t = 0.0f;
+	if (attack_id < 42 || attack_id > 65)
+		return;
+	float sp = ENEMY_ATK_SP[attack_id - 42];
+	float dx = s_body_pos[0] - from_x, dz = s_body_pos[2] - from_z, n = sqrtf(dx * dx + dz * dz);
+	if (sp <= 0.0f || n < 1e-3f)
+		return;
+	s_push_dx = dx / n, s_push_dz = dz / n;
+	s_push_v = sp * PUSH_PER_SP;
+	s_push_t = PUSH_TIME;
+}
+
+static void push_update(CombatBody* b, float dt)
+{
+	if (s_push_t <= 0.0f)
+		return;
+	float t = dt < s_push_t ? dt : s_push_t;
+	s_push_t -= dt;
+	float nx = *b->x + s_push_dx * s_push_v * t, nz = *b->z + s_push_dz * s_push_v * t;
+	if (s_col)
+		col_push(s_col, &nx, &nz, *b->y, 900.0f, 130.0f);   // James' column, as main.c moves him
+	*b->x = nx, *b->z = nz;
+}
+
 void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 {
 	if (s_god)
@@ -1056,6 +1099,7 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 	sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);   // injured (four or five takes)
 	const JAnim* hurt = damage_motion(attack_id, false, from_x, from_z);
 	play(hurt ? hurt : &J_HURT);
+	push_start(attack_id, from_x, from_z);
 }
 
 // What James can see (0x52f2c0 sets his areas, 0x5420f0 tests them): a "look" sphere ahead of him
@@ -2299,7 +2343,8 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		if (s_end) { s_mode = M_FREE; s_attack_seq = false; play(&J_STAND); return false; }
 		break;
 	case M_HURT:
-		if (s_end) { s_mode = M_FREE; play(&J_STAND); return false; }
+		push_update(b, dt);
+		if (s_end) { s_mode = M_FREE; s_push_t = 0.0f; play(&J_STAND); return false; }
 		break;
 	case M_HELD: {
 		// hurt pose held in its middle while he struggles
