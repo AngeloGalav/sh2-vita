@@ -197,9 +197,26 @@ def convert_area(data_dir, pack_root, area, max_tex, rooms_filter, bg='bg'):
             except Exception as e:  # keep going; report at the end
                 print(f'  ! {area}/{fn}: {e}')
     textures = {}
-    for m in maps.values():
-        for tid, t in m.textures.items():
-            textures.setdefault(tid, t)
+    used = {tid for m in maps.values() for tid in m.textures}
+    for name, m in maps.items():
+        for tid, t in list(m.textures.items()):
+            have = textures.get(tid)
+            if have is None or have.data == t.data:
+                textures.setdefault(tid, t)
+                continue
+            # The same id with other pixels in another map of the area: the PC loads each room's map
+            # with its own textures, the pack keeps one file per id. The Enhanced Edition's ap64 adds a
+            # window texture as 2191, ap72's floor, which then drew that floor white with dark panes
+            # (West Apartments 2F, reported from play). This map's texture gets an id of its own.
+            nid = tid | 0x10000
+            while nid in used:
+                nid += 0x10000
+            used.add(nid)
+            textures[nid] = t
+            for mt in m.materials:
+                if mt.texture_id == tid:
+                    mt.texture_id = nid
+            print(f'  {area}/{name}: texture {tid} differs from another map\'s, kept as {nid}')
     rooms = [r for r in maps if r != area and (not rooms_filter or r in rooms_filter)]
     needed = {mt.texture_id for r in rooms for mt in maps[r].materials if mt.texture_id}
     tex_alpha, jobs, missing = {}, [], 0
