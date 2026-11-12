@@ -1,8 +1,7 @@
 # Console test: batch of 2026-11-12
 
-Everything below is in the working tree, uncommitted, and written up in [STATUS.md](STATUS.md) as
-"Not run on a console". After the run, report what works and what doesn't; the fixes are then
-finished, STATUS updated and the batch committed on main.
+Committed (8cff251..bb90d1c). Run on a console on 2026-11-12; the results are in the table and in
+[STATUS.md](STATUS.md).
 
 ## 1. Copy to the Vita
 
@@ -19,20 +18,20 @@ Options → **Debug** → **Performance Log** On.
 
 | # | What | Where / how | Expected | Result |
 |---|---|---|---|---|
-| 1 | Debug tab | Options → Debug | Six tabs fit in the tab row; each row switches live | |
-| 2 | Shadow Volumes | Debug tab On, flashlight on | Shadows drawn in red | |
-| 3 | Map Test / Fog Test | Change the views | The room or the fog changes as named | |
-| 4 | West Apartments 2F floor | The save point room | Dark worn floor, not white with dark panes; closer to 30 fps | |
-| 5 | Maria at the bowling alley | The scene where she stays outside | Maria visible for the whole scene | |
-| 6 | Eddie and Laura | First scene inside the bowling alley; the talk with Eddie eating | Both there from the start; only one Eddie | |
-| 7 | Flooded elevator | Hotel basement (otherworld) | Doors drawn open, close during the ride, stay closed after | |
-| 8 | Push on a blow | Get hit by any enemy | James slides back a little, never through a wall; none from grabs or guns | |
-| 9 | Lying Figure | One that sees James while wandering | A short walk before it spits, not an instant spray | |
-| 10 | Audio | Item pickups, doors, gunshots, loud fights with music | No click at the end of sounds, no crackle on bass | |
-| 11 | Prop shadows | Bars, furniture, crates in the flashlight | Intact shapes, also while James stands still | |
-| 12 | Maria's voices | Born From a Wish | Her lines play, two of them with subtitles | |
-| 13 | Footsteps | Hotel rooms 0x92, 0x99, 0xa0, 0xa3; the flooded basement after draining; hospital rooms 0x2a, 0x46 | Different step sounds on those floors | |
-| 14 | Arrivals | Rebirth ending back to the lake; hospital 1F otherworld elevator car; boarding the lake boat; dog ending | On the boat; on the car's floor; no fall; the movie, then the title | |
+| 1 | Debug tab | Options → Debug | Six tabs fit in the tab row; each row switches live | Works |
+| 2 | Shadow Volumes | Debug tab On, flashlight on | Shadows drawn in red | Works |
+| 3 | Map Test / Fog Test | Change the views | The room or the fog changes as named | Works |
+| 4 | West Apartments 2F floor | The save point room | Dark worn floor, not white with dark panes; closer to 30 fps | Works |
+| 5 | Maria at the bowling alley | The scene where she stays outside | Maria visible for the whole scene | Works |
+| 6 | Eddie and Laura | First scene inside the bowling alley; the talk with Eddie eating | Both there from the start; only one Eddie | Works |
+| 7 | Flooded elevator | Hotel basement (otherworld) | Doors drawn open, close during the ride, stay closed after | Not fixed: looks closed, James walks through |
+| 8 | Push on a blow | Get hit by any enemy | James slides back a little, never through a wall; none from grabs or guns | Works |
+| 9 | Lying Figure | One that sees James while wandering | A short walk before it spits, not an instant spray | Misread: the issue is no pause between attacks (Mandarins, Nurses) |
+| 10 | Audio | Item pickups, doors, gunshots, loud fights with music | No click at the end of sounds, no crackle on bass | Not fixed: crackle unchanged (White Noise, forest) |
+| 11 | Prop shadows | Bars, furniture, crates in the flashlight | Intact shapes, also while James stands still | Red volumes fine; broken shadows aren't red (other geometry) |
+| 12 | Maria's voices | Born From a Wish | Her lines play, two of them with subtitles | Later |
+| 13 | Footsteps | Hotel rooms 0x92, 0x99, 0xa0, 0xa3; the flooded basement after draining; hospital rooms 0x2a, 0x46 | Different step sounds on those floors | Later |
+| 14 | Arrivals | Rebirth ending back to the lake; hospital 1F otherworld elevator car; boarding the lake boat; dog ending | On the boat; on the car's floor; no fall; the movie, then the title | Later |
 
 ## 4. Logs to bring
 
