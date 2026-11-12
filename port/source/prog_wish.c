@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "demo.h"
 
 // Stage programs of Born From a Wish (stages 53..58, Director's Cut only): Maria in the Baldwin
 // mansion and Blue Creek. Flags, items, messages and SE ids are the PC's. The PS2 beta has no
@@ -367,14 +368,21 @@ static int s56_calendar(Prog* p)
 static int s56_sound_1(Prog* p) { (void)p; p_se(0x428d); return 1; }
 static int s56_sound_2(Prog* p) { (void)p; p_se(0x428e); return 1; }
 
-// 0x571860 / 0x571880: BGM changes (FUN_0049fe30 0xeaf1, 0xeaf2); bgm.c follows the stage.
-static int s56_bgm(Prog* p) { (void)p; return 1; }
+// 0x571860 / 0x571880: Maria's voice 0xeaf1 (no subtitles) and 0xeaf2 (subtitle message 0x38, table
+// 0x8c62e4). 0x49fe30 is the subtitle manager's set (table, first message, voice; its other callers
+// are the piano, the videotape and the voice through the wall), not a BGM change as the port had it.
+// The packed tracks are pack/demo/voice_571860.voc and voice_571880.voc.
+static int s56_voice_1(Prog* p) { (void)p; demo_voice_free("sdmc:/3ds/sh23ds", "voice_571860"); return 1; }
+static int s56_voice_2(Prog* p) { (void)p; demo_voice_free("sdmc:/3ds/sh23ds", "voice_571880"); return 1; }
 
-// 0x5718a0: BGM 0xeaf3 and the camera hp246 for three seconds (_DAT_0062ede0).
+// 0x5718a0: James held, then Maria's voice 0xeaf3 (subtitle 0x39, table 0x8c62ec) and up to three
+// seconds (_DAT_0062ede0) or a press. Not ported: the sound 0x3f4 (0x514d60) at the start and the end,
+// and the wait for the playing sound's state (0x514af0) before the voice.
 static int s56_music_room(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+		demo_voice_free("sdmc:/3ds/sh23ds", "voice_5718a0");
 		p->timer = 0.0f;
 	PROG_STEP(p, 10, p_wait(p, 3.0f) || (p->down & (KEY_A | KEY_B | KEY_START)))
 		p_lock(p, false);
@@ -383,7 +391,7 @@ static int s56_music_room(Prog* p)
 
 static const ProgFn s_stage56[14] = {
 	NULL, s56_ernest_1, s56_ernest_2, s56_get_white_board, s56_use_acacia_key, s56_get_matches,
-	s56_light_candle, s56_birthday_card, s56_calendar, s56_sound_1, s56_sound_2, s56_bgm, s56_bgm,
+	s56_light_candle, s56_birthday_card, s56_calendar, s56_sound_1, s56_sound_2, s56_voice_1, s56_voice_2,
 	s56_music_room,
 };
 
