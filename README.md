@@ -45,6 +45,44 @@ You need:
    The game folder is the one with `sh2pc.exe`, `data/` and the Enhanced Edition's `sh2e/`. On Windows leave out `--user ...` and write the paths as `"C:\Games\Silent Hill 2:/game:ro"` and `"${PWD}\out:/out"`. It takes an hour or more; if it stops, the same command picks up where it stopped (`-e FRESH=1` starts over).
 3. Copy the contents of `out/sh2-vita/` to `ux0:data/sh2-vita/` on the Vita (about 2.6 GB).
 
+### Windows, step by step
+
+1. Install [Git for Windows](https://git-scm.com/download/win) and
+   [Docker Desktop](https://www.docker.com/products/docker-desktop/) (keep its default, the WSL 2 backend).
+   Restart the PC if the installer asks.
+2. Start **Docker Desktop** and wait until it says the engine is running. It has to stay open while
+   the packer runs.
+3. Find your game folder: the one with `sh2pc.exe`, `data` and the Enhanced Edition's `sh2e` in it.
+   Shift + right-click it in Explorer and choose **Copy as path**.
+4. Open **PowerShell** (Start menu, type `PowerShell`). Not the Command Prompt: the commands below are
+   PowerShell's.
+5. Paste these lines one at a time, pressing Enter after each. In the last one, put your own path
+   (the one you copied) in place of `C:\Games\Silent Hill 2`, and keep the `:/game:ro` after it:
+   ```powershell
+   cd $HOME
+   git clone https://github.com/AngeloGalav/sh2-vita
+   cd sh2-vita
+   docker build -f tools/packer/Dockerfile -t sh2-vita-packer .
+   mkdir out
+   docker run --rm -v "C:\Games\Silent Hill 2:/game:ro" -v "${PWD}\out:/out" sh2-vita-packer
+   ```
+   The `docker build` line takes a few minutes, and the `docker run` line an hour or more. Leave the
+   window open until it prints `Done`.
+6. The game data is now in `C:\Users\<your name>\sh2-vita\out\sh2-vita`. Copy what is **inside** that
+   folder to `ux0:data/sh2-vita/` on the Vita (VitaShell's USB or FTP mode).
+
+If something goes wrong:
+
+- **`docker` is not recognized**, or **cannot connect to the Docker daemon**: Docker Desktop is not
+  running, or not installed. Start it, wait for the engine, and run the line again.
+- **`git` is not recognized**: install Git for Windows, then close PowerShell and open a new one.
+- **It says the `sh2e` folder is missing**: the path is not the game folder, or the Enhanced Edition
+  is not installed in it.
+- **It stopped partway** (a closed window, a restart): run the same `docker run` line again from the
+  `sh2-vita` folder (`cd $HOME\sh2-vita` first). Finished steps are skipped.
+- **The game starts on the Vita but says it has no data**: the files went one folder too deep. The
+  Vita needs `ux0:data/sh2-vita/bg`, not `ux0:data/sh2-vita/sh2-vita/bg`.
+
 Without Docker, the same steps by hand:
 
 ```sh
@@ -77,31 +115,9 @@ The first time each shader is needed it is compiled and kept on the card, so the
 
 In menus, Cross confirms and Circle goes back, whatever the console's own setting. Actions can be rebound in *Options*, *Controls*, *Buttons*. More in [CONTROLS.md](port/CONTROLS.md).
 
-## Options for this port
-
-Under *Options*, *System*:
-
-| Option | Choices |
-| --- | --- |
-| Resolution | 960 x 544, or 720 x 416 for a steadier frame rate |
-| FPS Cap | 30 or 60 |
-| Texture Filter | Bilinear or trilinear |
-| Fog | Off or on |
-| Fog Detail | The fog's target at a half, a third or a quarter of the view each way |
-| Filters | The blur some scenes use, off or on |
-
 ## Status
 
-Open at the moment:
-
-- **Item screen:** close to the original, but the layout is about 13% wider than 4:3 and Adjust volume shows a number in place of the blocks
-- **Options:** the look follows the original's screens, the tabs and some settings are the port's own
-- **Other menus:** the memo list, stage panels and first run use the same style without being ported from the game's own screens, and the Movie Menu takes the options' look
-- **Title:** the menu's words are the game's pictures, which exist only in English
-- **Sound:** crackling can be heard
-- **Not wired:** subtitles on the movies and New Game+'s yellow NEW GAME
-
-More in [port/vita/README.md](port/vita/README.md) and [port/STATUS.md](port/STATUS.md).
+What works, what is open and what is being worked on: [port/STATUS.md](port/STATUS.md).
 
 ## Building and working on it
 
