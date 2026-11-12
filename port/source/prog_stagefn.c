@@ -20,6 +20,7 @@ static int s_room = -1, s_room_stage = -1;
 
 // ---------------------------------------------------------------- stage 34, the labyrinth's first part
 
+float prog_bf_elevator_door;            // 0x1d85d40 (prog_int.h)
 static float s_lift_gate = 450.0f, s_lift_gv, s_lift_t, s_lift_y, s_lift_step, s_lift_accel_end;
 
 static int ring_outer(void) { return p_flag(317) | p_flag(318) << 1; }   // EvProgControlCube's rings
@@ -338,6 +339,17 @@ static void room_enter(int stage, int room)
 			after_load(0x4db8, p_flag(216) ? 1.0f : 0.0f, NULL);
 			p_set(216);
 			s_h22_steps = 0, s_h22_t = 0.0f;
+		}
+		break;
+	case 43:                             // 0x577600: the flooded elevator's room
+		if (room == 0xb8) {
+			// the doors stand open (250) while the water is up (479 off); 0x2f80400 into 0x1f7d6f4
+			prog_bf_elevator_door = p_flag(479) ? 0.0f : 250.0f;
+			static const int done[] = { 2218, 2227, 2228, 2229, 2230, 2231, 2233 };
+			for (int i = 0; i < (int)(sizeof done / sizeof done[0]); i++)
+				p_set(done[i]);
+			// not ported: model 0x200 id 0xe5 shown here (+4 bit 0x10, +0x148 bit 0x400 cleared) and
+			// hidden again by the program's state 6
 		}
 		break;
 	case 34:                             // the +0x3c part of 0x582ee0: room 0x88, and the cube room once 327 is on
@@ -665,6 +677,15 @@ void prog_stagefn_tick(int stage, float dt)
 		}
 		break;
 	case 32: prison_bars_tick(dt); break;
+	case 43:
+		// 0x577690: in room 0xb8, while the water is up (479 off), the door's leaves (model 0x519,
+		// bones 0 and 1) stand apart along z by 0x1d85d40 from their own places. The wall 0x8cb7a0
+		// (stagewalls.c) faces into the car: it keeps James in, it does not keep him out.
+		if (room == 0xb8 && !p_flag(479)) {
+			stagemdl_bone_move(0x519, 0, 0.0f, 0.0f, -prog_bf_elevator_door);
+			stagemdl_bone_move(0x519, 1, 0.0f, 0.0f, prog_bf_elevator_door);
+		}
+		break;
 	case 44: hall_voice_tick(room, dt); break;
 	case 48: case 49: case 50: case 51: end_stairs_tick(pos, dt); break;
 	default: break;

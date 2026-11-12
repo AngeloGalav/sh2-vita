@@ -3,6 +3,7 @@
 #include "bgm.h"
 #include "stagemdl.h"
 #include "boat.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -775,6 +776,8 @@ static const ProgFn s_stage42[6] = { NULL, s42_use_stair_key, s42_use_312_key, s
 
 // ================================================================ stage 43 Stg_hotel_bf_b (0x8cb840)
 
+static float s_bf_door_speed;   // 0x1d85d3c: how fast the flooded elevator's doors close
+
 // 0x5777f0 EvProgOpenElevatorWater: the flooded elevator (buttons 0x577540). The fourth button
 // starts the car with James inside and the water drains (478, then 501, 502, 2219, and 479 once the
 // level is 0); the fifth sets 22 and the stage's door event takes him up.
@@ -816,9 +819,30 @@ static int s43_elevator_water(Prog* p)
 	}
 		// fallthrough
 	case 0x10:
-		if (!p_wait(p, 6.0f + 4.5f))    // _DAT_0069f324, _DAT_007117a4
+		// 0x10: 6 s (_DAT_0069f324), then the sound 0x4a44 and 0x1b: the timer starts again
+		p->timer += p->dt;
+		if (p->sub == 0) {
+			if (p->timer <= 6.0f)
+				return 0;
+			p_se(0x4a44);
+			p->sub = 1, p->timer = 0.0f;
+			s_bf_door_speed = 0.0f;     // 0x1d85d3c
+		}
+		// 0x1c, 0x1d: after 4 s (_DAT_006318a4) the doors close, faster by 250 a second
+		// (_DAT_006a91d4) up to 200 (_DAT_006a7920), with the sound 0x4a42 as they start
+		if (p->timer > 4.0f) {
+			if (p->sub == 1) {
+				p_se(0x4a42);
+				p->sub = 2;
+			}
+			s_bf_door_speed = fminf(s_bf_door_speed + p->dt * 250.0f, 200.0f);
+			prog_bf_elevator_door = fmaxf(prog_bf_elevator_door - p->dt * s_bf_door_speed, 0.0f);
+		}
+		// 0x1d from 4.5 s (_DAT_007117a4) waits for the doors to shut. Stand-in: the PC then waits
+		// for flag 502 or a press (0x4466e0, 0x446820) and fades (0x4ee620) into state 6; the port
+		// goes on once they are shut, as it went on after the fixed 10.5 s before.
+		if (p->timer <= 4.5f || prog_bf_elevator_door > 0.0f)
 			return 0;
-		p_se(0x4a44);
 		p_set(501);                     // FLAGW_480 |= 0x600000
 		p_set(502);
 		p_set(2219);                    // FLAGW_2208 |= 0x800
