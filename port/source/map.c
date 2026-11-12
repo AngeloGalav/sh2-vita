@@ -4,6 +4,7 @@
 #include "prog.h"
 #include "sdio.h"
 #include "stream.h"
+#include "perf.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -381,8 +382,12 @@ static bool load_t3x(C3D_Tex* tex, const char* name)
 	char path[64];
 	t3x_path(path, sizeof path, name);
 	long n = 0;
+	// steps for the watchdog's stall.txt (perflog 1): a report had the game freeze on opening the map
+	// after a long session, at a step not yet known
+	perf_crumb("map: take from the reader");
 	u8* b = stream_take_file(path, &n);  // read ahead for the touch screen's small map (textures_ready)
 	if (!b) {
+		perf_crumb("map: read the texture");
 		FILE* f = fopen(path, "rb");
 		if (!f)
 			return false;
@@ -394,8 +399,10 @@ static bool load_t3x(C3D_Tex* tex, const char* name)
 			free(b), b = NULL;
 		fclose(f);
 	}
+	perf_crumb("map: upload the texture");
 	Tex3DS_Texture t = b ? Tex3DS_TextureImport(b, n, tex, NULL, false) : NULL;
 	free(b);
+	perf_crumb(t ? "map: texture in" : "map: texture failed");
 	if (!t)
 		return false;
 	Tex3DS_TextureFree(t);
