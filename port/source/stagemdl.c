@@ -492,6 +492,17 @@ static bool npc_load(int i)
 	return true;
 }
 
+// The kinds of the stage's placed characters shown in the last drawn frame (stagemdl_npc_kind_here)
+static int s_here_kind[16], s_nhere;
+
+bool stagemdl_npc_kind_here(int kind)
+{
+	for (int i = 0; i < s_nhere; i++)
+		if (s_here_kind[i] == kind)
+			return true;
+	return false;
+}
+
 static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
 	float me[3], yaw;
@@ -510,6 +521,10 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 	// motion, the others it left alone wait on their first frame (Eddie's pizza went on to his mouth and
 	// back in the air while the scene moved Eddie). What the PC does with their motion then isn't traced.
 	bool scene_has = false;
+	s_nhere = 0;
+	for (int i = 0; i < N_NPC; i++)
+		if (k_npc[i].stage == stage && npc_shown(i, stage, me[0], me[2]) && s_nhere < 16)
+			s_here_kind[s_nhere++] = k_npc[i].kind;
 	for (int i = 0; i < N_NPC; i++)
 		scene_has = scene_has || (k_npc[i].stage == stage && demo_shows_kind(k_npc[i].kind) && npc_shown(i, stage, me[0], me[2]));
 	for (int i = 0; i < N_NPC; i++) {

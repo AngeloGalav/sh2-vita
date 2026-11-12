@@ -875,12 +875,8 @@ static bool scene_start(const char* pack_dir, const char* key)
 		S.chars[i].rec = &recs[i];
 		S.chars[i].model = load_model(pack_dir, i, &recs[i], &S.chars[i].own_model, &S.chars[i].morph);
 		S.chars[i].dec_frame = -1;
-		// Stand-in, from a console test: in the bowling alley's first scene (bp_edi_a, 0x591860) the script
-		// shows Eddie and Laura only after the first shot, about 3 s in, yet the game has them in it. What
-		// keeps them drawn on the PC before the show command isn't traced (0x49fb20 sets 0x950be4, its
-		// reader is not found); here the two start shown in that scene.
-		if (!strcmp(key, "bp_edi_a") && (recs[i].kind == 0x108 || recs[i].kind == 0x104))
-			S.next.visible[i] = true;
+		// bp_edi_a (0x591860) shows Eddie and Laura only about 3 s in; they are drawn from the start
+		// all the same, as every scene character is (the draw loop, 0x950be4 is never read)
 	}
 	// DramaDemoInit: names were matched by the converter; the first record is read now
 	S.p = dds + 0x19 + 16 * S.n_chars;
@@ -1629,7 +1625,14 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		C3D_LightEnvBind(&s_lenv);
 	for (int i = 0; i < S.n_chars; i++) {
 		DemoChar* dc = &S.chars[i];
-		if (!dc->model || !S.next.visible[i])
+		// The PC draws every character of the scene for the whole scene: 0x49fb20 writes the show and
+		// hide commands' flag (0x950be4, 0x49fcf6 / 0x49fd05) and nothing in the exe reads it (only the
+		// positions next to it, 0x4a0f30 / 0x4a183b). The port hid a character until its show command,
+		// so one shown late or never went missing (Maria in bowl_mae_1, reported from play; Eddie and
+		// Laura in bp_edi_a). Kept from the console test: while the script has a character off and the
+		// stage's own placed copy of it shows (Eddie eating while James talks, 0x591a40), that copy
+		// stands in for it and the scene's is not drawn over it.
+		if (!dc->model || (!S.next.visible[i] && stagemdl_npc_kind_here(dc->rec->kind)))
 			continue;
 		float p[3];
 		for (int k = 0; k < 3; k++)
