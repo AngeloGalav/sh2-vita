@@ -195,6 +195,31 @@ static void emit(V3 a, V3 b, V3 c, V3 out)
 	S.vbuf[S.nv++] = c;
 }
 
+// A triangle as given: the map volumes' winding is built, not guessed (see side_wall).
+static void emit_raw(V3 a, V3 b, V3 c)
+{
+	if (S.nv + 3 > S.vmax) {
+		S.full = true;
+		return;
+	}
+	S.vbuf[S.nv++] = a;
+	S.vbuf[S.nv++] = b;
+	S.vbuf[S.nv++] = c;
+}
+
+// The wall under the near cap's edge u -> v (cap wound to face the light, far cap the other way):
+// v -> u on the near side, q_u -> q_v on the far side, so every edge of the volume meets its
+// reverse and the volume is closed. emit()'s guess from the edge's midpoint and the third corner
+// turned walls inside out on thin or grazing-lit triangles; a wall facing the wrong way counts with
+// the wrong sign on depth fail, which left dark patches that came and went as the flashlight moved
+// (bowling alley, bw05 / bw09; a host test found open volumes in a third to a half of the light
+// positions there, all of them strips and billboards).
+static void side_wall(V3 pu, V3 pv, V3 qu, V3 qv)
+{
+	emit_raw(pv, pu, qu);
+	emit_raw(pv, qu, qv);
+}
+
 // A corner pulled S.len from the light (a corner farther than that a little past itself, where the
 // PC's volume would fold back), and *p moved S.eps away from it (map volumes, see shadow_cast_maps).
 // The volumes are counted where they pass behind the scene (depth fail), which needs their far caps
@@ -252,14 +277,6 @@ static float uniform_len(const V3* p, int n, V3 Lw)
 }
 static void maps_release(void);
 
-// The side wall of one silhouette edge (vertices i, j) of a lit triangle whose third corner is k.
-static void side(const V3* p, const V3* q, int i, int j, int k)
-{
-	V3 out = sub(scl(add(p[i], p[j]), 0.5f), p[k]);
-	emit(p[i], p[j], q[j], out);
-	emit(p[i], q[j], q[i], out);
-}
-
 // One TRIANGLE_STRIP_ADV geometry (prim 5 or 6): two vertices, then per triangle its face normal and
 // the next vertex, all s16 x, y, z, w in the bone's space. The characters' volumes start at the
 // triangles with (v - L) . n < 0 (L in the bone's space); the maps' at those with (v - L) . n >= 0,
@@ -269,7 +286,7 @@ static void strip(const Mtx34* w, const s16* g, int nv, V3 L, V3 Lw)
 {
 	if (nv < 3 || nv > 256)
 		return;
-	V3 v[256], p[256], q[256];
+	V3 v[256], p[256], q[256], nf[256];
 	bool lit[256];
 	v[0] = s16v(g);
 	v[1] = s16v(g + 4);
@@ -278,30 +295,71 @@ static void strip(const Mtx34* w, const s16* g, int nv, V3 L, V3 Lw)
 	for (int t = 0; t < nv - 2; t++, t16 += 8) {
 		V3 n = s16v(t16);
 		v[t + 2] = s16v(t16 + 4);
-		lit[t] = (dot(sub(v[t], L), n) < 0.0f) != S.back;
+		float d = dot(sub(v[t], L), n);
+		lit[t] = (d < 0.0f) != S.back;
+		nf[t] = d < 0.0f ? n : scl(n, -1.0f);   // the stored face normal turned towards the light
 		any |= lit[t];
 	}
 	if (!any)
 		return;
 	for (int i = 0; i < nv; i++)
 		p[i] = xf(w, v[i]);
+	for (int t = 0; t < nv - 2; t++)       // into world space (the bone's matrix is rigid)
+		nf[t] = sub(xf(w, add(v[t], nf[t])), p[t]);
 	float len = uniform_len(p, nv, Lw);
 	for (int i = 0; i < nv; i++)
 		q[i] = pull_from(&p[i], Lw);
 	S.len = len;
-	int nt = nv - 2;
+	// The strips join their runs with repeated corners and some triangles carry a zero normal (bw05,
+	// bw09), so which edges are open is found by position, not by index: each lit triangle's cap
+	// edges are paired with their reverse, and a wall goes under every edge left over. Zero-area
+	// triangles cover nothing and are skipped. The PC counts open volumes on depth pass and needs
+	// none of this; the port's depth-fail count needs every volume closed.
+	int canon[256];
+	for (int i = 0; i < nv; i++) {
+		canon[i] = i;
+		for (int j = 0; j < i; j++)
+			if (v[j].x == v[i].x && v[j].y == v[i].y && v[j].z == v[i].z) {
+				canon[i] = j;
+				break;
+			}
+	}
+	static short eu[3 * 256], ev[3 * 256];
+	static bool used[3 * 256];
+	int ne = 0, nt = nv - 2;
 	for (int t = 0; t < nt; t++) {
 		if (!lit[t])
 			continue;
 		int a = t, b = t + 1, c = t + 2;
-		V3 ctr = scl(add(add(p[a], p[b]), p[c]), 1.0f / 3.0f);
-		emit(p[a], p[b], p[c], sub(Lw, ctr));                  // near cap, facing the light
-		emit(q[a], q[b], q[c], sub(ctr, Lw));                  // far cap
-		side(p, q, a, c, b);                                   // the strip's outer edge
-		if (t == 0 || !lit[t - 1])
-			side(p, q, a, b, c);                               // where the lit run starts
-		if (t == nt - 1 || !lit[t + 1])
-			side(p, q, b, c, a);                               // and where it ends
+		if (canon[a] == canon[b] || canon[b] == canon[c] || canon[a] == canon[c])
+			continue;
+		V3 cr = cross(sub(p[b], p[a]), sub(p[c], p[a]));
+		if (dot(cr, cr) <= 0.0f)
+			continue;
+		// near cap wound to face the light (by the stored normal, by the light when it is zero),
+		// far cap the other way round
+		V3 to = dot(nf[t], nf[t]) > 0.0f ? nf[t] : sub(Lw, scl(add(add(p[a], p[b]), p[c]), 1.0f / 3.0f));
+		if (dot(cr, to) < 0.0f) {
+			int k = b;
+			b = c, c = k;
+		}
+		emit_raw(p[a], p[b], p[c]);
+		emit_raw(q[a], q[c], q[b]);
+		eu[ne] = (short)a, ev[ne++] = (short)b;
+		eu[ne] = (short)b, ev[ne++] = (short)c;
+		eu[ne] = (short)c, ev[ne++] = (short)a;
+	}
+	memset(used, 0, ne * sizeof used[0]);
+	for (int i = 0; i < ne; i++) {
+		if (used[i])
+			continue;
+		for (int j = i + 1; j < ne; j++)
+			if (!used[j] && canon[eu[j]] == canon[ev[i]] && canon[ev[j]] == canon[eu[i]]) {
+				used[i] = used[j] = true;    // an inner edge: the two caps meet there
+				break;
+			}
+		if (!used[i])
+			side_wall(p[eu[i]], p[ev[i]], q[eu[i]], q[ev[i]]);
 	}
 }
 
@@ -908,7 +966,7 @@ static void kg2_mtx(Mtx34* w, const float* M)
 // each edge (0x4449f0's planes and billboards emit the walls, 0x442ae0 a quad each)
 static void poly_volume(V3* p, int n, V3 Lw)
 {
-	V3 q[16], ctr = v3(0, 0, 0);
+	V3 q[16], ctr = v3(0, 0, 0), nrm = v3(0, 0, 0);
 	float len = uniform_len(p, n, Lw);
 	for (int i = 0; i < n; i++) {
 		q[i] = pull_from(&p[i], Lw);
@@ -916,16 +974,19 @@ static void poly_volume(V3* p, int n, V3 Lw)
 	}
 	S.len = len;
 	ctr = scl(ctr, 1.0f / n);
-	V3 toL = sub(Lw, ctr), fromL = sub(ctr, Lw);
+	for (int i = 0; i < n; i++)           // Newell's normal of the corners as given
+		nrm = add(nrm, cross(p[i], p[(i + 1) % n]));
+	int o[16];                            // the corners in the order that faces the light
+	bool rev = dot(nrm, sub(Lw, ctr)) < 0.0f;
+	for (int i = 0; i < n; i++)
+		o[i] = rev ? n - 1 - i : i;
 	for (int i = 1; i + 1 < n; i++) {
-		emit(p[0], p[i], p[i + 1], toL);
-		emit(q[0], q[i], q[i + 1], fromL);
+		emit_raw(p[o[0]], p[o[i]], p[o[i + 1]]);
+		emit_raw(q[o[0]], q[o[i + 1]], q[o[i]]);
 	}
 	for (int i = 0; i < n; i++) {
-		int k = (i + 1) % n;
-		V3 out = sub(scl(add(p[i], p[k]), 0.5f), ctr);
-		emit(p[i], p[k], q[k], out);
-		emit(p[i], q[k], q[i], out);
+		int u = o[i], v = o[(i + 1) % n];
+		side_wall(p[u], p[v], q[u], q[v]);
 	}
 }
 
