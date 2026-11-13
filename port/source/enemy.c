@@ -6167,6 +6167,8 @@ void enemy_stream_update(int stage, const Collision* col)
 // move longer than the radius counts as a placing, and a column that met nobody keeps the place
 // that code gave it.
 typedef struct { float cx, cz, mx, mz, feet, top, r, px, pz; int w; bool moved; Enemy* e; bool maria; } PushCol;
+static float s_mwas[2];          // Maria's place before this frame's update
+static bool s_mwas_ok;
 
 static void push_share(float* a, float b)       // 0x522940
 {
@@ -6203,10 +6205,16 @@ void enemy_push_apart(float jx, float jz, float jy, float jyaw, float jr, float 
 	if (jr > 0.0f)       // 0x534d70: from 50 above his feet to 850 above, weight 2 (0x536f10)
 		c[n++] = (PushCol){ wx + fx, wz + fz, jx - wx, jz - wz, jy - 50.0f, jy - 850.0f, jr, 0.0f, 0.0f, 2, false, NULL };
 	{
-		// Maria (MariaSetHitColumn 0x52b330: 50 to 800 above her feet, her radius); her weight is taken as James' 2
+		// Maria (MariaSetHitColumn 0x52b330: 50 to 800 above her feet, her radius); her weight is taken as James' 2.
+		// Her column starts where she stood and takes this frame's move, as the enemies' do: put in
+		// where she ended, a run that carried her past James' centre was pushed out on his far side
 		float mx, my, mz, mr;
-		if (maria_column(&mx, &my, &mz, &mr))
-			c[n++] = (PushCol){ mx, mz, 0.0f, 0.0f, my - 50.0f, my - 800.0f, mr, 0.0f, 0.0f, 2, false, NULL, true };
+		if (maria_column(&mx, &my, &mz, &mr)) {
+			float ox = s_mwas_ok ? s_mwas[0] : mx, oz = s_mwas_ok ? s_mwas[1] : mz;
+			if (hypotf(mx - ox, mz - oz) > mr)
+				ox = mx, oz = mz;            // longer than her radius: a placing
+			c[n++] = (PushCol){ ox, oz, mx - ox, mz - oz, my - 50.0f, my - 800.0f, mr, 0.0f, 0.0f, 2, false, NULL, true };
+		}
 	}
 	for (int i = 0; i < ENEMY_MAX; i++) {
 		Enemy* e = &s_en[i];
@@ -6292,6 +6300,11 @@ void enemy_update(const EnPlayer* p, float dt)
 {
 	s_dt = dt;
 	s_px = p->x, s_pz = p->z;
+	{   // where Maria's push column starts (enemy_push_apart), as the enemies' below
+		float x, y, z, r;
+		s_mwas_ok = maria_column(&x, &y, &z, &r);
+		s_mwas[0] = x, s_mwas[1] = z;
+	}
 	for (int i = 0; i < ENEMY_MAX; i++) {    // where the push columns start (enemy_push_apart)
 		s_was_ok[i] = s_en[i].used;
 		s_was[i][0] = s_en[i].x, s_was[i][1] = s_en[i].z;
