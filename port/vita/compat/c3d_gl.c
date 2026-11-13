@@ -571,15 +571,18 @@ void C3D_RenderTargetClear(C3D_RenderTarget* t, C3D_ClearBits bits, u32 color, u
 	G.unif_gen++;
 }
 
+static GLint s_vp[4] = { -1, 0, 0, 0 };   // the game's last viewport, for passes that change it mid-frame
+
 void C3D_SetViewport(u32 x, u32 y, u32 w, u32 h)
 {
 	C3D_RenderTarget* t = G.target;
 	if (t && (t->sx != 1.0f || t->sy != 1.0f)) {
-		glViewport((GLint)(x * t->sx + 0.5f), (GLint)(y * t->sy + 0.5f), (GLsizei)(w * t->sx + 0.5f),
-		           (GLsizei)(h * t->sy + 0.5f));
-		return;
+		s_vp[0] = (GLint)(x * t->sx + 0.5f), s_vp[1] = (GLint)(y * t->sy + 0.5f);
+		s_vp[2] = (GLsizei)(w * t->sx + 0.5f), s_vp[3] = (GLsizei)(h * t->sy + 0.5f);
+	} else {
+		s_vp[0] = (GLint)x, s_vp[1] = (GLint)y, s_vp[2] = (GLsizei)w, s_vp[3] = (GLsizei)h;
 	}
-	glViewport(x, y, w, h);
+	glViewport(s_vp[0], s_vp[1], s_vp[2], s_vp[3]);
 }
 
 // The PICA's framebuffer copies. gameover.c keeps a still of the last frame and main.c's
@@ -2476,6 +2479,128 @@ bool vita_touch_to_bottom(int x, int y, u16* px, u16* py)
 	return true;
 }
 
+// Enhanced Edition EnableSoftShadows (Wrappers/d3d8/IDirect3DDevice8.cpp DrawSoftShadows, zlib
+// licence): the PC darkens every pixel inside a volume through the stencil at once, which gives
+// hard-edged shadows that end black where the flashlight's beam fades out. The EE draws the
+// stencil's shadowed pixels into a mask, shrinks it, blurs it four times with four taps half a texel
+// off on each diagonal and lays it over the view as black at the shadow's opacity. The same here, the
+// mask in the view's own alpha (nothing reads the view's alpha after): a second target sharing the
+// view's depth and stencil found them cleared on a console, as the GPU starts a target switched to
+// mid-frame without loading them, and no shadow showed. Blurred at half size each way (the EE's
+// divisor is 1 at 720 lines and 2 at 1440; half keeps the four passes cheaper on the Vita), or a
+// quarter with one pass (Soft Lite). False when it cannot run: the caller
+// darkens through the stencil as before.
+static GLuint s_mask_prog, s_shade_prog, s_alpha_prog;   // built in present_init
+static GLint s_shade_tex, s_shade_alpha, s_mask_v, s_alpha_tex;
+static struct { u16 w, h, div; } SHM;
+// Options, Shadow Quality: 0 hard (the caller's stencil quad), 1 Soft Lite (a quarter size each way, one
+// blur pass: the shrinking's bilinear filter does most of the softening), 2 Soft (the EE's four passes)
+static int s_shq = 2;
+
+void vita_set_shadow_quality(int q) { s_shq = q < 0 ? 0 : q > 2 ? 2 : q; }
+static struct { C3D_RenderTarget rt; C3D_Tex tex; } SHA, SHB;
+
+static void sh_free(void)
+{
+	C3D_RenderTarget* t[2] = { &SHA.rt, &SHB.rt };
+	C3D_Tex* x[2] = { &SHA.tex, &SHB.tex };
+	for (int i = 0; i < 2; i++) {
+		if (t[i]->fbo)
+			glDeleteFramebuffers(1, &t[i]->fbo);
+		if (x[i]->gl)
+			glDeleteTextures(1, &x[i]->gl);
+		memset(t[i], 0, sizeof *t[i]);
+		memset(x[i], 0, sizeof *x[i]);
+	}
+	SHM.w = SHM.h = SHM.div = 0;
+}
+
+static void sh_pass(C3D_RenderTarget* to, GLuint tex, float ou, float ov)
+{
+	G.target = NULL;
+	bind_target(to);
+	glViewport(0, 0, to->gl_w, to->gl_h);
+	quad_state();
+	glUseProgram(s_fx4_prog);
+	glUniform1i(s_fx4_tex, 0);
+	glUniform1f(s_fx4_alpha, 1.0f);
+	glUniform4f(s_fx4_off, ou, ov, ou, -ov);   // the four diagonal taps: (-,-), (-,+), (+,-), (+,+)
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+bool vita_soft_shadow(float alpha)
+{
+	half_fog_end();
+	C3D_RenderTarget* m = G.target;
+	if (s_shq == 0 || !m || !m->depth_rb || !m->tex || !s_mask_prog || !s_shade_prog || !s_fx4_prog || !s_alpha_prog)
+		return false;
+	int div = s_shq == 1 ? 4 : 2, passes = s_shq == 1 ? 1 : 4;
+	int w = m->gl_w, h = m->gl_h, hw = w / div, hh = h / div;
+	if (SHM.w != w || SHM.h != h || SHM.div != div) {
+		sh_free();
+		fx_target(&SHA.rt, &SHA.tex, hw, hh);
+		fx_target(&SHB.rt, &SHB.tex, hw, hh);
+		SHM.w = (u16)w, SHM.h = (u16)h, SHM.div = (u16)div;
+	}
+	// the mask in the view's alpha, on the view itself while its stencil holds the counts: 0, then 1
+	// where the count is past the 0x80 the frame starts with
+	G.target = NULL;
+	bind_target(m);
+	glViewport(0, 0, w, h);
+	quad_state();
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+	glUseProgram(s_mask_prog);
+	glUniform1f(s_mask_v, 0.0f);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_LESS, 0x80, 0xff);
+	glStencilMask(0x00);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	glUniform1f(s_mask_v, 1.0f);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisable(GL_STENCIL_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	// shrunk (bilinear) from the view's alpha into the small target's red, then the blur passes
+	G.target = NULL;
+	bind_target(&SHA.rt);
+	glViewport(0, 0, hw, hh);
+	quad_state();
+	glUseProgram(s_alpha_prog);
+	glUniform1i(s_alpha_tex, 0);
+	glBindTexture(GL_TEXTURE_2D, m->tex->gl);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	float ou = 0.5f / hw, ov = 0.5f / hh;
+	for (int i = 0; i < passes; i++)
+		sh_pass(i & 1 ? &SHA.rt : &SHB.rt, i & 1 ? SHB.tex.gl : SHA.tex.gl, ou, ov);
+	C3D_Tex* blurred = passes & 1 ? &SHB.tex : &SHA.tex;
+	// laid over the view: black, the mask's coverage times the shadow's opacity
+	G.target = NULL;
+	bind_target(m);
+	glViewport(0, 0, w, h);
+	quad_state();
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glUseProgram(s_shade_prog);
+	glUniform1i(s_shade_tex, 0);
+	glUniform1f(s_shade_alpha, alpha);
+	glBindTexture(GL_TEXTURE_2D, blurred->gl);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, FX_POS);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, FX_UV);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	if (s_vp[0] >= 0)                    // the game's viewport back for its next draws
+		glViewport(s_vp[0], s_vp[1], s_vp[2], s_vp[3]);
+	G.unif_gen++;                        // the game's programs set their uniforms again
+	return true;
+}
+
 static const char PRESENT_VS[] =
 	"void main(float2 pos, float2 uv, out float4 gl_Position : POSITION, out float2 o_uv : TEXCOORD0)\n"
 	"{ gl_Position = float4(pos, 0.0, 1.0); o_uv = uv; }\n";
@@ -2491,8 +2616,41 @@ static const char FX4_FS[] =
 	"{ float3 c = tex2D(tex, o_uv - off.xy).rgb + tex2D(tex, o_uv - off.zw).rgb + tex2D(tex, o_uv + off.zw).rgb +\n"
 	"tex2D(tex, o_uv + off.xy).rgb; return float4(c * 0.25, alpha); }\n";
 
+// The soft shadows' mask and its laying over the view (vita_soft_shadow)
+static const char MASK_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform float v) : COLOR { return float4(v, v, v, v); }\n";
+static const char ALPHA_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex) : COLOR { float a = tex2D(tex, o_uv).a; return float4(a, a, a, 1.0); }\n";
+static const char SHADE_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float alpha) : COLOR\n"
+	"{ return float4(0.0, 0.0, 0.0, tex2D(tex, o_uv).r * alpha); }\n";
+static GLuint quad_prog(const char* fs, const char* what)
+{
+	GLuint p = glCreateProgram();
+	if (!link(p, compile(GL_VERTEX_SHADER, PRESENT_VS), compile(GL_FRAGMENT_SHADER, fs))) {
+		vita_log("%s program not built", what);
+		glDeleteProgram(p);
+		return 0;
+	}
+	glBindAttribLocation(p, 0, "pos");
+	glBindAttribLocation(p, 1, "uv");
+	glLinkProgram(p);
+	return p;
+}
+
 static void present_init(void)
 {
+	s_mask_prog = quad_prog(MASK_FS, "shadow mask");
+	if (s_mask_prog)
+		s_mask_v = glGetUniformLocation(s_mask_prog, "v");
+	s_alpha_prog = quad_prog(ALPHA_FS, "shadow shrink");
+	if (s_alpha_prog)
+		s_alpha_tex = glGetUniformLocation(s_alpha_prog, "tex");
+	s_shade_prog = quad_prog(SHADE_FS, "shadow shade");
+	if (s_shade_prog) {
+		s_shade_tex = glGetUniformLocation(s_shade_prog, "tex");
+		s_shade_alpha = glGetUniformLocation(s_shade_prog, "alpha");
+	}
 	s_present_prog = glCreateProgram();
 	if (!link(s_present_prog, compile(GL_VERTEX_SHADER, PRESENT_VS), compile(GL_FRAGMENT_SHADER, PRESENT_FS))) {
 		vita_log("present program not built");

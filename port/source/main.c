@@ -4477,6 +4477,8 @@ static void options_apply(void)
 	vita_res_save(s_opt.res);
 	extern void vita_set_trilinear(bool on);
 	vita_set_trilinear(s_opt.trilinear != 0);
+	extern void vita_set_shadow_quality(int q);
+	vita_set_shadow_quality(s_opt.shadow_q);
 #else
 	picture_set_soft(s_opt.picture == 0);
 #endif

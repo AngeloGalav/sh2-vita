@@ -55,6 +55,7 @@ typedef struct {
 	u8 res;              // the Vita: 0 the display's 960 x 544, 1 720 x 416
 	u8 trilinear;        // the Vita: 0 bilinear within a level, 1 trilinear between levels
 	u8 fog_size;         // the Vita: the fog's target, a half, a third or a quarter of the view each way
+	u8 shadow_q;         // the Vita: 0 hard (the PC's), 1 soft at a quarter size, 2 soft as the Enhanced Edition
 	u8 filters;          // the Vita: the PC's 2D filters in the scenes that use them (main.c filters_frame)
 	u8 shot_light;       // the room lit by a gunshot (0x509f40), on as the PC has it; the row is the port's
 	u8 vita_cam;         // the Vita: 2, the camera was put back on Original after a build moved it

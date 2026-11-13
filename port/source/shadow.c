@@ -1285,7 +1285,14 @@ void shadow_draw(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* ortho)
 	C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
 	C3D_StencilTest(S.debug != 3, S.debug == 2 || S.debug >= 5 ? GPU_NOTEQUAL : S.debug == 4 ? GPU_EQUAL : GPU_LESS, 0x80, 0xff, 0x00);
 	C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_KEEP);
-	C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
+#ifdef SH2_VITA
+	// The Enhanced Edition's soft shadows (vita/compat/c3d_gl.c vita_soft_shadow): the same pixels,
+	// blurred, so a shadow fades at its edges as the flashlight's beam does instead of ending hard and
+	// black. The debug modes keep the plain quad.
+	extern bool vita_soft_shadow(float alpha);
+	if (S.debug != 0 || !vita_soft_shadow(S.strength))
+#endif
+		C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
 	gpucost_px(GC_SHADOW_QUAD, 400.0f * 240.0f, 6);
 
 	C3D_StencilTest(false, GPU_ALWAYS, 0, 0xff, 0x00);

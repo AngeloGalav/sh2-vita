@@ -73,6 +73,7 @@ void opt_defaults(Options* o)
 	o->ps2_flash = o->noise_ps2 = o->ps2_camera = o->cutscene_fov = 1;
 #ifdef SH2_VITA
 	o->fog_size = 1;             // a third each way (c3d_gl.c half_fog_begin)
+	o->shadow_q = 2;             // the Enhanced Edition's soft shadows (c3d_gl.c vita_soft_shadow)
 	o->filters = 1;
 #endif
 	o->hold_stomp = o->swap_attack = 1;
@@ -102,7 +103,7 @@ static const Key s_keys[] = {
 	K("ps2flashlight", ps2_flash, 0, 1), K("ps2noise", noise_ps2, 0, 1), K("ps2camera", ps2_camera, 0, 1),
 	K("cutscenefov", cutscene_fov, 0, 1), K("togglerun", toggle_run, 0, 1), K("holdstomp", hold_stomp, 0, 1),
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
-	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("filters", filters, 0, 1), K("fogsize", fog_size, 0, 2), K("vitacam", vita_cam, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
+	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("filters", filters, 0, 1), K("fogsize", fog_size, 0, 2), K("shadowq", shadow_q, 0, 2), K("vitacam", vita_cam, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
 	K("debughud", dbg_hud, 0, 1), K("perflog", dbg_perflog, 0, 1), K("shadowdebug", dbg_shadows, 0, 6),
 	K("diaglog", dbg_log, 0, 1),
@@ -320,6 +321,10 @@ static const char* const VITA_FILTER[2] = { "Bilinear", "Trilinear" };
 static const char* const VITA_FILTER_L[2] = { "Lighter. A line can show where detail changes.", "Smoothest, and more work for the console." };
 static const char* const VITA_FOGSIZE[3] = { "High", "Medium", "Low" };
 static const char* const VITA_FOGSIZE_L[3] = { "A half of the screen's size each way.", "A third each way.", "A quarter each way: the lightest." };
+static const char* const VITA_SHQ[3] = { "Hard", "Soft Lite", "Soft" };
+static const char* const VITA_SHQ_L[3] = { "Hard edges, as the original game: the lightest.",
+                                           "Soft edges, blurred at a quarter size: a little more work.",
+                                           "Soft edges as the Enhanced Edition: the most work." };
 static const char* const VITA_FX_L[2] = { "Scenes play without their blur: a little lighter.", "The soft focus and motion blur some scenes use." };
 static const char* const VITA_FPS[2] = { "30", "60" };
 static const char* const VITA_FPS_L[2] = { "The steadiest motion.", "Smoother only where the console keeps up." };
@@ -412,6 +417,8 @@ static const Setting SETTINGS[] = {
 	  .what = "The drifting fog.", .lines = VITA_FOG_L },
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Fog Detail", AT(fog_size), .hi = 2, .texts = VITA_FOGSIZE,
 	  .what = "How finely the fog is drawn.", .lines = VITA_FOGSIZE_L },
+	{ .tab = TAB_SYSTEM, .label = -1, .name = "Shadow Quality", AT(shadow_q), .hi = 2, .texts = VITA_SHQ,
+	  .what = "How the flashlight's shadows are edged.", .lines = VITA_SHQ_L },
 	{ .tab = TAB_SYSTEM, .label = -1, .name = "Filters", AT(filters), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "The blur in some scenes.", .lines = VITA_FX_L },
 #else
