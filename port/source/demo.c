@@ -1593,6 +1593,13 @@ static bool lights_frame(const C3D_Mtx* view, float t)
 	return true;
 }
 
+// The scene's copy of the player: James (0x100..0x103), or Maria (0x106, hhh_mar) in Born From a
+// Wish, where she is the one playing (geki, no_answer).
+static bool player_kind(int kind)
+{
+	return (kind >= 0x100 && kind <= 0x103) || (kind == 0x106 && prog_chapter() == 1);
+}
+
 // 0x546550 sets the plane by room (0x495220); 0x546110 keeps a second James at the mirrored position.
 // Stand-ins: that copy only mirrors his position and negates his yaw, where this reflects the whole
 // model, so his sides come out as a mirror's would; the floors that reflect (axis 1: rooms 0x25, 0x26,
@@ -1652,7 +1659,7 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		if (own) {
 			chr_light_ambient(&s_lenv, s_amb[0] * k, s_amb[1] * k, s_amb[2] * k);
 		} else {
-			chrlight_at(p, dc->rec->kind >= 0x100 && dc->rec->kind <= 0x103);
+			chrlight_at(p, player_kind(dc->rec->kind));
 			if (s_light_hook && k != 1.0f)
 				s_light_hook(k);
 		}
@@ -1673,7 +1680,7 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		}
 		chr_draw(dc->model, uBones);
 		C3D_Mtx reflect;
-		if (kind >= 0x100 && kind <= 0x103 && demo_mirror(p, &reflect)) {
+		if (player_kind(kind) && demo_mirror(p, &reflect)) {   // Maria too, in Born From a Wish (0xd5)
 			C3D_Mtx mirrored, mmv;
 			Mtx_Multiply(&mirrored, &reflect, &model);
 			Mtx_Multiply(&mmv, view, &mirrored);
@@ -1717,7 +1724,7 @@ bool demo_has_james(void)
 	if (!S.active)
 		return false;
 	for (int i = 0; i < S.n_chars; i++)
-		if (S.chars[i].model && S.chars[i].rec->kind >= 0x100 && S.chars[i].rec->kind <= 0x103)
+		if (S.chars[i].model && player_kind(S.chars[i].rec->kind))
 			return true;
 	return false;
 }
