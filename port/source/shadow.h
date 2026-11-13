@@ -70,3 +70,5 @@ void shadow_view(const float cam[3], float far);
 // 3 darkens the whole screen, 4 the pixels with an unchanged count, 5 counts on depth pass, 6 off,
 // 7 drop shadows in red, 8 no map volumes.
 void shadow_debug(int mode);
+// The share of the light's cone (of its tangent) inside which shadows show (Debug tab, Shadow Cone).
+void shadow_beam(float share);

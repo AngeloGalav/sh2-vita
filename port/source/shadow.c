@@ -42,6 +42,12 @@
 #define MAX_VERTS (3 * 12288)
 #define DROP_VERTS (3 * 6000)
 #define DROP_CASTERS 16          // the PC's character list (0x1dbe9bc, 16 slots)
+#define CONE_SEG 16              // beam_clip's cone: sides and the far cap
+#define CONE_VERTS (CONE_SEG * 6)
+// beam_clip: the share of the cone's tangent that casts (the Debug tab's Shadow Cone, shadow_beam); 0.95
+// leaves about a tenth of the PC's cookie (1 - tan^2 / tan^2 cone) at the edge
+static float s_beam_tan = 0.95f;
+void shadow_beam(float share) { s_beam_tan = share; }
 
 typedef struct { float x, y, z; u8 c[4]; } DVtx;
 
@@ -66,6 +72,7 @@ static struct {
 	bool full;                   // emit ran out of room: the volume being built is taken back whole
 	float cam[3], far;           // the camera and its far plane (shadow_view): far caps stay inside
 	void* quad;                  // linear memory, the darkening quad
+	V3* cone;                    // linear memory, the beam's cone (beam_clip)
 	bool drop;                   // this frame draws drop shadows instead (shadow_begin_drop)
 	DVtx* dbuf;                  // linear memory, drop shadow triangles
 	int ndv, dcasters;
@@ -127,8 +134,9 @@ bool shadow_init(void)
 	S.uMv = shaderInstanceGetUniformLocation(S.prog.vertexShader, "modelView");
 	S.vbuf = linearAlloc(MAX_VERTS * sizeof(V3));
 	S.quad = linearAlloc(6 * sizeof(V3));
+	S.cone = linearAlloc(CONE_VERTS * sizeof(V3));
 	S.dbuf = linearAlloc(DROP_VERTS * sizeof(DVtx));
-	S.ready = S.vbuf && S.quad && S.dbuf;
+	S.ready = S.vbuf && S.quad && S.dbuf && S.cone;
 	snprintf(S.status, sizeof S.status, "shadow %s", S.ready ? "ready" : "off");
 	return S.ready;
 }
@@ -139,6 +147,8 @@ void shadow_exit(void)
 		linearFree(S.vbuf);
 	if (S.quad)
 		linearFree(S.quad);
+	if (S.cone)
+		linearFree(S.cone);
 	if (S.dbuf)
 		linearFree(S.dbuf);
 	if (S.dvlb) {
@@ -1201,6 +1211,87 @@ static void drop_draw(const C3D_Mtx* proj, const C3D_Mtx* view)
 	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_ALL);
 }
 
+// Shadows only inside the lit part of the beam (the port's own). The PC culls the casters by the
+// light's whole cone (0x444b20) and darkens every pixel in a volume alike; its beam (the cookie
+// 1 - tan^2 / tan^2 cone, main.c spot_cookie) is at half by 0.7 of the cone's tangent and near
+// nothing at the rim, so a volume running past the lit part darkened the dim surroundings where no
+// light falls, and stood out (reported from play). Before the volumes are counted, every pixel whose
+// surface lies outside the cone at s_beam_tan of its tangent, out to RANGE, has its base set to 0, as
+// the characters' are: a count from 0 never passes the darkening's 0x80. Inside: front faces closer
+// than the surface and back faces behind it. Skipped when the eye is inside the cone (no front faces
+// to see) and for the parallel light.
+static void beam_clip(const C3D_Mtx* ortho, const C3D_Mtx* view)
+{
+	V3 A = v3(S.light[0], S.light[1], S.light[2]), D = v3(S.dir[0], S.dir[1], S.dir[2]);
+	float tc = S.cos_cone > 0.01f ? S.sin_cone / S.cos_cone * s_beam_tan : 1.0f, len = RANGE;
+	V3 e = sub(v3(S.cam[0], S.cam[1], S.cam[2]), A);
+	float along = dot(e, D), across2 = dot(e, e) - along * along;
+	if (along > -50.0f && along < len + 50.0f && across2 < (along * tc + 50.0f) * (along * tc + 50.0f))
+		return;                          // the eye is in the cone
+	V3 U = fabsf(D.y) < 0.9f ? v3(0, 1, 0) : v3(1, 0, 0);
+	V3 X = cross(D, U);
+	X = scl(X, 1.0f / sqrtf(dot(X, X)));
+	V3 Y = cross(D, X);
+	V3 C = add(A, scl(D, len)), B[CONE_SEG];
+	float r = len * tc;
+	for (int i = 0; i < CONE_SEG; i++) {
+		float a = i * 6.2831853f / CONE_SEG;
+		B[i] = add(C, add(scl(X, cosf(a) * r), scl(Y, sinf(a) * r)));
+	}
+	int n = 0;
+	V3* v = S.cone;
+	for (int i = 0; i < CONE_SEG; i++) {
+		V3 p = B[i], q = B[(i + 1) % CONE_SEG];
+		V3 side[3] = { A, p, q }, cap[3] = { C, q, p };
+		V3* tri[2] = { side, cap };
+		V3 out[2] = { sub(scl(add(p, q), 0.5f), add(A, scl(D, dot(sub(scl(add(p, q), 0.5f), A), D)))), D };
+		for (int k = 0; k < 2; k++) {        // wound to face out (counter-clockwise from outside)
+			V3* t = tri[k];
+			if (dot(cross(sub(t[1], t[0]), sub(t[2], t[0])), out[k]) < 0.0f) {
+				V3 x = t[1];
+				t[1] = t[2], t[2] = x;
+			}
+			v[n++] = t[0], v[n++] = t[1], v[n++] = t[2];
+		}
+	}
+	GSPGPU_FlushDataCache(S.cone, n * sizeof(V3));
+	C3D_BufInfo* bi = C3D_GetBufInfo();
+	BufInfo_Init(bi);
+	BufInfo_Add(bi, S.cone, sizeof(V3), 1, 0x0);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, S.uMv, view);
+	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_COLOR);   // colour kept by the blend ZERO, ONE
+	// front faces closer than the surface: 0x80 -> 0x81
+	C3D_StencilTest(true, GPU_EQUAL, 0x80, 0xff, 0xff);
+	C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_INCR);
+	C3D_CullFace(GPU_CULL_BACK_CCW);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, n);
+	// back faces closer than the surface (it lies past the cone): back to 0x80
+	C3D_StencilTest(true, GPU_EQUAL, 0x81, 0xff, 0xff);
+	C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_DECR);
+	C3D_CullFace(GPU_CULL_FRONT_CCW);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, n);
+	C3D_CullFace(GPU_CULL_NONE);
+	// over the screen: 0x80 (outside) -> 0, 0x81 (inside) -> 0x80
+	V3* q = S.quad;
+	q[0] = v3(0, 0, 0.5f), q[1] = v3(400, 0, 0.5f), q[2] = v3(400, 240, 0.5f);
+	q[3] = v3(0, 0, 0.5f), q[4] = v3(400, 240, 0.5f), q[5] = v3(0, 240, 0.5f);
+	GSPGPU_FlushDataCache(S.quad, 6 * sizeof(V3));
+	bi = C3D_GetBufInfo();
+	BufInfo_Init(bi);
+	BufInfo_Add(bi, S.quad, sizeof(V3), 1, 0x0);
+	C3D_Mtx id;
+	Mtx_Identity(&id);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, S.uMv, &id);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, S.uProj, ortho);
+	C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
+	C3D_StencilTest(true, GPU_EQUAL, 0x80, 0xff, 0xff);
+	C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_ZERO);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
+	C3D_StencilTest(true, GPU_EQUAL, 0x81, 0xff, 0xff);
+	C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_DECR);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
+}
+
 void shadow_draw(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* ortho)
 {
 	if (S.drop)
@@ -1247,6 +1338,16 @@ void shadow_draw(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* ortho)
 		C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_COLOR);   // blend ZERO, ONE: the colour stays
 		env = C3D_GetTexEnv(0);
 		C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
+	}
+	if (!S.parallel && S.debug == 0) {
+		beam_clip(ortho, view);
+		// the volumes' buffer and matrices back
+		bi = C3D_GetBufInfo();
+		BufInfo_Init(bi);
+		BufInfo_Add(bi, S.vbuf, sizeof(V3), 1, 0x0);
+		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, S.uProj, proj);
+		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, S.uMv, view);
+		C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_COLOR);
 	}
 	C3D_StencilTest(true, GPU_ALWAYS, 0, 0xff, 0xff);
 	bool zpass = S.debug == 5;

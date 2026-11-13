@@ -4498,6 +4498,7 @@ static void debug_apply(void)
 		// a time: No Map (8), No Props (9), No Chars (10), in shadow.c's modes
 		static const u8 mode[7] = { 0, 1, 7, 6, 8, 9, 10 };
 		shadow_debug(s_opt.dbg_shadows ? mode[s_opt.dbg_shadows < 7 ? s_opt.dbg_shadows : 0] : s_dbg_txt_shadow);
+		shadow_beam(0.80f + 0.05f * (s_opt.dbg_cone < 7 ? s_opt.dbg_cone : 3));
 	}
 	int map_test = s_opt.dbg_maptest < MAP_TESTS ? s_opt.dbg_maptest : 0;
 	if (map_test != s_map_test)
