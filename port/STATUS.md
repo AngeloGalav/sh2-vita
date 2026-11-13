@@ -309,7 +309,7 @@ Ordered by weight. Each line names where the work starts.
 - Memos: the text's position is wrong while reading them. Later.
 - Sound events: the stages' sounds at a room's load (Stage_Data +0x3c: 0x59fe40, 0x59d1b0, 0x593c90, 0x58bff0, 0x582ee0,
   0x57e840, 0x57dab0, the endings') and the forest's and the hospital's timed ones (0x59fec0, 0x58c040) are in
-  (`prog_stagefn.c`). Still missing from the per-frame code: stages 12, 25, 26, 28 (0x9c73), 30, 32, 41, 42. Some already heard on a console (the dog's bark); the rest not checked.
+  (`prog_stagefn.c`). Per-frame sounds now in too (`frame_sounds`, `room_enter`): stage 25 room 0x55 (0x589fa0, until 224), 26 room 0x47 (0x588bf0: it drifts at 1000 a second), 28 room 0x5d (0x587c40: 0x9c73, louder the lower James is), 32 room 0x72 (0x5847f0), 41 room 0x9f (0x57a4a0: 541 and a line across the room, 542; it runs along x) and 42 room 0xa3 (0x578950: once, 550, walking north past a spot faster than 0.4 m/s). Not run on a console. Still missing: stage 12 room 0x21 (0x596660: two sounds' fades and flag 526 when one ends) and stage 30 room 0x65 (0x587780: 0x4278 fades in while a 0x1f7d3e4 bit is off); those stages' model and light switches are not sounds. Some already heard on a console (the dog's bark); the rest not checked.
 - A gunshot lights the room and the characters for five frames (0x509f40, 0x47a540, 0x508060; `combat_shot_light`), with
   the port's own row Gunshot Light to turn it off. Works on a console.
 - Yes/No questions (the hotel elevator, "Jump down?"): on the Vita the question's last page now shows once, where messages are, with its answers in a row under it (`p_choice`, the PC's ff f6 box). Works on a console.

@@ -209,6 +209,8 @@ static void hospital_sounds(int room, const float* me, float dt)
 	}
 }
 
+static float s_t25, s_t28, s_t32, s_mv[3], s_mv_dir;   // 0x1d862f8, 0x1d862bc, 0x1f83780; a moving sound
+
 static void frame_sounds(int stage, int room, const float* me, float yaw, float dt)
 {
 	static float s_boiler_t;
@@ -251,11 +253,92 @@ static void frame_sounds(int stage, int room, const float* me, float yaw, float 
 			p_set(161);
 		}
 		break;
-	case 28:                             // 0x587c40, room 0x5c
+	case 28:                             // 0x587c40, room 0x5c; room 0x5d: a sound below, louder the lower James is
+		if (room == 0x5d) {
+			s_t28 -= dt;
+			if (s_t28 < 0.0f) {
+				float at[3] = { frand() * 2500.0f - 11520.0f - 1250.0f, 42670.0f, frand() * 2500.0f + 40151.7f - 1250.0f };
+				float v = 1.0f - (35000.0f - me[1]) * 2.857143e-5f;
+				v = v < 0.2f ? 0.2f : v > 1.0f ? 1.0f : v;
+				sfx_play_at(0x9c73, v * 0.5f, at);
+				s_t28 = ((1.0f - v) * 12.5f + 2.0f) * frand() + 1.5f;
+			}
+		}
 		if (room == 0x5c && !p_flag(551) && me[0] > -19600.0f) {
 			static const float at[3] = { -22000.0f, -500.0f, -18900.0f };   // 0x8d7664
 			sfx_play_at(0x4982, 1.0f, at);
 			p_set(551);
+		}
+		break;
+	case 25:                             // 0x589fa0, room 0x55 until 224: a sound somewhere round James
+		if (room == 0x55 && !p_flag(224)) {
+			s_t25 -= dt;
+			if (s_t25 < 0.0f) {
+				float a = frand() * 6.2831855f;
+				float at[3] = { sinf(a) * 1000.0f + me[0], me[1] - 500.0f, cosf(a) * 1000.0f + me[2] };
+				sfx_play_at(0x9cb3, 0.8f, at);
+				s_t25 = frand() * 0.6f + 3.2f;
+			}
+		}
+		break;
+	case 26:                             // 0x588bf0, room 0x47: now and then a sound that drifts by
+		if (room != 0x47)
+			break;
+		if (sfx_playing(0x9cc7)) {
+			s_mv[0] += sinf(s_mv_dir) * 1000.0f * dt;
+			s_mv[2] += cosf(s_mv_dir) * 1000.0f * dt;
+			sfx_move(0x9cc7, s_mv);
+		} else if (me[1] > 0.0f && frand() < dt * 30.0f / 128.0f) {   // (rand & 0x7f) == 0 a 30 fps frame
+			s_mv[0] = frand() * 4000.0f - 62000.0f;
+			s_mv[1] = 2000.0f;
+			s_mv[2] = -219000.0f - sinf(frand() * 1.5707964f) * 3000.0f;
+			float v = me[1] * 0.0005f;
+			sfx_play_at(0x9cc7, v > 0.0001f ? v : 0.0001f, s_mv);
+			s_mv_dir = frand() * 6.2831855f;
+		}
+		break;
+	case 32:                             // 0x5847f0, room 0x72: a sound that comes back at a new spot
+		if (room == 0x72) {
+			s_t32 -= dt;
+			sfx_move(0x4682, s_mv);
+			if (s_t32 < 0.0f) {
+				s_mv[0] = frand() * 12000.0f - 146000.0f;
+				s_mv[1] = -500.0f;
+				s_mv[2] = frand() * 21600.0f + 10400.0f;
+				s_t32 = frand() * 10.0f + 5.0f;   // the PC picks a first wait (0x448810 & 3) and overwrites it
+				sfx_play_at(0x4682, 1.0f, s_mv);
+			}
+		}
+		break;
+	case 41:                             // 0x57a4a0, room 0x9f: 541 (one time in four) and James on a line
+		if (room == 0x9f) {
+			if (p_flag(541) && !p_flag(542) && fabsf(me[2] - s_thr) < 50.0f) {
+				s_mv[0] = 18750.0f, s_mv[1] = -250.0f, s_mv[2] = -22350.0f;   // 0x57a410
+				sfx_play_at(0x9cef, 1.0f, s_mv);
+				p_set(542);
+			}
+			if (sfx_playing(0x9cef)) {   // it runs along x at 750 a second
+				s_mv[0] += dt * 750.0f;
+				sfx_move(0x9cef, s_mv);
+			}
+		}
+		break;
+	case 42:                             // 0x578950, room 0xa3: once, walking north past a spot (550)
+		{
+			// and the player's +0xa8 (speed, metres a second, as forest_sounds reads it) over 0.4
+			static float last[2];
+			static int last_room = -1;
+			float sp = last_room == room ? hypotf(me[0] - last[0], me[2] - last[1]) / dt / 1000.0f : 0.0f;
+			last[0] = me[0], last[1] = me[2], last_room = room;
+			float y = yaw;
+			while (y > 3.1415927f) y -= 6.2831855f;
+			while (y < -3.1415927f) y += 6.2831855f;
+			if (room == 0xa3 && !p_flag(550) && me[2] > 20750.0f && me[0] < 16800.0f &&
+			    y > -0.7853982f && y < 0.7853982f && sp > 0.4f) {
+				static const float at[3] = { 17600.0f, -500.0f, 18800.0f };   // 0x8cc2e0
+				sfx_play_at(0x9cf8, 0.3f, at);
+				p_set(550);
+			}
 		}
 		break;
 	case 31:                             // 0x585bb0, room 0x73: a sound now and then past a spot
@@ -405,9 +488,22 @@ static void room_enter(int stage, int room)
 			}
 		}
 		break;
-	case 41:                             // 0x57a410: one time in four
-		if (room == 0x9f && (p_rand() & 3) == 0)
-			p_set(541);
+	case 41:                             // 0x57a410: one time in four, and the line James must cross
+		if (room == 0x9f) {
+			if ((p_rand() & 3) == 0)
+				p_set(541);
+			s_thr = (frand() * 32.0f + 431.0f) * -50.0f;
+		}
+		break;
+	case 25:                             // 0x589f90
+		s_t25 = 0.0f;
+		break;
+	case 28:                             // 0x587c20
+		s_t28 = frand() * 2.0f + 2.0f;
+		break;
+	case 32:                             // 0x5847c0
+		if (room == 0x72)
+			s_t32 = frand() * 5.0f + 10.0f;
 		break;
 	case 16:
 		// 0x591340: back at Heaven's Night after Maria's second wait at the bowling alley (163)
