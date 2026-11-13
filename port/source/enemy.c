@@ -1683,10 +1683,12 @@ static void move_exec(Enemy* e, float adv, float dt)
 	float nx = e->x + mx, nz = e->z + mz;
 	// Port stand-in for the kinds without a push column yet (push_column): an upright enemy stops at
 	// James' collision radius (130) plus its own. The others meet James in enemy_push_apart, as on
-	// the PC, whose enMoveExec never looks at him.
+	// the PC, whose enMoveExec never looks at him. Not the Mandarin: it hangs under the floor and
+	// James walks over it. The stop put it back on a ring 370 from him at every step towards him, so
+	// it slid along with him at his speed and stayed in its strike's reach (console, 2026-11-13).
 	float mind = 130.0f + e->size * 0.8f;
 	float dx = nx - s_px, dz = nz - s_pz, d = sqrtf(dx * dx + dz * dz);
-	if (!push_column(e, NULL, NULL) && d < mind && d < hypotf(e->x - s_px, e->z - s_pz) &&
+	if (!push_column(e, NULL, NULL) && e->kind != EN_KIND_ARM && d < mind && d < hypotf(e->x - s_px, e->z - s_pz) &&
 	    (!enemy_is_down(e) || e->kind == EN_KIND_TYU)) {
 		if (d < 1.0f) return;
 		nx = s_px + dx / d * mind;
