@@ -476,6 +476,14 @@ static void free_textures(void)
 
 void map_set_open_zoomed(bool in) { s_open_in = in; }
 
+bool map_area_known(const MapPlayer* p)
+{
+	if (!s_ready)
+		return false;
+	int m = james_map(bgm_room_id(p->glb_crd, p->x, p->z), p->x, p->y, p->z);
+	return m > 0 && m < N_MAPS && available(m);
+}
+
 int map_open(const MapPlayer* p)
 {
 	if (!s_ready)

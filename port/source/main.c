@@ -3585,19 +3585,35 @@ static bool s_memo_dirty;
 
 static bool screens_open(void) { return map_is_open() || s_memo_open; }
 
-// The PC's map key (0x48ef03): in a dark room the map needs the flashlight (item 18, switched on,
-// not taken away by flags 272 / 625), except in room 0xaa.
+// The PC's map key (EventMain 0x48ecb0, at 0x48ef03): the map reads when the room isn't dark
+// (0x47b1f0), the flashlight is on (0x48c840: item 18 switched on, flags 272 / 625 clear), in Born
+// From a Wish (gChapterID 1), when 0x507e00 finds James lit (flag 625, map 0xb00bd) or in room 0xaa.
+// Not ported: 0x507e00's third case, James in the list 0x507f00 fills while he is drawn with a light
+// over 0.1. chrlight_lit (every room light at his feet) answered yes in nearly every dark room on a
+// console (2026-11-13): the map always opened.
+static bool map_readable(void)
+{
+	if (!s_env.dark || (flash_lit() && !ev_flag(272) && !ev_flag(625)) || prog_chapter() == 1)
+		return true;
+	if (ev_flag(625) || s_env.map_id == 0xb00bd)
+		return true;
+	return bgm_room_id(ev_glb_crd(), s_px, s_pz) == 0xaa;
+}
+
 static void open_map(void)
 {
-	bool light = s_flash_on && ev_have_item(18) && !ev_flag(272) && !ev_flag(625);
-	if (s_env.dark && !light && bgm_room_id(ev_glb_crd(), s_px, s_pz) != 0xaa) {
+	if (!map_readable()) {
 		show_message(ev_system_message(2));        // "It's too dark to read the map."
 		return;
 	}
 	MapPlayer mp = { s_px, s_py, s_pz, s_yaw, ev_glb_crd(), prog_chapter() };
-	int r = map_open(&mp);
-	if (r != MAP_OPEN)
+	// With no map of the area only the message shows. The PC's 0x49de50 (states 3, 4) would open the
+	// town map once it is closed (flag 24); the port does not, asked for from play (2026-11-13).
+	if (!map_area_known(&mp)) {
 		show_message(ev_system_message(3));        // "I don't have a map of this area."
+		return;
+	}
+	int r = map_open(&mp);
 	if (r != MAP_NONE)
 		sfx_play(0x2b17, 1.0f, 0.0f);
 #ifdef SH2_VITA
@@ -3747,8 +3763,7 @@ static bool screens_update(u32 down, u32 held, const circlePosition* cp, float d
 {
 	prog_overlay_memo(s_memo_open && s_memo_view != 0 ? s_memo_cur : -1);   // 0x49a210 (prog_overlay.c)
 	touchui_map(map_is_open());      // the map screen's buttons on the touch screen
-	touchui_map_readable(!s_env.dark || (s_flash_on && ev_have_item(18) && !ev_flag(272) && !ev_flag(625)) ||
-	                     bgm_room_id(ev_glb_crd(), s_px, s_pz) == 0xaa);   // as open_map
+	touchui_map_readable(map_readable());   // as open_map
 	if (!screens_open()) {
 		bool free = !prog_running() && !s_inv_open && !s_msg_page && !s_save_prompt && !s_warp_pending;
 		if (free && ((down & KEY_TOUCH) || (s_gdown & GK_MAP)))
