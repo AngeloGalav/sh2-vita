@@ -1656,7 +1656,10 @@ static void move_exec(Enemy* e, float adv, float dt)
 	else if (e->kind == EN_KIND_ONI)
 		stride = e->anim == 1 ? 9.6f : 0.0f;    // feet 12 / 13 (0x892798)
 	else if (e->kind == EN_KIND_ARM)
-		stride = e->anim >= 2 && e->anim <= 5 ? 34.7f : 0.0f;   // a planted hand: about 590 a step
+		// a planted hand: about 590 a step (anime 2, 3). 0x4a6e40 holds the body to the planted hand;
+		// the strikes (4, 5) swing the other arm and stay where they are. They carried the step's
+		// 590 too, so every strike crawled it after James and kept him in reach (console 2026-11-13)
+		stride = e->anim == 2 || e->anim == 3 ? 34.7f : 0.0f;
 	else if (e->anim == 0 || e->anim == A_WALK)
 		stride = e->kind == EN_KIND_MKN ? MKN_WALK_STRIDE : SCU_WALK_STRIDE;
 	else if (e->kind == EN_KIND_MKN)
@@ -4758,16 +4761,23 @@ static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 		if (e->attacking) {
 			float f = frame_in(e);
 			if (f <= 16.0f) swing_hit(e, p, e->anim == 4 ? 0x46 : 0x47, 10.0f, 450.0f + 300.0f, 1.0f);
+			if (e->attack_hit || e->maria_hit)
+				e->flags &= ~EF_STRIKE;          // 0x4a6000: the strike landed
 		}
 		if (e->anim_end) {
+			// 0x4acc00: a strike decision counts up +0xd1, any other clears it. Out of tracking or
+			// striking, a change of mind, a strike that landed (bit 4 clear: none pending) or a fifth
+			// strike in a row turns it away for 180 ticks (3 s) of plain crawling.
 			int d = arm_decide(e, p);
 			int s = d == 0 ? 1 : d == 1 ? (e->timer == 0 ? 2 : 1) : 3;
-			if (s == 3) e->amb_n++;
-			if ((e->slv > 1 && s != e->slv && s < 3) || e->amb_n > 4) {
+			e->amb_n = s == 3 ? e->amb_n + 1 : 0;
+			if ((e->slv > 1 && ((s != e->slv && s < 3) || !(e->flags & EF_STRIKE))) || e->amb_n > 4) {
 				set_timer(e, 180);
 				e->amb_n = 0;
-				if (s == 3) s = 1;
+				s = 1;
 			}
+			if (s == 3)
+				e->flags |= EF_STRIKE;           // 0x4a5fe0
 			e->slv = s;
 			e->ival = e->ival == 0 ? 1 : 0;   // the hands take turns
 			e->attacking = s == 3;

@@ -12,6 +12,8 @@
 #define ENEMY_MAX 24
 
 // What the enemies need to know about James each frame.
+#define EF_STRIKE 4u   // 0x4a5fe0 sets it as an attack starts, 0x4a6000 clears it when it lands
+
 typedef struct {
 	float x, y, z, yaw;      // feet position (Y down), facing (forward = sin yaw, cos yaw)
 	bool light;              // flashlight on
@@ -75,7 +77,8 @@ typedef struct {
 	u8 type;                 // EnLOCAL +4 behaviour bits (0x10 crawler, 0x08 wait, 0xff no recovery)
 	u8 lie;                  // 0 face down, 1 face up (EnLOCAL +6)
 	int last_atk;            // attack id of the last hit (EnLOCAL +8)
-	u32 flags;               // EnLOCAL +0x10 bits used here: 0x200 straight crawl, 0x2000 timer tick
+	u32 flags;               // EnLOCAL +0x10 bits used here: 4 a strike not landed yet (EF_STRIKE),
+	                         // 0x200 straight crawl, 0x2000 timer tick
 	float x, y, z, yaw;      // position (feet) and facing
 	float path_angle, mark_angle;   // EnPATH angle / markangle
 	float stx, stz, tx, tz;  // wander start point and target
