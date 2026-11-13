@@ -104,7 +104,7 @@ static const Key s_keys[] = {
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
 	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("filters", filters, 0, 1), K("fogsize", fog_size, 0, 2), K("vitacam", vita_cam, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
-	K("debughud", dbg_hud, 0, 1), K("perflog", dbg_perflog, 0, 1), K("shadowdebug", dbg_shadows, 0, 1),
+	K("debughud", dbg_hud, 0, 1), K("perflog", dbg_perflog, 0, 1), K("shadowdebug", dbg_shadows, 0, 6),
 	K("diaglog", dbg_log, 0, 1),
 };
 
@@ -245,7 +245,13 @@ static const char* const DBG_CAM_L[2] = { "Set On to save.",
                                           "Written to camtrace.txt now: the camera's last minute of play." };
 static const char* const DBG_PERF_L[2] = { "No performance log.",
                                            "Frame times, loads and freezes written to perf.txt (and stall.txt)." };
-static const char* const DBG_SHD_L[2] = { "Shadows as in the game.", "Shadow volumes drawn in red, to see a broken one." };
+static const char* const DBG_SHD_T[7] = { "Off", "Volumes", "Drop", "None", "No Map", "No Props", "No Chars" };
+static const char* const DBG_SHD_L[7] = { "Shadows as in the game.", "Shadow volumes drawn in red, to see a broken one.",
+                                          "The lit rooms' drop shadows drawn in red.",
+                                          "No shadows at all: a dark shape that stays is not a shadow.",
+                                          "No shadows from the map's own walls and pillars.",
+                                          "No shadows from props (furniture, doors, objects).",
+                                          "No shadows from James or the other characters." };
 static const char* const DBG_LOG_L[2] = { "Only errors go to vita_log.txt.",
                                           "Draw, memory, fog and audio statistics each second in vita_log.txt." };
 static const char* const SHOT_L[2] = { "Shots light nothing.", "The room and whoever is near flash with each shot, as in the original." };
@@ -423,8 +429,8 @@ static const Setting SETTINGS[] = {
 	  .what = "Frame time and test readouts on screen.", .lines = DBG_HUD_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Performance Log", AT(dbg_perflog), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "Frame times and freezes, for a bug report.", .lines = DBG_PERF_L },
-	{ .tab = TAB_DEBUG, .label = -1, .name = "Shadow Volumes", AT(dbg_shadows), .hi = 1, .texts = OFF_ON_TEXT,
-	  .what = "Draws the shadows' shapes in red.", .lines = DBG_SHD_L },
+	{ .tab = TAB_DEBUG, .label = -1, .name = "Shadow Volumes", AT(dbg_shadows), .hi = 6, .texts = DBG_SHD_T,
+	  .what = "Draws the shadows' shapes in red, or turns them off.", .lines = DBG_SHD_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Diagnostic Log", AT(dbg_log), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "Statistics in vita_log.txt each second.", .lines = DBG_LOG_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Map Test", AT(dbg_maptest), .hi = 6, .texts = DBG_MAP_T,

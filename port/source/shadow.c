@@ -74,7 +74,8 @@ static struct {
 	u8 dcol;                     // their grey
 	float dcam[3];
 	char status[64];
-	int debug;                   // shadow_debug(): 1 volumes in red, 2 darken every changed count
+	int debug;                   // shadow_debug(): 1 volumes in red, 2 darken every changed count;
+	                             // 8 / 9 / 10 no map / prop / character (James too) volumes
 } S;
 
 static V3 v3(float x, float y, float z) { V3 r = { x, y, z }; return r; }
@@ -508,6 +509,8 @@ static void cast_at(const Character* c, const Mtx34* model, const float pos[3])
 
 void shadow_cast(const Character* c, const float pos[3], float yaw)
 {
+	if (S.debug == 10 && !S.drop)
+		return;
 	Mtx34 m;
 	model_at(&m, pos, yaw);
 	cast_at(c, &m, pos);
@@ -525,7 +528,7 @@ static bool placed_excluded(int kind)
 void shadow_cast_placed(const Character* c, const C3D_Mtx* model, int kind)
 {
 	// 0x50b5d0 / 0x50b770 add kinds 0x400..0x5ff through 0x50b210 when the model table gives a .kg1
-	if (kind < 0x400 || kind > 0x5ff || !c->kg1 || placed_excluded(kind))
+	if (kind < 0x400 || kind > 0x5ff || !c->kg1 || placed_excluded(kind) || (S.debug == 9 && !S.drop))
 		return;
 	Mtx34 m;
 	c3d_to34(&m, model);
@@ -550,7 +553,7 @@ void shadow_cast_james(const Character* c, const float pos[3], float yaw, const 
 		S.cast_ticks += svcGetSystemTick() - t0;
 		return;
 	}
-	if (!S.on || S.parallel || !light)
+	if (!S.on || S.parallel || !light || S.debug == 10)
 		return;
 	cast(c, &m, v3(light[0], light[1], light[2]), false, false);
 }

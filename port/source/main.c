@@ -4477,7 +4477,11 @@ static void debug_apply(void)
 {
 	s_debug_hud = s_opt.dbg_hud || s_dbg_txt_hud;
 	perf_set_log(s_opt.dbg_perflog || s_perflog, s_memlog || s_memtest);
-	shadow_debug(s_opt.dbg_shadows ? 1 : s_dbg_txt_shadow);
+	{   // the Debug tab's Shadow Volumes: Off, Volumes (1), Drop (7), None (6), and one source off at
+		// a time: No Map (8), No Props (9), No Chars (10), in shadow.c's modes
+		static const u8 mode[7] = { 0, 1, 7, 6, 8, 9, 10 };
+		shadow_debug(s_opt.dbg_shadows ? mode[s_opt.dbg_shadows < 7 ? s_opt.dbg_shadows : 0] : s_dbg_txt_shadow);
+	}
 	int map_test = s_opt.dbg_maptest < MAP_TESTS ? s_opt.dbg_maptest : 0;
 	if (map_test != s_map_test)
 		perf_event("maptest", "mode %d: %s", map_test, MAP_TEST_NAME[map_test]);
