@@ -2037,7 +2037,8 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 			free_moves(b, cp, held, dt);
 			return false;
 		}
-		if (action_down && s_stompable && s_weapon != W_KNIFE && move_can_aim() && !s_maria) {
+		// Maria too (Born From a Wish), with what she stomps with when aiming (not her knife).
+		if (action_down && s_stompable && (s_weapon <= W_SPRAY || is_bare() || is_gun()) && move_can_aim()) {
 			if (s_hold_to_stomp) {
 				s_free_charge = 0.0f;
 			} else {
