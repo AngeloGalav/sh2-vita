@@ -1,5 +1,6 @@
 #include "chrlight.h"
 #include "maria.h"
+#include "shadow.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -219,6 +220,10 @@ static bool load(void)
 		chr_free(&s_chr);
 		return false;
 	}
+	// Her shadow: the game's lll_mar.kg1 is empty and the PC casts none for her; the port gives her the
+	// cutscene model's hull, as CharaDataLoadExec (0x493260) does for the playable Maria (hhh_mar.kg1)
+	snprintf(path, sizeof path, "%s/hhh_mar.kg1", dir);
+	chr_load_kg1(&s_chr, path);
 	s_loaded = true;
 	return true;
 }
@@ -571,6 +576,8 @@ void maria_draw(const C3D_Mtx* view, int uModelView, int uBones)
 	chr_pose_loop(&s_chr, &s_anim, M.frame, t->loop ? t->start : 0, t->loop ? t->end : 0);
 	float at[3] = { M.x, M.y, M.z };
 	chrlight_at(at, false);
+	if (!stereo_eye())
+		shadow_cast(&s_chr, at, M.yaw);   // the port's own (see maria_load)
 	chr_draw(&s_chr, uBones);
 }
 

@@ -792,6 +792,13 @@ static void player_sync(void)
 			snprintf(dir, sizeof dir, "%s/chr/%s", s_pack, pdef()->dir);
 			chr_load(s_james, dir, pdef()->model, err, sizeof err);
 		}
+		// CharaDataLoadExec (0x493260) pairs the gameplay model with the cutscene model's shadow hull
+		// (the game's own hll_jms / lxx_mar .kg1 are empty): hhh_jms.kg1 (record 0x7d8688) for James,
+		// chr2/mar/hhh_mar.kg1 (0x7d8ec8) for Maria. Loaded only at start-up before, so Maria had no
+		// shadow and James lost his after Born From a Wish
+		char kg1[128];
+		snprintf(kg1, sizeof kg1, "%s/chr/%s", s_pack, s_maria ? "mar2/hhh_mar.kg1" : "jms/hhh_jms.kg1");
+		chr_load_kg1(s_james, kg1);
 		s_mode = M_FREE;
 		s_side = 0;
 		if (s_maria || !owns(W_PLANK) || !load_weapon(W_PLANK))
