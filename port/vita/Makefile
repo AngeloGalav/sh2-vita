@@ -11,6 +11,8 @@ TITLE     := Silent Hill 2
 TITLE_ID  := SHIL00002
 # the LiveArea's APP_VER from the repository's VERSION: 0.1.0 is 00.10, 1.2.3 is 01.23
 VERSION   := $(shell awk -F. '{ printf "%02d.%d%d", $$1, $$2, $$3 }' ../../VERSION)
+# the whole VERSION (0.1.0-alpha.2) for the title screen's corner (titlemenu.c)
+FULL_VER  := $(shell tr -d '[:space:]' < ../../VERSION)
 
 PREFIX    := arm-vita-eabi
 CC        := $(PREFIX)-gcc
@@ -30,7 +32,7 @@ OBJS      := $(patsubst ../source/%.c,$(BUILD)/game/%.o,$(GAME_SRC)) \
 CFLAGS    := -O2 -g -Wall -Wno-unused-function -ffast-math -fno-strict-aliasing \
              -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -mthumb \
              -ffunction-sections -fdata-sections \
-             -D__vita__ -DSH2_VITA \
+             -D__vita__ -DSH2_VITA -DSH2_VERSION=\"$(FULL_VER)\" \
              -Icompat/include -Ideps/vitagl/include -I../source -I$(BUILD)/gen -MMD -MP
 
 LIBS      := -lvitaGL -lvitashark -lSceShaccCgExt -lmathneon -ltaihen_stub \
@@ -85,3 +87,6 @@ clean:
 
 .PHONY: all clean check
 -include $(OBJS:.o=.d)
+
+# the title screen shows VERSION: rebuild it when VERSION changes
+$(BUILD)/game/titlemenu.o: ../../VERSION

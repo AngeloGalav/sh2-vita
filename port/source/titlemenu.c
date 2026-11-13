@@ -429,6 +429,10 @@ static void pic_item(int c, float x, float y, bool chosen, float bright)
 // pixel up and left (item). Coordinates in the PC's 512 x 448 screen.
 static MapDrawFn s_panel_draw;
 
+#ifndef SH2_VERSION
+#define SH2_VERSION "dev"
+#endif
+
 static void draw_vita(float bright)
 {
 	if (s_screen == SC_MOVIES && s_panel_draw) {
@@ -453,6 +457,13 @@ static void draw_vita(float bright)
 		static const int LV[4] = { CL_HARD, CL_NORMAL, CL_EASY, CL_BEGINNER };
 		switch (s_screen) {
 		case SC_MENU:
+			// the port's own: the build's version in the screen's bottom left corner (VERSION, via the Makefile)
+			{
+				u32 g = 0x80808000u | (u32)(0xa0 * (bright < 0.0f ? 0.0f : bright > 1.0f ? 1.0f : bright));
+				// text space x -64 and y 512 are the screen's left and bottom edges (font.c: 400 x 240
+				// layout pixels, the 4:3 picture 320 of them): about 4 of those pixels in from each
+				font_text(FONT_SMALL, -58.0f, 474.0f, "v" SH2_VERSION, FONT_LEFT, g, g);
+			}
 			for (int it = 0; it < IT_N; it++)
 				if (listed(it) && it < 5)
 					pic_item(MENU[it], 256, 332 + 24 * it, it == s_sel, bright);
