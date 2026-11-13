@@ -1,4 +1,5 @@
 #include "stream.h"
+#include "perf.h"
 #include "sdsim.h"
 #include "sdio.h"
 #include "t3xcap.h"
@@ -318,6 +319,7 @@ StreamJob* stream_take_named(const char* area, const char* name)
 		LightLock_Unlock(&W.lock);
 		if (j || !busy)
 			return j;
+		perf_crumb("stream: waits for a room the reader has");
 		svcSleepThread(2000000);          // still being read: that is quicker than reading it again
 	}
 }
@@ -430,6 +432,7 @@ void* stream_take_file_ex(const char* path, long* size, bool* draft)
 			return d;                    // NULL when the read failed: the caller tries itself
 		if (!busy)
 			return NULL;
+		perf_crumb("stream: waits for a file the reader has");
 		svcSleepThread(2000000);
 	}
 }

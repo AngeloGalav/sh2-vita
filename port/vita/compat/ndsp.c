@@ -366,6 +366,10 @@ u32 ndspChnGetSamplePos(int id)
 
 u16 ndspChnGetWaveBufSeq(int id) { return s_ch[id].head ? s_ch[id].seq_playing : 0; }
 
+// The Debug tab's Sound Buffer Guard (on by default): see ndspChnWaveBufAdd
+static bool s_guard = true;
+void vita_sound_guard(bool on) { s_guard = on; }
+
 void ndspChnWaveBufAdd(int id, ndspWaveBuf* buf)
 {
 	if (!buf || !buf->nsamples)
@@ -384,6 +388,17 @@ void ndspChnWaveBufAdd(int id, ndspWaveBuf* buf)
 		memcpy(s_cap_mus + s_cap_mus_n, buf->data_pcm16, n * sizeof(s16));
 		s_cap_mus_n += n;
 	}
+	// A buffer already in a channel's list (this one or another) is not added again: re-linking it
+	// set buf->next = buf when it was the list's last, and the walk below or the mixer's then went
+	// round it for ever holding s_lock, a freeze with no error. The callers re-add a buffer only once
+	// it is done; this keeps a slip from ever hanging the game.
+	for (int k = 0; k < NCH && s_guard; k++)
+		for (ndspWaveBuf* t = s_ch[k].head; t; t = t->next)
+			if (t == buf) {
+				pthread_mutex_unlock(&s_lock);
+				vita_log("audio: a sound buffer added twice (channel %d, already on %d); left out", id, k);
+				return;
+			}
 	buf->next = NULL;
 	buf->sequence_id = ++c->seq_next;
 	if (!c->head) {

@@ -38,3 +38,5 @@ const char* mem_log(const char* what);
 // string literal; it costs a store.
 void perf_crumb(const char* step);
 void perf_watchdog_start(void);
+// The Debug tab's Freeze Watchdog (on by default): off, a stall writes nothing.
+void perf_watchdog_enable(bool on);

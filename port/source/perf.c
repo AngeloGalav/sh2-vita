@@ -305,6 +305,8 @@ void perf_crumb(const char* step)
 	C.n++;
 }
 
+static bool s_watch_on = true;   // Debug tab, Freeze Watchdog
+
 static void watchdog(void* arg)
 {
 	(void)arg;
@@ -316,7 +318,7 @@ static void watchdog(void* arg)
 			seen = n, since = now_ms();
 			continue;
 		}
-		if (n == written || now_ms() - since < 3000)
+		if (n == written || now_ms() - since < 3000 || !s_watch_on)
 			continue;
 		written = n;                     // once per stop
 		char path[128];
@@ -336,9 +338,20 @@ static void watchdog(void* arg)
 	}
 }
 
+void perf_watchdog_enable(bool on)
+{
+	s_watch_on = on;
+	if (on)
+		perf_watchdog_start();       // the thread stays once started; off, it writes nothing
+}
+
 void perf_watchdog_start(void)
 {
-	if (C.thread || !P.log_frames)
+	// On by default (it was only with the performance log; the Debug tab's Freeze Watchdog turns it off):
+	// breadcrumbs are a few stores a step, and the thread sleeps until the main loop has stood still
+	// 3 s, then writes stall.txt once. A player's freeze then names the step it stopped in (a report
+	// of random freezes that could not be reproduced, 2026-11-13).
+	if (C.thread || !s_watch_on)
 		return;
 	s32 prio = 0x30;
 	svcGetThreadPriority(&prio, CUR_THREAD_HANDLE);

@@ -70,6 +70,8 @@ typedef struct {
 	// Debug tab (the port's): what debug.txt's debughud, perflog and shadowdebug turn on, from the menu,
 	// and the Vita's periodic diagnostics in vita_log.txt (off: nothing written to the card in play)
 	u8 dbg_hud, dbg_perflog, dbg_shadows, dbg_log;
+	u8 dbg_watch;        // Debug tab Freeze Watchdog: 1 on (perf.c)
+	u8 dbg_guard;        // Debug tab Sound Buffer Guard: 1 on (the Vita mixer, ndsp.c)
 	u8 dbg_cone;         // Debug tab Shadow Cone: 80 % .. 110 % of the cone in steps of 5 (3: 95 %)
 	u8 dbg_maptest, dbg_fogtest;   // the map and fog test views; not saved
 	u8 dbg_camtrace;               // On writes the camera's last minute to camtrace.txt, then goes Off

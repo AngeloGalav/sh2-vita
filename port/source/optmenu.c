@@ -75,6 +75,8 @@ void opt_defaults(Options* o)
 	o->fog_size = 1;             // a third each way (c3d_gl.c half_fog_begin)
 	o->shadow_q = 2;             // the Enhanced Edition's soft shadows (c3d_gl.c vita_soft_shadow)
 	o->dbg_cone = 3;             // shadows inside 95 % of the beam's cone (shadow.c beam_clip)
+	o->dbg_watch = 1;            // a freeze writes stall.txt (perf.c)
+	o->dbg_guard = 1;            // the mixer leaves out a sound buffer added twice (ndsp.c)
 	o->filters = 1;
 #endif
 	o->hold_stomp = o->swap_attack = 1;
@@ -106,7 +108,7 @@ static const Key s_keys[] = {
 	K("swapattack", swap_attack, 0, 1), K("hwprofile", hwprofile, 0, 2), K("quality", quality, 0, 2),
 	K("framerate", framerate, 0, 2), K("resolution", res, 0, 1), K("trilinear", trilinear, 0, 1), K("filters", filters, 0, 1), K("fogsize", fog_size, 0, 2), K("shadowq", shadow_q, 0, 2), K("vitacam", vita_cam, 0, 2), K("ctrllayout", ctrllayout, 0, 2), K("infstamina", inf_stamina, 0, 1),
 	K("infammo", inf_ammo, 0, 1), K("camera", camera, 0, 1), K("setup", setup, 0, 1), K("ctlseen", ctl_seen, 0, 1),
-	K("debughud", dbg_hud, 0, 1), K("perflog", dbg_perflog, 0, 1), K("shadowdebug", dbg_shadows, 0, 6), K("shadowcone", dbg_cone, 0, 6),
+	K("debughud", dbg_hud, 0, 1), K("perflog", dbg_perflog, 0, 1), K("shadowdebug", dbg_shadows, 0, 6), K("shadowcone", dbg_cone, 0, 6), K("watchdog", dbg_watch, 0, 1), K("soundguard", dbg_guard, 0, 1),
 	K("diaglog", dbg_log, 0, 1),
 };
 
@@ -257,6 +259,10 @@ static const char* const DBG_SHD_L[7] = { "Shadows as in the game.", "Shadow vol
 static const char* const DBG_CONE_T[7] = { "80%", "85%", "90%", "95%", "100%", "105%", "110%" };
 static const char* const DBG_CONE_L[7] = { "Shadows only well inside the beam.", "", "", "Shadows to near the beam's edge.", "",
                                            "", "Shadows a little past the beam's edge." };
+static const char* const DBG_WATCH_L[2] = { "A freeze leaves no record.",
+                                             "A freeze of 3 s or more writes its last steps to stall.txt." };
+static const char* const DBG_GUARD_L[2] = { "Sound buffers as the game hands them.",
+                                             "A sound buffer added twice is left out, not looped for ever." };
 static const char* const DBG_LOG_L[2] = { "Only errors go to vita_log.txt.",
                                           "Draw, memory, fog and audio statistics each second in vita_log.txt." };
 static const char* const SHOT_L[2] = { "Shots light nothing.", "The room and whoever is near flash with each shot, as in the original." };
@@ -444,6 +450,10 @@ static const Setting SETTINGS[] = {
 	  .what = "Draws the shadows' shapes in red, or turns them off.", .lines = DBG_SHD_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Shadow Cone", AT(dbg_cone), .hi = 6, .texts = DBG_CONE_T,
 	  .what = "How far from the beam's middle shadows show.", .lines = DBG_CONE_L },
+	{ .tab = TAB_DEBUG, .label = -1, .name = "Freeze Watchdog", AT(dbg_watch), .hi = 1, .texts = OFF_ON_TEXT,
+	  .what = "Records where the game stops if it freezes.", .lines = DBG_WATCH_L },
+	{ .tab = TAB_DEBUG, .label = -1, .name = "Sound Buffer Guard", AT(dbg_guard), .hi = 1, .texts = OFF_ON_TEXT,
+	  .what = "Keeps a sound slip from freezing the game.", .lines = DBG_GUARD_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Diagnostic Log", AT(dbg_log), .hi = 1, .texts = OFF_ON_TEXT,
 	  .what = "Statistics in vita_log.txt each second.", .lines = DBG_LOG_L },
 	{ .tab = TAB_DEBUG, .label = -1, .name = "Map Test", AT(dbg_maptest), .hi = 6, .texts = DBG_MAP_T,
