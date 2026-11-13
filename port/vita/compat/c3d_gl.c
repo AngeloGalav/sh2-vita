@@ -401,10 +401,15 @@ void C3D_FrameEnd(u8 flags)
 	// that takes longer goes out at the next refresh, a 20 fps frame; vitaGL's own swap interval 2
 	// waits two refreshes after the frame is ready (its display callback, gxm.c), so a frame a
 	// little over 33 ms (the scenes' close-ups) was held to the fourth, 15 fps
+	// The wait is at most the two refreshes, counted unsigned: an unbounded `while (vc - last_vc < 2)`
+	// froze the game on a console after about 16 minutes (stall.txt, last step r_swap1, frame 28846),
+	// the vblank count reading below last_vc (a wrap or a reset) so the difference never reached 2
 	static unsigned last_vc;
-	if (G.fps <= 30.5f)
-		while ((int)(sceDisplayGetVcount() - last_vc) < 2)
+	if (G.fps <= 30.5f) {
+		unsigned since = (unsigned)sceDisplayGetVcount() - last_vc;
+		for (unsigned n = since < 2 ? 2 - since : 0; n; n--)
 			sceDisplayWaitVblankStart();
+	}
 	perf_part("r_pace", tp);
 	tp = svcGetSystemTick();
 	u64 ts = sceKernelGetProcessTimeWide();
