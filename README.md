@@ -139,6 +139,7 @@ To test on a console, these combinations work while holding SELECT: L changes th
 - [vitaGL](https://github.com/Rinnegatamante/vitaGL) and vitaShaRK by Rinnegatamante, and the [VitaSDK](https://vitasdk.org/) team
 - [sh23ds](https://github.com/ankushKun/sh23ds) by ankushKun
 - The Silent Hill Database for its file format notes, and the PS2 beta's debug information, which names much of the PC code
+- [sh2-nx](https://github.com/cutarev/sh2-nx) by cutarev and contributors, the Switch port whose Linux build runs the original game's code and lets this port be checked against it
 - [pl_mpeg](https://github.com/phoboslab/pl_mpeg) by Dominic Szablewski, which plays the movies
 - [Ghidra](https://ghidra-sre.org/)
 

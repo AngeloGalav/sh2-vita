@@ -335,7 +335,9 @@ static void anim_set(Enemy* e, int a)
 		              (a == 7 && e->kind == EN_KIND_RED);
 		// 0x538920 mode 4: the crossfade's 8 refreshes (4 of the PC's frames) stand on the new clip's
 		// first frame (0x551820 states 4 and 3); only then does it play
-		e->hold = e->anim_cut ? 0.0f : 4.0f / 30.0f;
+		// Not the Mandarin: its clips take their 17 frames each in the running original (sh2-nx), the
+		// nurse's 32-frame swing 36
+		e->hold = e->anim_cut || e->kind == EN_KIND_ARM ? 0.0f : 4.0f / 30.0f;
 	}
 	e->rate = 1.0f;
 	e->loops = 0;
@@ -5033,8 +5035,9 @@ static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 		{
 			float tx = e->slv == 1 ? e->x + sinf(e->yaw) * 1000.0f : p->x;
 			float tz = e->slv == 1 ? e->z + cosf(e->yaw) * 1000.0f : p->z;
-			// the port's own: back towards where it was placed, but not while it turns away from James
-			if (e->slv == 1 && e->timer == 0 && hypotf(e->x - e->stx, e->z - e->stz) > 2500.0f) tx = e->stx, tz = e->stz;
+			// the original roams its corridor, 7000 and more from James (sh2-nx); turning back is the port's
+			// own, a guard against it leaving the room's walls
+			if (e->slv == 1 && e->timer == 0 && hypotf(e->x - e->stx, e->z - e->stz) > 9000.0f) tx = e->stx, tz = e->stz;
 			walk_to(e, tx, tz, 0.05236f, dt);
 		}
 		e->rate = arm_rate(e);
