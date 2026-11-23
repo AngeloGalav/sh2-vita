@@ -571,6 +571,7 @@ static int s_stg_clips;
 static int s_stg_stage = -1;
 static char* s_stgmot;            // chr/jms/stgmot.txt, read once
 static JAnim s_damage_clip;
+static int s_damage_found;        // its id less 20000
 
 static void stage_motion_load(int stage)
 {
@@ -658,6 +659,7 @@ static const JAnim* damage_motion(int attack_id, bool dead, float from_x, float 
 	for (int i = 0; i < s_stg_clips; i++) {
 		const StageClip* c = &s_stg_clip[i];
 		if (c->id == id && c->last < s_anim.frames) {
+			s_damage_found = id - 20000;
 			s_damage_clip = (JAnim){ c->first, c->last, (u8)(c->flags & 1), (s16)c->speed };
 			return &s_damage_clip;
 		}
@@ -1047,7 +1049,8 @@ void combat_set_god(bool on) { s_god = on; }
 // 0x1d82494 / 0x1d824a8 by 0x548f30 / 0x54f0b0) times sh2jms.shock (0x1fbacec). Nothing ever writes
 // that field (0x533ab0 clears the player block; no store in the DC or v1.0), so the PC's push is 0;
 // the blow's own shock, the attack's sp in sh2_attack_list (0x6ec568), lands in jms + 0x120 and is
-// cleared unread by 0x5350d0. Stand-in, asked for from play (STATUS section 3): for those 10 frames
+// cleared unread by 0x5350d0. Stand-in, asked for from play, where the stage has no damage motion (Maria's
+// among them; James' own motions move him as 0x559100 does, damage_speed): for those 10 frames
 // (1/3 s) James slides away from the attacker at PUSH_PER_SP units a second per point of sp,
 // through the room's walls. The sp of the enemies' attacks 42..65, from 0x6ec568 (36-byte
 // shAttackInfo: u16 id, u16 kind, f32 ap, sp, min_range, max_range, ...).
@@ -1059,9 +1062,31 @@ static const float ENEMY_ATK_SP[24] = {
 #define PUSH_TIME (10.0f / 30.0f)
 static float s_push_t, s_push_dx, s_push_dz, s_push_v;
 
+static int s_damage_id;         // the damage motion playing, less 20000; 0 none of the stage's
+
+// 0x559100: the damage state moves James along the blow by its motion (metres a second, on these frames of
+// the clip). The state read for the push above (0x547900) is the guarded flinch's, not this one.
+static float damage_speed(int id, int f)
+{
+	switch (id) {
+	case 8: case 9: return f > 0 && f < 8 ? 0.96f : 0.0f;
+	case 12: case 13: return f > 0 && f < 8 ? 0.3f : 0.0f;
+	case 16: return f > 0 && f < 8 ? 1.2f : 0.0f;
+	case 17: return f > 0 && f < 8 ? -1.2f : 0.0f;
+	case 25: case 26: return f > 0 && f < 4 ? -0.3f : 0.0f;
+	case 33: case 34: return f < 5 ? 1.2f : 0.0f;
+	default: return 0.0f;
+	}
+}
+
 static void push_start(int attack_id, float from_x, float from_z)
 {
 	s_push_t = 0.0f;
+	if (s_damage_id) {
+		float dx = s_body_pos[0] - from_x, dz = s_body_pos[2] - from_z, n = sqrtf(dx * dx + dz * dz);
+		s_push_dx = n > 1e-3f ? dx / n : 0.0f, s_push_dz = n > 1e-3f ? dz / n : 0.0f;
+		return;
+	}
 	if (attack_id < 42 || attack_id > 65)
 		return;
 	float sp = ENEMY_ATK_SP[attack_id - 42];
@@ -1075,6 +1100,16 @@ static void push_start(int attack_id, float from_x, float from_z)
 
 static void push_update(CombatBody* b, float dt)
 {
+	if (s_damage_id) {
+		float v = damage_speed(s_damage_id, (int)(s_frame - s_cur->start)) * 500.0f * dt;
+		if (v == 0.0f)
+			return;
+		float nx = *b->x + s_push_dx * v, nz = *b->z + s_push_dz * v;
+		if (s_col)
+			col_push(s_col, &nx, &nz, *b->y, 900.0f, 130.0f);
+		*b->x = nx, *b->z = nz;
+		return;
+	}
 	if (s_push_t <= 0.0f)
 		return;
 	float t = dt < s_push_t ? dt : s_push_t;
@@ -1145,6 +1180,7 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 	s_mode = M_HURT;
 	sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);   // injured (four or five takes)
 	const JAnim* hurt = damage_motion(attack_id, false, from_x, from_z);
+	s_damage_id = hurt ? s_damage_found : 0;
 	play(hurt ? hurt : &J_HURT);
 	push_start(attack_id, from_x, from_z);
 }
