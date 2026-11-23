@@ -1147,6 +1147,44 @@ static void scu_backward(Enemy* e, const EnPlayer* p, float dt)
 	}
 }
 
+// 0x544440 (attack 42, kind 4, ap 7): on frames 9..22 five thin rays go out from 650 up the body, straight,
+// 24 degrees (0x6e1770) to either side and tipped up and down (the port leaves the last two out, they tell
+// on slopes only). Their length grows with the frame, 1.8 x 500 x (frame - 9) / 13, 3.6 in the open areas
+// (0x6e2be0, 0x6ed2c8): 900 and 1800 at the end. The first thing they meet, James' column (150 round a
+// point 25 ahead of him, 900 tall) or a wall, ends the spray.
+static void acid_hit(Enemy* e, const EnPlayer* p)
+{
+	float f = floorf(e->frame - SCU_ANIM[A_ATTACK].start);
+	if (!e->attacking || e->hold > 0.0f || f < 9.0f || f > 22.0f)
+		return;
+	float len = (town_stage() ? 1800.0f : 900.0f) * (f - 9.0f) / 13.0f;
+	if (len <= 0.0f)
+		return;
+	blow_maria(e, len, 0.42f, 7.0f);
+	float y = e->y - 650.0f, jx = p->x + sinf(p->yaw) * 25.0f, jz = p->z + cosf(p->yaw) * 25.0f;
+	bool wall = false, hit = false;
+	for (int k = -1; k <= 1; k++) {
+		float a = e->yaw + (float)k * 0.4189f, dx = sinf(a), dz = cosf(a), l = len;
+		if (s_col) {
+			float cx = e->x + dx * len, cz = e->z + dz * len, tx = cx, tz = cz;
+			col_clamp_ray(s_col, e->x, e->z, &cx, &cz, y);
+			if (hypotf(cx - tx, cz - tz) > 1.0f) {
+				wall = true;
+				l = hypotf(cx - e->x, cz - e->z);
+			}
+		}
+		float t = (jx - e->x) * dx + (jz - e->z) * dz;
+		t = t < 0.0f ? 0.0f : t > l ? l : t;
+		hit |= hypotf(e->x + dx * t - jx, e->z + dz * t - jz) < 150.0f;
+	}
+	if (hit && !e->attack_hit && p->alive && y <= p->y && y >= p->y - 900.0f) {
+		e->attack_hit = true;
+		hit_james(p, 42, 7.0f, e);
+	}
+	if (hit || wall)
+		e->attacking = false;
+}
+
 // 0x4c63f0 enSCUCtrlAttack: the acid spray (attack 42, frames 9..22 of the anime).
 static void scu_attack(Enemy* e, const EnPlayer* p, float dt)
 {
@@ -1169,20 +1207,7 @@ static void scu_attack(Enemy* e, const EnPlayer* p, float dt)
 		e->mark_angle = dir_to(e->x, e->z, p->x, p->z);
 		approach_angle(&e->yaw, e->mark_angle, aim_rate() * dt * 60.0f);
 		e->path_angle = e->yaw;
-		// attack 42 (sh2_attack_list at 0x629000): kind 4 spray, ap 7, frames 9..22.
-		float f = e->frame - SCU_ANIM[A_ATTACK].start;
-		if (e->attacking && f >= 9.0f && f <= 22.0f)
-			blow_maria(e, attack_range(p) + 150.0f, 0.4f, 7.0f);
-		if (e->attacking && !e->attack_hit && f >= 9.0f && f <= 22.0f && p->alive) {
-			float fx = sinf(e->yaw), fz = cosf(e->yaw);
-			float dx = p->x - e->x, dz = p->z - e->z;
-			float along = dx * fx + dz * fz, side = fabsf(dx * fz - dz * fx);
-			if (along > 0.0f && along < attack_range(p) + 150.0f && side < 250.0f + 130.0f &&
-			    line_of_sight(e, p)) {
-				e->attack_hit = true;
-				hit_james(p, 42, 7.0f, e);
-			}
-		}
+		acid_hit(e, p);
 		if (!e->anim_end)
 			return;
 		e->attacking = false;
@@ -1784,8 +1809,8 @@ static void sounds(Enemy* e, float f0, float dt)
 	e->sound_wait = 0.0f;
 }
 
-// 0x4c3c20: while the spit (anime 3) is past its frame 10 and short of 20, a puff of acid each tick
-// (0x4a4580, mist_poison) from 700 up the body along its facing, 2500 long in stages 1..4 and 17
+// 0x4c3c20: while the spit (anime 3) is past its frame 10 and short of 20, a puff of acid each frame
+// (0x4a4580, mist_poison) from 700 up the body along its facing, 2500 long in the open areas
 // (0x494d80) and 1250 elsewhere, tipped by half of James' height above it. Grey 0x80, or 0x18 in the
 // dark with the flashlight off (0x4a4580 makes it 0x30 there while 0x507e00 finds the light on the
 // enemy it follows, not ported).
@@ -1800,7 +1825,7 @@ static void acid(Enemy* e, const EnPlayer* p, float dt)
 	float pos[3] = { e->x, e->y - 700.0f, e->z };
 	float vec[3] = { sinf(e->yaw) * len, (p->y - e->y) * 0.5f, cosf(e->yaw) * len };
 	u8 grey = light_index(p) == 3 ? 0x18 : 0x80;
-	for (e->acid_acc += dt * 60.0f; e->acid_acc >= 1.0f; e->acid_acc -= 1.0f)
+	for (e->acid_acc += dt * 30.0f; e->acid_acc >= 1.0f; e->acid_acc -= 1.0f)
 		mist_poison(pos, vec, grey);
 }
 
