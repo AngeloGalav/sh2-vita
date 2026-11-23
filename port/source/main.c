@@ -1689,7 +1689,12 @@ static RoomEnv s_env;
 
 // The room is lit, or the flashlight is on (events with the "needs light" bit want this).
 // The flashlight shines once James has it (item 18, the PC's gFlashLightAcquired) and it is switched on.
-static bool flash_lit(void) { return s_flash_on && ev_have_item(18); }
+// Not while its battery is dead (272, from the Spiral Key to the dry cell's use; 0x48c840 tests it).
+// The port's own: only as long as the player can put that right, in stage 30 with the room's lock
+// still shut (269) and the dry cell in hand. Saves from builds where the light went on working left
+// the room with 272 on, and nothing past it can clear the flag.
+static bool flash_dead(void) { return ev_flag(272) && ev_stage() == 30 && ev_flag(269) && ev_have_item(0x37); }
+static bool flash_lit(void) { return s_flash_on && ev_have_item(18) && !flash_dead(); }
 static bool s_flash_james;            // this frame: James' own flashlight lights the room
 
 // A room record's own spot (its byte +8, spotLNum, 0: on), which the PC draws in place of James'
@@ -3622,7 +3627,7 @@ static bool screens_open(void) { return map_is_open() || s_memo_open; }
 // console (2026-11-13): the map always opened.
 static bool map_readable(void)
 {
-	if (!s_env.dark || (flash_lit() && !ev_flag(272) && !ev_flag(625)) || prog_chapter() == 1)
+	if (!s_env.dark || (flash_lit() && !ev_flag(625)) || prog_chapter() == 1)
 		return true;
 	if (ev_flag(625) || s_env.map_id == 0xb00bd)
 		return true;
@@ -6107,6 +6112,8 @@ int main(void)
 			} else {
 				s_flash_on = !s_flash_on;
 				sfx_play(s_flash_on ? SFX_LIGHT_ON : SFX_LIGHT_OFF, 0.8f, 0.0f);
+				if (s_flash_on && flash_dead())      // EventMain 0x48ecb0, its state 0xb
+					show_message(ev_system_message(15));  // "I pressed the switch, but nothing happens."
 			}
 		} else if (s_cam.mode == CAM_PLAYER && (down & KEY_B) && !(controls_keys(ACT_FLASHLIGHT) & KEY_B)) {
 			// the Vita's default is Circle (KEY_B with Cross confirming); a saved binding can take it
