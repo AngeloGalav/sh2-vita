@@ -1536,6 +1536,64 @@ static void swing_hits(const CombatBody* b)
 
 static u8 grip_flags(void);
 
+// 0x544ac0: the plank's, the pipe's and the knife's light and combo swings take the next attack only from 2
+// to 4 frames after their last hit frame. A press up to 0.3 s before counts too (the EE's tap buffer).
+static bool combo_window(void)
+{
+	if (!s_atk || !s_cur || !(s_atk->id == 12 || s_atk->id == 13 || s_atk->id == 15 || s_atk->id == 16 ||
+	                          s_atk->id == 28 || s_atk->id == 29))
+		return true;
+	float f = s_frame - s_cur->start, early = 0.3f * 30.0f * (float)abs(s_cur->speed) / 2048.0f;
+	return f >= (float)s_atk->last + 2.0f - early && f < (float)s_atk->last + 5.0f;
+}
+
+// The step an attack takes standing, in metres a second along his facing: 0x558200 the raise of the plank,
+// Maria's knife and the rifle, 0x5586b0 their lowering (the same back), 0x558830 a heavy swing or lunge
+// (ahead, then back), each on these frames of its clip (0x6f85f0..0x6f8648 over the PC's 30 frames). After a
+// step ahead it runs out by 20 a second (0x5567b0); one back stops at once. Measured frame by frame in
+// sh2-nx for the plank.
+static float s_step_v;
+
+static void step_in(CombatBody* b, float dt)
+{
+	const MeleeDef* m = md();
+	if (!s_cur || (s_mode == M_SWING ? s_swing_legs : !move_standing())) {
+		s_step_v = 0.0f;
+		return;
+	}
+	int f = (int)(s_frame - s_cur->start);
+	float v = 0.0f;
+	s_step_v = f < 1 ? 0.0f : fmaxf(s_step_v - 20.0f * dt, 0.0f);
+	if (s_mode == M_RAISE || s_mode == M_LOWER)
+		v = (s_weapon == W_PLANK && f >= 2 && f < 9 ? 20.0f : s_weapon == W_KNIFE && f >= 2 && f < 9 ? 25.0f
+		     : s_weapon == W_RIFLE && f >= 4 && f < 15 ? 25.0f : 0.0f) * (s_mode == M_LOWER ? -1.0f : 1.0f);
+	else if (s_weapon == W_PLANK && s_cur == &m->heavy[s_side])
+		v = f >= 4 && f < 10 ? 30.0f : f >= 11 && f < 20 ? -20.0f : 0.0f;
+	else if (s_weapon == W_KNIFE && s_cur == &m->heavy[s_side])
+		v = f >= 3 && f < 9 ? 30.0f : f >= 11 && f < 20 ? -20.0f : 0.0f;
+	else if (m->kind == MK_PIPE && s_cur == &m->extra[s_side])
+		v = f >= 2 && f < 10 ? 35.0f : f >= 14 && f < 25 ? -20.0f : 0.0f;
+	else if (m->kind == MK_CSAW && s_cur == &m->extra[s_side])
+		v = s_side == 0 ? (f >= 1 && f < 7 ? 30.0f : f >= 13 && f < 19 ? -25.0f : 0.0f)
+		                : (f >= 2 && f < 7 ? 30.0f : f >= 12 && f < 18 ? -25.0f : 0.0f);
+	else if (m->kind == MK_NATA && s_cur == &m->heavy[s_side])
+		v = s_side ? (f >= 1 && f < 4 ? -3.0f : f >= 14 && f < 18 ? 33.0f : f >= 25 && f < 31 ? -24.0f : 0.0f)
+		           : (f >= 2 && f < 5 ? 10.0f : f >= 10 && f < 14 ? 5.0f : f >= 14 && f < 17 ? 30.0f
+		              : f >= 25 && f < 31 ? -28.0f : 0.0f);
+	if (v != 0.0f)
+		s_step_v = v / 30.0f;
+	if (s_step_v == 0.0f)
+		return;
+	v = s_step_v * 500.0f * dt;
+	float nx = *b->x + sinf(*b->yaw) * v, nz = *b->z + cosf(*b->yaw) * v, ny;
+	if (s_col) {
+		col_push(s_col, &nx, &nz, *b->y, 900.0f, 130.0f);
+		if (!col_floor(s_col, nx, nz, *b->y, 160.0f, &ny))
+			return;
+	}
+	*b->x = nx, *b->z = nz;
+}
+
 static void start_swing(const CombatBody* b, bool combo, bool heavy)
 {
 	const MeleeDef* m = md();
@@ -2141,6 +2199,7 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		free_moves(b, cp, held, dt);
 		return false;
 	case M_RAISE:
+		step_in(b, dt);
 		// the raise is the hold status' clip too (0x52fae0 case 0x1a): the attack waits for its end
 		if (is_melee())
 			ee_queue_update(held, action_down, dt);
@@ -2298,8 +2357,9 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 	}
 	case M_SWING: {
 		const MeleeDef* m = md();
-		if (action_down || action_again)
+		if ((action_down || action_again) && combo_window())
 			s_combo_req = true;       // 0x558bd0 asks 0x533ff0 again through the swing
+		step_in(b, dt);
 		swing_sound();
 		swing_hits(b);
 		// 0x5350d0: a plank or pipe blow that meets an enemy (+0x124 1) plays back on normal and hard
@@ -2446,6 +2506,7 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		                       : (is_melee() ? &md()->lower[s_side] : &w->lower));
 		break;
 	case M_LOWER:
+		step_in(b, dt);
 		if (held & KEY_R) {
 			lock_on(b);
 			s_mode = M_RAISE;
