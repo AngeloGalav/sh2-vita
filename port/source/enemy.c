@@ -2276,6 +2276,15 @@ static void mkn_init(Enemy* e, int status)
 	switch (status) {
 	case 1: scale = 1.2f; break;
 	case 2: scale = 0.5f; break;
+	case 13: case 14:                  // 0x4c15c0: bodies placed dead, in their own poses
+		e->mlv = MKN_DYING;
+		e->slv = 1;
+		e->hp = 0.0f;
+		e->dead_flag = true;
+		anim_set(e, status == 13 ? 0x1e : 0x1f);
+		e->frame = MKN_ANIM[e->anim].end;
+		size_lying(e, true);
+		return;
 	case 3: case 4:
 		if (status == 4) e->type = 5;
 		go_raw(e, MKN_DOWN);
@@ -5949,6 +5958,15 @@ static void scu_init(Enemy* e, int status)
 		e->mlv = SCU_DYING;
 		e->hp = 0.0f;
 		anim_set(e, A_LIE + e->lie);
+		size_lying(e, true);
+		return;
+	case 13: case 14:                  // 0x4c46c0: bodies placed dead, in their own poses
+		e->mlv = SCU_DYING;
+		e->slv = 1;
+		e->hp = 0.0f;
+		e->dead_flag = true;
+		anim_set(e, status == 13 ? 0x1e : 0x20);
+		e->frame = SCU_ANIM[e->anim].end;
 		size_lying(e, true);
 		return;
 	case 6: e->type &= ~2; break;
