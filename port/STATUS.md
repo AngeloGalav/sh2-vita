@@ -358,6 +358,7 @@ Ordered by weight. Each line names where the work starts.
     - The clock in room 208 (issue 5): its ticking (0x3e83, 14 s) was started on every turn of the hands and never stopped. Now as the PC: heard while the hands move, stopped on leaving.
     - The red light in the corridor behind the bars (issue 5): 0x59c090 gives ap50 its fifth light only while Pyramid Head is there (69 and not 70) and ap42 its one from 69 on; the port had both always. `chrlight_points`.
     - Drops (issue 8, the pool in Wood Side's courtyard): 0x52eb40 lets James fall to a floor up to 1500 below; the port stopped him at 160. `fall_update` in `main.c`, everywhere. Not ported: the falling state's clip (0x18).
+    - The action level never reached the enemies or James' health and combat (issue 9): `enemy_set_difficulty` ran only at boot, so every game played Normal there. Set on New Game, Born From a Wish and load now. Easy and Beginner games get James' 200 health.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.

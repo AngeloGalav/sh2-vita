@@ -4352,6 +4352,7 @@ static void new_game(void)
 	radio_reset(10);                 // 0x49e980
 	boat_reset();
 	ev_reset();
+	enemy_set_difficulty(s_action);        // before combat_reset: James' health goes by it
 	combat_reset();
 	enemy_killed_reset();
 	prog_new_game(s_riddle, s_action);     // FlagInit: difficulty flags, puzzle answers
@@ -4380,6 +4381,7 @@ static void new_game_wish(void)
 	radio_reset(4);                  // 0x5a21f0
 	prog_abort();
 	ev_reset();
+	enemy_set_difficulty(s_action);
 	combat_reset();
 	enemy_killed_reset();
 	prog_new_game_wish(s_riddle, s_action);
@@ -4487,10 +4489,11 @@ static bool continue_game(void)
 	}
 	prog_abort();
 	ev_reset();
-	combat_reset();
-	ev_state_set(sv.events);
 	if (sv.version >= 3)
 		prog_state_set(sv.prog);
+	enemy_set_difficulty(prog_action_level());   // gActionDifficulty (0x1dbebf4): one level for all
+	combat_reset();
+	ev_state_set(sv.events);
 	if (sv.version >= 7)
 		prog_boat_set(sv.boat);
 	boat_reset();
