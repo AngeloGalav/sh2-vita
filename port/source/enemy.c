@@ -855,6 +855,13 @@ static void pose(Enemy* e, int a)
 		anim_random_loops(e);
 }
 
+// 0x4c4550: room to stand where it lies (not under a car). The PC casts five clearance checks
+// (0x4aa490); here the walls within the upright body's radius.
+static bool can_stand(const Enemy* e)
+{
+	return !s_col || col_clearance(s_col, e->x, e->z, e->y, 750.0f, 150.0f) > 100.0f;
+}
+
 static void stand_up(Enemy* e)
 {
 	pose(e, A_GETUP + e->lie);
@@ -1347,7 +1354,7 @@ static void scu_down(Enemy* e, const EnPlayer* p, float dt)
 		if (!is_dead(e)) {
 			set_timer(e, down_time(e));
 			if (e->status == 3 || e->status == 4)
-				e->timer += (int)(rnd() * 600.0f);
+				e->timer += 600;               // 0x4a6b80
 			e->slv = 1;
 			return;
 		}
@@ -1363,6 +1370,11 @@ static void scu_down(Enemy* e, const EnPlayer* p, float dt)
 		if (reduce_timer(e, ticks) > 0 || p->stomping) {
 			if (!(e->flags & 0x2000) || p->stomping)
 				return;
+			// 0x4c6b99: face down, on each of these marks it crawls off (0x4c4280, 0.8)
+			if (e->kind == EN_KIND_SCU && e->lie == 0 && s_diff > 0 && rnd() < stay_down_probability()) {
+				go(e, SCU_CRAWL);
+				return;
+			}
 			if (e->anim != A_WRITHE + e->lie) {
 				if (rnd() * 200.0f < hp_rate(e) + 100.0f)
 					pose(e, A_WRITHE + e->lie);
@@ -1380,6 +1392,10 @@ static void scu_down(Enemy* e, const EnPlayer* p, float dt)
 		}
 		add_hp(e, 50.0f);
 		if (e->kind == EN_KIND_SCU && (e->type == 0xff || (e->lie == 0 && rnd() < stay_down_probability()))) {
+			go(e, SCU_CRAWL);
+			return;
+		}
+		if (e->kind == EN_KIND_SCU && !can_stand(e)) {
 			go(e, SCU_CRAWL);
 			return;
 		}
@@ -1473,9 +1489,11 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 			e->tz = e->z + cosf(a) * 1000.0f;
 		}
 		set_timer(e, (int)((1.0f + rnd_signed(-0.5f, 0.5f)) * 180.0f));
-		if (s_diff < 2)
-			e->flags |= 0x200;
+		// 0x4c5800: below normal it never homes on James; from normal on its first grab, landed or not
+		// (0x544870 marks it done either way), sets the same bit, so it dashes to its own points too
+		e->flags |= 0x200;
 		e->attacking = s_diff >= 2;
+		e->attack_hit = false;
 		e->slv = 1;
 		// fall through
 	case 1: {
@@ -1499,10 +1517,10 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 			float fx = sinf(e->yaw), fz = cosf(e->yaw);
 			float dx = p->x - e->x, dz = p->z - e->z;
 			float along = dx * fx + dz * fz, side = fabsf(dx * fz - dz * fx);
-			if (along > 0.0f && along < 250.0f + e->size && side < 200.0f) {
+			bool in = along > 0.0f && along < 250.0f + e->size && side < 200.0f;
+			if (in && !e->attack_hit)
 				hit_james(p, 43, 5.0f, e);
-				e->flags |= 0x200;
-			}
+			e->attack_hit = in;             // one grab a pass, not one a frame
 		}
 		if (hypotf(e->tx - e->x, e->tz - e->z) < 400.0f || chance(0.002f, dt)) {
 			float a = rnd_signed(-PI / 2.0f, 0.5f) + e->yaw;
@@ -1517,7 +1535,8 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 		}
 		if (reduce_timer(e, ticks) <= 0) {
 			e->vx = e->vz = 0.0f;
-			if ((e->type & 0x10) && !(e->type & 0x20) && e->p_dist < 2000.0f) {
+			if ((e->type & 0x10) && !(e->type & 0x20) && e->p_dist < 2000.0f && can_stand(e)) {
+				e->type &= ~0x18;
 				stand_up(e);
 				e->slv = 2;
 				return;
@@ -1535,6 +1554,9 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 					add_hp(e, 10.0f);
 					return;
 				}
+			} else if (e->life >= 0.0f && !can_stand(e)) {
+				set_timer(e, 60);
+				return;
 			} else if (e->life >= 0.0f) {
 				add_hp(e, 10.0f);
 				stand_up(e);
@@ -1575,10 +1597,16 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 		e->rate = 0.0f;
 		if (reduce_timer(e, ticks) > 0 || p->stomping)
 			return;
-		if ((seen > 1 || e->hp >= e->hp_max * 0.5f) && e->type != 0xff && s_diff > 0 && rnd() < 0.3f) {
+		if ((seen > 1 || e->hp >= e->hp_max) && !(e->type & 0x30) && e->type != 0xff && s_diff > 0 && can_stand(e)) {
 			add_hp(e, 50.0f);
 			stand_up(e);
 			e->slv = 2;
+			return;
+		}
+		if (rnd() < 0.1f) {
+			pose(e, A_WRITHE);
+			set_timer(e, (int)((1.0f + rnd_signed(-0.5f, 0.5f)) * 180.0f));
+			e->slv = 4;
 			return;
 		}
 		e->slv = 0;
@@ -1588,7 +1616,12 @@ static void scu_crawl(Enemy* e, const EnPlayer* p, float dt)
 			return;
 		add_hp(e, 10.0f);
 		if (e->life < 0.0f) { pose(e, A_LIE); e->hp = 0.0f; start_dying(e); return; }
-		e->slv = 0;
+		if (rnd() * 100.0f < hp_rate(e)) {
+			e->slv = 0;
+		} else {
+			set_timer(e, (int)((1.0f + rnd_signed(-0.5f, 0.5f)) * 180.0f));
+			e->slv = 3;
+		}
 		return;
 	case 5:
 		if (e->hb == 0.0f && reduce_timer(e, ticks) <= 0) {
@@ -1800,6 +1833,10 @@ static void sounds(Enemy* e, float f0, float dt)
 		if (step_passed(a, b, len, s1) || step_passed(a, b, len, s2))
 			play_at(e, mkn ? 12500 : 12019);
 	}
+	// the Lying Figure's comes from these states only (0x4c4350's callers): none while it waits, crawls or lies
+	if (!mkn && e->mlv != SCU_WANDER && e->mlv != SCU_PRECAUTION && e->mlv != SCU_CHASE && e->mlv != SCU_BACKWARD &&
+	    e->mlv != SCU_ATTACK)
+		return;
 	e->sound_wait += pc_frames(dt);
 	if (e->sound_wait < 300.0f || e->mlv == (mkn ? MKN_DYING : SCU_DYING) || (mkn && e->mlv == MKN_STAY))
 		return;
@@ -1847,7 +1884,15 @@ static void scu_update(Enemy* e, const EnPlayer* p, float dt)
 	case SCU_CHASE: scu_chase(e, p, dt); break;
 	case SCU_BACKWARD: scu_backward(e, p, dt); break;
 	case SCU_AMBUSH: scu_ambush(e, p, dt); break;
-	case SCU_WAITCAR: if (e->p_dist < 2000.0f) go(e, SCU_CRAWL); break;   // event wait, simplified
+	case SCU_WAITCAR:
+		// 0x4c5740: writhes, silent and not to be hit, until James is within 2000; then faces him and crawls
+		if (e->slv == 0) { pose(e, A_WRITHE); e->slv = 1; }
+		reset_damage(e);
+		if (e->p_dist < 2000.0f) {
+			e->yaw = e->path_angle = e->mark_angle = dir_to(e->x, e->z, p->x, p->z);
+			go(e, SCU_CRAWL);
+		}
+		break;
 	case SCU_CRAWL: scu_crawl(e, p, dt); break;
 	case SCU_ATTACK: scu_attack(e, p, dt); break;
 	case SCU_DAMAGE: scu_damage(e, p, dt); break;
@@ -6521,7 +6566,8 @@ bool enemy_is_down(const Enemy* e)
 		return e->mlv == BOS_DEAD && e->status == 13;   // lying after the fall
 	if (e && (e->kind == EN_KIND_ONI || e->kind == EN_KIND_ARM || e->kind == EN_KIND_EDI || e->kind == EN_KIND_IKE))
 		return false;
-	return e && (e->mlv == SCU_DOWN || e->mlv == SCU_CRAWL || e->mlv == SCU_WAITCAR ||
+	// 0x4c5800 clears the down bit (+0x148 bit 4) for a born crawler and at full endurance: not stomped then
+	return e && (e->mlv == SCU_DOWN || (e->mlv == SCU_CRAWL && !(e->type & 0x10) && e->endurance < e->endurance_max) ||
 	             (e->mlv == SCU_DAMAGE && e->slv == 2));
 }
 
@@ -6547,12 +6593,13 @@ void enemy_hit_cylinder(const Enemy* e, float* x, float* z, float* r, float* top
 		*bottom = e->y + 900.0f;
 		return;
 	}
-	if (enemy_is_down(e) && e->kind != EN_KIND_TYU) {
-		// lying bodies stretch along their facing: centre the column on the torso
-		*x = e->x + sinf(e->yaw) * 250.0f;
-		*z = e->z + cosf(e->yaw) * 250.0f;
-		*r = 330.0f;
-	}
+	// x 1.5 (0x69f31c) with the down bit; the creeper's own factor is 2 and its bit is always set
+	if (e->kind == EN_KIND_TYU)
+		*r = e->size * 2.0f * 1.5f;
+	else if (enemy_is_down(e))
+		*r = e->size * 0.8f * 1.5f;
+	if (e->kind == EN_KIND_SCU && e->mlv == SCU_WAITCAR)
+		*r = 0.0f;                     // no hit column (+0x10 bit 8)
 }
 
 // 0x543210, a blow landing: the sound by the attack first, then by the enemy's kind, a random one of its set

@@ -154,8 +154,8 @@ of twelve states, in the order of the PC table:
 | 1 Precaution | 0x4c4f50 | yes | stands (random 2..4 loops), turns to James |
 | 2 Chase | 0x4c5070 | yes | walks at James, slower while turning (0x4a66c0); calls the others within 4000 (communication queue) |
 | 3 Backward | 0x4c5230 | yes | walks backwards when James is within 750 (type bit 2, not on beginner) |
-| 4 Ambush | 0x4c5370 | no | needs the `ambush_apart` rectangles (hard and up only); falls back to Wander |
-| 5 WaitCar | 0x4c5740 | simplified | lies in wait (status 8) until James is within 2000, then crawls |
+| 4 Ambush | 0x4c5370 | yes | waits in the `ambush_apart` rectangles (hard and up only) |
+| 5 WaitCar | 0x4c5740 | yes | writhes in wait (status 8), silent and not to be hit, until James is within 2000, then faces him and crawls |
 | 6 Crawl | 0x4c5800 | yes | dashes along the floor at 1500 x crawl rate units/s, grabbing at James (attack 43) once a pass: a grab that lands sets +0x10 bit 0x200 and it dashes on past him, rests, writhes, or stands up |
 | 7 Attack | 0x4c63f0 | yes | sprays acid (attack 42), turning slowly toward James; may repeat |
 | 8 Damage | 0x4c65d0 | yes | applies the hit: flinch, or a knock-down when endurance runs out |
@@ -166,7 +166,7 @@ of twelve states, in the order of the PC table:
 Senses (0x4a9aa0 with the EnSCU table at 0x8931b8): sight distance 5000 in lit places, 4000 in the dark
 with the flashlight on, 750 with it off. The row is DAT_01f7fa24, which 0x4a88e0 sets every frame: 0
 where the place is lit (0x47b1f0, gFlashlightAvailable 1), 3 in the dark with the flashlight off, and
-with it on 1 in stages 1..4 and 17 (0x494d80), else 2; 0x4a5a60 makes it 2 in stages 13 and 16 and in
+with it on 1 in glb 1..4 and 17 (0x494d80), else 2; 0x4a5a60 makes it 2 in glb 13 and 16 and in
 rooms 0x89, 0x8f, 0x90 and 0xa2 elsewhere (`light_index`, with `enemy_set_dark` from main.c). Until
 2026-10-28 the port never chose row 0, so in every lit place an enemy saw James only within 750, as
 if it were dark with the light off, and walked about blind in daylight; the paces, reaches and turn
@@ -213,12 +213,18 @@ first/last frame, sound, effect):
 | 14 | 2 melee | 140 | 80 | -150..350 | 8-10 | plank downward swing |
 | 15..17 | 2 melee | 120 / 96 / 160 | 100 | -150..540 | | steel pipe |
 
-How the acid is placed is simplified: James is hit once per spit when he is in front within the acid
-reach + 150 and 380 to the side, with a clear line through the room walls.
+The acid's hit (0x544440, `acid_hit`): on frames 9..22 rays from 650 up the body, straight and 24 degrees to
+either side (and two tipped up and down, left out), growing to 900 units, 1800 in the open areas; the first
+thing they meet, James (150 wide, 25 ahead of his feet) or a wall, ends the spray. Until 2026-11-23 the port
+hit at once from frame 9 anywhere within the spit's trigger range + 150 and 380 to the side.
+
+No enemy that uses the sight check 0x4a9aa0 or 0x4a5fc0 starts an attack while James is in his damage motion
+or for 2 seconds after it (0x542e00, `combat_busy`); the Mandarin and the creepers do not ask. A new anime
+stands on its first frame through its 8-refresh crossfade (0x551820, `hold`).
 
 The acid itself (0x4c3c20, anime 3 past its frame 10 and short of 20): a puff each tick through
 0x4a4580 (effect 0x1e, the PS2 beta's enEfctSetPoisonFog), from 700 up the body along its facing,
-2500 long in stages 1..4 and 17 and 1250 elsewhere, tipped by half of James' height above it. Each
+2500 long in glb 1..4 and 17 and 1250 elsewhere, tipped by half of James' height above it. Each
 puff flies, slows, sinks and fades over 22 ticks (0x4a3a30) as a soft disc with the poison texture
 (0x4a3d00), drawn by `mist.c` with the hyper spray's puffs (`mist_poison`). The PC's grey (0x80, 0x18
 in the dark with the light off) modulates the texture's own tan, a yellowish haze; the pack keeps
