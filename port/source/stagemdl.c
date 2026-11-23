@@ -130,7 +130,9 @@ static void npc_free(int i)
 }
 
 // Bones the stage code moves (the labyrinth lift's gates, 0x5831aa; the endings' falling stairs,
-// 0x440470): added to the bone's place.
+// 0x440470): added to the bone's place. The PC's 0x538b80 / 0x538c30 read and set it after the stay
+// object's half turn (0x554710 keeps the turned bind matrix and its place at +0x58 / +0x98), while
+// the port turns the whole model when it is drawn, so for those x and z go in the other way round.
 static struct { int kind, bone; float d[3]; } s_bone[12];
 
 void stagemdl_bone_move(int kind, int bone, float dx, float dy, float dz)
@@ -380,12 +382,15 @@ static void turn(Mtx34* L, float ax, float ay, float az)
 // 135 (cos(theta) - 1), stopping at theta = 3 pi. The stairway key in the box (0x747): bone 0 turns
 // about z by theta and goes round x = -135 sin(theta - pi/4) - 103, y = 135 cos(theta - pi/4) -
 // 103, stopping at theta = 11 pi / 4.
+static bool stay_turned(int kind);
+
 static void pose(Character* c, int kind, float t)
 {
 	static Mtx34 world[CHR_MAX_BONES];
 	const float T = 15.0f, k = 15.707964f / T, k2 = 11.780972f / T;
 	bool playing = t >= 0.0f && t < T;
 	float lid = playing ? -k * fminf(t, 0.1f * T) + k * fmaxf(0.0f, t - 0.9f * T) : 0.0f;
+	float turned = stay_turned(kind) ? -1.0f : 1.0f;
 	float spin = !playing || t <= 1.5f ? 0.0f : t >= 13.5f ? 3.0f * (float)M_PI : (t - 1.5f) * k2;
 	for (u32 b = 0; b < c->n_bones; b++) {
 		Mtx34 L = c->bind_local[b];
@@ -406,7 +411,7 @@ static void pose(Character* c, int kind, float t)
 		}
 		for (int k = 0; k < 12; k++)
 			if (s_bone[k].kind == kind && s_bone[k].bone == (int)b)
-				L.m[0][3] += s_bone[k].d[0], L.m[1][3] += s_bone[k].d[1], L.m[2][3] += s_bone[k].d[2];
+				L.m[0][3] += turned * s_bone[k].d[0], L.m[1][3] += s_bone[k].d[1], L.m[2][3] += turned * s_bone[k].d[2];
 		if (c->parents[b] == 255)
 			world[b] = L;
 		else

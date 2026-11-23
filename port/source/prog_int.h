@@ -32,9 +32,13 @@ extern const ProgStage prog_hotel_stages[];     // stages 38..52 (prog_hotel.c)
 extern const ProgStage prog_wish_stages[];      // stages 53..58 (prog_wish.c)
 void prog_hotel_tick(int stage);
 void prog_stagefn_tick(int stage, float dt);      // prog_stagefn.c: the stages' room and per-frame code
-// 0x1d85d40: how far the flooded elevator's two door leaves stand apart (stage 43, model 0x519): 250
-// on entering room 0xb8 until flag 479 (0x577600), closed by EvProgOpenElevatorWater (prog_hotel.c)
+// 0x1d85d40: how far the flooded elevator's two door leaves are moved from their open places (stage
+// 43, model 0x519): 250, shut, on entering room 0xb8 until flag 479 (0x577600); opened by
+// EvProgOpenElevatorWater (prog_hotel.c).
 extern float prog_bf_elevator_door;
+// 0x1d85f48: how far the employee elevator's door is open (stage 41 room 0x9d, model 0x556): 300 on
+// entering (0x57a410), shut and opened by EvProgElvatorButton (prog_hotel.c).
+extern float prog_emp_elevator_door;
 // prog_overlay.c: the sprites the PC draws over puzzle stills
 void prog_overlay_init(const ProgHost* host);
 void prog_overlay_picture(const char* pic);     // a still went up (NULL: down)

@@ -21,6 +21,8 @@ static int s_room = -1, s_room_stage = -1;
 // ---------------------------------------------------------------- stage 34, the labyrinth's first part
 
 float prog_bf_elevator_door;            // 0x1d85d40 (prog_int.h)
+float prog_emp_elevator_door;           // 0x1d85f48 (prog_int.h)
+static float s_buzz_t;                  // 0x1d85f3c: the overweight buzzer's wait
 static float s_lift_gate = 450.0f, s_lift_gv, s_lift_t, s_lift_y, s_lift_step, s_lift_accel_end;
 
 static int ring_outer(void) { return p_flag(317) | p_flag(318) << 1; }   // EvProgControlCube's rings
@@ -426,7 +428,7 @@ static void room_enter(int stage, int room)
 		break;
 	case 43:                             // 0x577600: the flooded elevator's room
 		if (room == 0xb8) {
-			// the doors stand open (250) while the water is up (479 off); 0x2f80400 into 0x1f7d6f4
+			// the doors are shut (250) while the water is up (479 off); 0x2f80400 into 0x1f7d6f4
 			prog_bf_elevator_door = p_flag(479) ? 0.0f : 250.0f;
 			static const int done[] = { 2218, 2227, 2228, 2229, 2230, 2231, 2233 };
 			for (int i = 0; i < (int)(sizeof done / sizeof done[0]); i++)
@@ -493,6 +495,9 @@ static void room_enter(int stage, int room)
 			if ((p_rand() & 3) == 0)
 				p_set(541);
 			s_thr = (frand() * 32.0f + 431.0f) * -50.0f;
+		} else if (room == 0x9d) {       // the employee elevator's door is open until 447
+			s_buzz_t = 0.0f;
+			prog_emp_elevator_door = p_flag(447) ? 0.0f : 300.0f;
 		}
 		break;
 	case 25:                             // 0x589f90
@@ -774,12 +779,25 @@ void prog_stagefn_tick(int stage, float dt)
 		break;
 	case 32: prison_bars_tick(dt); break;
 	case 43:
-		// 0x577690: in room 0xb8, while the water is up (479 off), the door's leaves (model 0x519,
-		// bones 0 and 1) stand apart along z by 0x1d85d40 from their own places. The wall 0x8cb7a0
-		// (stagewalls.c) faces into the car: it keeps James in, it does not keep him out.
-		if (room == 0xb8 && !p_flag(479)) {
+		// 0x577690: in room 0xb8, while 479 is off, the door's leaves (model 0x519, bones 0 and 1) are
+		// moved along z by 0x1d85d40: 250 brings them together, shut, and 0 is their own places, open.
+		// James is in the car, the wall 0x8cb7a0 (stagewalls.c) keeps him there until 478.
+		if (room == 0xb8) {
 			stagemdl_bone_move(0x519, 0, 0.0f, 0.0f, -prog_bf_elevator_door);
 			stagemdl_bone_move(0x519, 1, 0.0f, 0.0f, prog_bf_elevator_door);
+		}
+		break;
+	case 41:
+		// 0x57a4a0, room 0x9d: the employee elevator's door (model 0x556, bones 0 and 1), shut at 0 and
+		// 300 open, and the overweight buzzer (401) every second and a half
+		if (room == 0x9d) {
+			stagemdl_bone_move(0x556, 0, 0.0f, 0.0f, prog_emp_elevator_door);
+			stagemdl_bone_move(0x556, 1, 0.0f, 0.0f, -prog_emp_elevator_door);
+			if (p_flag(401) && s_buzz_t == 0.0f) {
+				sfx_play(0x44c4, 1.0f, 0.0f);
+				s_buzz_t = 1.5f;
+			}
+			s_buzz_t = p_flag(401) ? fmaxf(s_buzz_t - dt, 0.0f) : 0.0f;
 		}
 		break;
 	case 44: hall_voice_tick(room, dt); break;
