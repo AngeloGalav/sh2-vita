@@ -515,21 +515,30 @@ static void recover_endurance(Enemy* e, float dt)
 // flashlight on, 3 dark with it off. The apartments are dark places.
 // DAT_01f7fa24, the row of the sight tables, as 0x4a88e0 sets it each frame: 0 where the place is
 // lit (0x47b1f0: gFlashlightAvailable 1), 3 in the dark with the flashlight off, and with it on 1 in
-// stages 1..4 and 17 (0x494d80), else 2. 0x4a5a60 makes it 2 in stages 13 and 16, and in rooms 0x89,
-// 0x8f, 0x90 and 0xa2 outside stages 1..8, 14, 15 and 17.
+// the open areas (0x494d80: the stage's glb_crd, +0x24, 1..4 or 17), else 2. 0x4a5a60 makes it 2 in
+// glb 13 and 16 (the hotel's otherworld, Born From a Wish), and in rooms 0x89, 0x8f, 0x90 and 0xa2
+// outside glb 1..8, 14, 15 and 17. The port took the stage number for the glb until 2026-11-23, so the
+// town's figures played by the buildings' rows.
 static bool s_dark;
 void enemy_set_dark(bool dark) { s_dark = dark; }
 
+// 0x494d80(0): one of the open areas
+static bool town_stage(void)
+{
+	int g = ev_glb_crd();
+	return (g >= 1 && g <= 4) || g == 17;
+}
+
 static int light_index(const EnPlayer* p)
 {
-	int st = ev_stage();
-	switch (st) {
+	int g = ev_glb_crd();
+	switch (g) {
 	case 13: case 16:
 		return 2;
 	case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 14: case 15: case 17:
 		break;
 	default: {
-		int room = bgm_room_id(ev_glb_crd(), p->x, p->z);
+		int room = bgm_room_id(g, p->x, p->z);
 		if (room == 0x89 || room == 0x8f || room == 0x90 || room == 0xa2)
 			return 2;
 	}
@@ -538,7 +547,7 @@ static int light_index(const EnPlayer* p)
 		return 0;
 	if (!p->light)
 		return 3;
-	return (st >= 1 && st <= 4) || st == 17 ? 1 : 2;
+	return town_stage() ? 1 : 2;
 }
 
 static float walk_rate(const Enemy* e, const EnPlayer* p)
@@ -569,13 +578,6 @@ static float attack_range(const EnPlayer* p)
 	if (li < 2) r *= 1.5f;
 	else if (li == 3) r *= 0.8f;
 	return r;
-}
-
-// 0x494d80(0): the stage is one of the town's, 1..4 or 17
-static bool town_stage(void)
-{
-	int st = ev_stage();
-	return (st >= 1 && st <= 4) || st == 17;
 }
 
 // 0x4a6340: James has nothing to shoot with: no handgun rounds or bullets (items 4, 5), and no
@@ -650,8 +652,22 @@ static const float MKN_ATTACK_ANGLE = 0.2617994f;
 
 // ---------------------------------------------------------------- senses
 
+// 0x4a70c0: clear of the room's walls and (0x524cb0) of the other live enemies' columns.
 static bool line_of_sight(const Enemy* e, const EnPlayer* p)
 {
+	float vx = p->x - e->x, vz = p->z - e->z, l2 = vx * vx + vz * vz;
+	for (int i = 0; i < ENEMY_MAX && l2 > 1.0f; i++) {
+		const Enemy* o = &s_en[i];
+		if (o == e || !o->used || o->kind == EN_KIND_ARM || o->kind == EN_KIND_IKE || o->kind == EN_KIND_NEST ||
+		    o->y - o->tall > e->y - 500.0f || o->y < e->y - 500.0f || !enemy_alive(o))
+			continue;
+		float t = ((o->x - e->x) * vx + (o->z - e->z) * vz) / l2;
+		if (t <= 0.0f || t >= 1.0f)
+			continue;
+		float dx = e->x + vx * t - o->x, dz = e->z + vz * t - o->z, r = o->size * 0.8f;
+		if (dx * dx + dz * dz < r * r)
+			return false;
+	}
 	if (!s_col)
 		return true;
 	float cx = p->x, cz = p->z;
@@ -660,13 +676,15 @@ static bool line_of_sight(const Enemy* e, const EnPlayer* p)
 	return dx * dx + dz * dz < 40.0f * 40.0f;
 }
 
-// Flashlight on the enemy (0x542cd0 tests the light cone against the enemy position).
+// The flashlight on the enemy (0x542cd0): within a sphere ahead of the lamp, half the record's light start
+// (1500) ahead and that times the sine of its half angle (0.785) wide.
 static bool lit_by_player(const Enemy* e, const EnPlayer* p)
 {
-	if (!p->light || e->p_dist > 6000.0f)
+	if (!p->light)
 		return false;
-	float a = wrap(dir_to(p->x, p->z, e->x, e->z) - p->yaw);
-	return fabsf(a) < 0.42f;
+	float dx = e->x - p->x - sinf(p->yaw) * 750.0f, dz = e->z - p->z - cosf(p->yaw) * 750.0f;
+	float dy = e->y - p->y;
+	return dx * dx + dy * dy + dz * dz < 530.0f * 530.0f;
 }
 
 // 0x4a9aa0 with the EnSCU table: 0 nothing, 1 sees James, 2 feels him near, 3 James in spitting
@@ -1778,8 +1796,7 @@ static void acid(Enemy* e, const EnPlayer* p, float dt)
 		e->acid_acc = 0.0f;
 		return;
 	}
-	int st = ev_stage();
-	float len = (st >= 1 && st <= 4) || st == 17 ? 2500.0f : 1250.0f;
+	float len = town_stage() ? 2500.0f : 1250.0f;
 	float pos[3] = { e->x, e->y - 700.0f, e->z };
 	float vec[3] = { sinf(e->yaw) * len, (p->y - e->y) * 0.5f, cosf(e->yaw) * len };
 	u8 grey = light_index(p) == 3 ? 0x18 : 0x80;
