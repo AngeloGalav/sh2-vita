@@ -121,9 +121,9 @@ also writes the sheets at their own size with alpha (`pack/sheet/<dir>/<name>.t3
 tables these overlays read from the exe (`pack/pic/overlay.dat`: the clock hands' sprites, the
 desk coins' places, the trunk's letters and places, the tombstone, the box and the wall). The panels
 on the bottom screen still print each puzzle's state. The music box and the hanging corpses are
-3D models on the PC, not overlays. The PC moves a cursor over the hospital elevator's five buttons
-(0x58c820, centres at 0x8da814); the port keeps its floor list on the bottom screen and lights the
-PC's button once a floor is chosen.
+3D models on the PC, not overlays. The elevators have the PC's
+cursor (0x4a25c0, `p_cursor`): over the hospital's five buttons (0x58c820, 0x5885f0, centres at 0x8da814
+and 0x8d83bc) and the hotel's six (0x579460, 0x577540); the other puzzles keep the port's D-pad choice.
 
 The seven stills that used to be skipped are converted now: `htl/p_hanging` and `p_hanging2` are
 PC files with 8-bit indices and an RGBA palette (format 8), and `hsp/p_box_key`,
