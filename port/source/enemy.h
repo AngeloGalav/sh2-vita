@@ -116,6 +116,8 @@ typedef struct {
 	// blend, whether that one cuts in instead, and whether its blend history is set up
 	float anim_age;
 	bool anim_new, anim_cut, drawn;
+	float hold;              // seconds a new anim still stands on its first frame (0x551820)
+	float regain_wait;       // Pyramid Head: ticks until his endurance comes back again (0x4bede0)
 	// 3DS-only: a body James killed takes stomps while he stays by it (enemy_corpse_stompable), and
 	// the stomps it took (main.c sprays blood on each)
 	bool corpse_open;

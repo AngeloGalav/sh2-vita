@@ -333,6 +333,9 @@ static void anim_set(Enemy* e, int a)
 		e->anim_cut = e->anim_age < 10.0f / 30.0f ||
 		              (a == 0x1c && (e->kind == EN_KIND_SCU || e->kind == EN_KIND_MKN)) ||
 		              (a == 7 && e->kind == EN_KIND_RED);
+		// 0x538920 mode 4: the crossfade's 8 refreshes (4 of the PC's frames) stand on the new clip's
+		// first frame (0x551820 states 4 and 3); only then does it play
+		e->hold = e->anim_cut ? 0.0f : 4.0f / 30.0f;
 	}
 	e->rate = 1.0f;
 	e->loops = 0;
@@ -363,6 +366,10 @@ static float anim_step(Enemy* e, float dt)
 	if (e->anim_end || t->speed == 0) {
 		if (t->speed == 0)
 			e->anim_end = true;
+		return 0.0f;
+	}
+	if (e->hold > 0.0f) {
+		e->hold -= dt;
 		return 0.0f;
 	}
 	e->frame += adv;
@@ -6413,7 +6420,7 @@ void enemy_draw(const C3D_Mtx* view, int uModelView, int uBones, float dt)
 				e->anim_new = false;
 			}
 			if (e->anim_new) {
-				chr_blend_start(bl, e->anim_cut ? 0.0f : 8.0f / 30.0f);
+				chr_blend_start(bl, e->anim_cut ? 0.0f : 4.0f / 30.0f);
 				e->anim_new = false;
 			}
 			bl->loop_start = t->loop ? t->start : 0;
