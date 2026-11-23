@@ -762,6 +762,20 @@ static bool comm_heard_kind(const Enemy* e, int kind)
 	return false;
 }
 
+// 0x4a7f20: the nearest call of that kind it hears, for where it came from.
+static const Comm* comm_call(const Enemy* e, int kind)
+{
+	const Comm* best = NULL;
+	float bd = 1e18f;
+	for (int i = 0; i < 8; i++) {
+		const Comm* c = &s_comm[i];
+		float dx = e->x - c->x, dz = e->z - c->z, d = dx * dx + dz * dz;
+		if (c->time > 0.0f && c->kind == kind && d < c->radius * c->radius && d < bd)
+			best = c, bd = d;
+	}
+	return best;
+}
+
 static bool comm_heard(const Enemy* e) { return comm_heard_kind(e, 1); }
 
 // The blow can catch Maria too when she stands in it (the PC tests the attack against every
@@ -2638,6 +2652,28 @@ static void tyu_wander(Enemy* e, const EnPlayer* p, float dt)          // 0x4af6
 	int s = tyu_sense(e, p);
 	if (s == 2) go_raw(e, TYU_ATTACK);
 	else if (s == 1) go_raw(e, TYU_CHASE);
+	else if (comm_heard_kind(e, 3)) go_raw(e, TYU_TARGET);
+}
+
+// 0x4afb90: runs to where another was hit (a call of kind 3) until it fades.
+static void tyu_target(Enemy* e, const EnPlayer* p, float dt)
+{
+	if (check_damage(e)) { go_raw(e, TYU_DAMAGE); return; }
+	const Comm* c = comm_call(e, 3);
+	if (!c) { go_raw(e, TYU_WANDER); return; }
+	if (e->slv == 0) {
+		anim_set(e, 1);
+		e->path_angle = e->yaw;
+		e->slv = 1;
+	}
+	steer(e, c->x, c->z);
+	float off = fabsf(wrap(dir_to(e->x, e->z, c->x, c->z) - e->yaw));
+	tyu_move(e, tyu_speed() * ((PI - off) / PI + 1.0f) * 0.5f, dt);
+	int s = tyu_sense(e, p);
+	if (s == 2) go_raw(e, TYU_ATTACK);
+	else if (s == 1) go_raw(e, TYU_CHASE);
+	if (tyu_under_foot(e))
+		e->vx = e->vz = 0.0f;
 }
 
 static void tyu_chase(Enemy* e, const EnPlayer* p, float dt)           // 0x4afa00
@@ -2958,6 +2994,17 @@ static void tyu_on_ceiling(Enemy* e, const EnPlayer* p, float dt)       // 0x4b0
 	e->rate = 1.0f;
 }
 
+// Out of health (0x4ae3e0): a kick or stomp (0x4a5ea0, 31..40) kills it at once.
+static void tyu_out(Enemy* e)
+{
+	if (e->last_atk >= 31 && e->last_atk <= 40) {
+		go_raw(e, TYU_DYING);
+		return;
+	}
+	set_timer(e, 300);
+	e->slv = 2;
+}
+
 static void tyu_damage(Enemy* e, const EnPlayer* p, float dt)
 {
 	(void)p;
@@ -2977,13 +3024,32 @@ static void tyu_damage(Enemy* e, const EnPlayer* p, float dt)
 	if (e->slv == 0) {
 		tyu_stun(e, reduce_hp(e));
 		e->rate = 0.0f;                 // 0x4a7b60: the legs stop
-		if (is_dead(e)) { go_raw(e, TYU_DYING); return; }
+		if (s_diff > 0)                 // calls those within 5000 (0x4a7e60)
+			comm_add(e->x, e->z, 5000.0f, is_dead(e) ? 300 : 180, 3);
+		if (is_dead(e)) { tyu_out(e); return; }
 		e->slv = 1;
+		return;
+	}
+	if (e->slv == 2) {
+		// out of health: it lies there 300 ticks more, a blow starting them again; a kick or stomp ends it
+		if (check_damage(e)) {
+			reduce_hp(e);
+			set_hitback(e);
+			tyu_out(e);
+			return;
+		}
+		if (reduce_timer(e, (int)(dt * 60.0f + 0.5f)) <= 0)
+			go_raw(e, TYU_DYING);
 		return;
 	}
 	if (check_damage(e)) {
 		tyu_stun(e, reduce_hp(e));
-		if (is_dead(e)) { go_raw(e, TYU_DYING); return; }
+		if (is_dead(e)) {
+			if (s_diff > 0)
+				comm_add(e->x, e->z, 5000.0f, 300, 3);
+			tyu_out(e);
+			return;
+		}
 	}
 	if (reduce_timer(e, (int)(dt * 60.0f + 0.5f)) > 0 || e->hb != 0.0f)
 		return;
@@ -3014,7 +3080,8 @@ static void tyu_update(Enemy* e, const EnPlayer* p, float dt)
 	if (e->ctrl != 1)
 		return;
 	switch (e->mlv) {
-	case TYU_WANDER: case TYU_TARGET: case TYU_EVENT:
+	case TYU_TARGET: tyu_target(e, p, dt); break;
+	case TYU_WANDER: case TYU_EVENT:
 		tyu_wander(e, p, dt);
 		break;
 	case TYU_WALL: tyu_on_wall(e, p, dt); break;
@@ -6700,7 +6767,8 @@ bool enemy_alive(const Enemy* e)
 	// (+0x148 bit 2) only once it dies, and until then 0x542a10 lets James stomp it and blows reach it
 	int down = !e ? 0 : e->kind == EN_KIND_MKN ? MKN_DOWN : e->kind == EN_KIND_NSE ? NSE_DOWN : SCU_DOWN;
 	bool throes = e && e->kind != EN_KIND_TYU && e->mlv == down && e->slv == 4;
-	return e && e->used && e->mlv != dying && (e->hp > 0.0f || throes);
+	bool out = e && e->kind == EN_KIND_TYU && e->mlv == TYU_DAMAGE && e->slv == 2;   // a creeper lying at 0 health
+	return e && e->used && e->mlv != dying && (e->hp > 0.0f || throes || out);
 }
 
 bool enemy_is_down(const Enemy* e)
