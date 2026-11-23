@@ -2324,8 +2324,10 @@ static bool fall_update(float dt)
 		return false;
 	}
 	if (s_fall_y - s_py > 100.0f || s_fall_v > 0.0f) {
-		if (s_fall_y - s_py > 250.0f)
+		if (s_fall_y - s_py > 250.0f && !s_fall_deep) {
 			s_fall_deep = true;
+			combat_fall(cosf(atan2f(s_vel[0], s_vel[1]) - s_yaw) < 0.0f && (s_vel[0] != 0.0f || s_vel[1] != 0.0f));
+		}
 		s_fall_v += 9.8f * 500.0f * dt;
 		s_py += s_fall_v * dt;
 		if (s_py >= s_fall_y - 100.0f) {
@@ -2609,10 +2611,6 @@ static void player_update(const circlePosition* cp, u32 held, float dt)
 	s_turn_speed = mo.turn_speed;
 	float ox = s_px, oz = s_pz;
 	if (s_have_col) {
-		if (fall_update(dt)) {
-			s_vel[0] = s_vel[1] = 0.0f;
-			return;
-		}
 		s_drop = false;
 		walk_move(&s_px, &s_py, &s_pz, mo.dx, mo.dz, true);
 		if (s_drop)
@@ -6321,6 +6319,7 @@ int main(void)
 					}
 					if (s_debug_weapon && combat_equip_item(s_debug_weapon))
 						s_debug_weapon = 0;
+					bool falling = fall_update(dt);
 					bool busy = !boat_active() && combat_update(&body, &cp, gdown, free_held, dt,
 					                                            s_have_col ? &s_col : NULL, &free_held);
 					// the play page's Action hint: Attack while the weapon is up (Action attacks only
@@ -6329,9 +6328,11 @@ int main(void)
 					touchui_action_attacks(combat_legs(&al) && al.aim);
 					// the legs go on under the weapon as far as it lets them (combat_legs)
 					CombatLegs lg;
-					if (!busy || combat_legs(&lg))
+					if (falling)
+						s_vel[0] = s_vel[1] = 0.0f;
+					else if (!busy || combat_legs(&lg))
 						player_update(&cp, free_held, dt);
-					if (!busy)
+					if (!busy && !falling)
 						events_update(gdown);
 				}
 				if (!prog_running() || !prog_player_locked()) {

@@ -54,6 +54,7 @@ static const JAnim J_STAND = { 1, 10, 1, 256 };       // 101
 static const JAnim J_WALK = { 51, 74, 1, 1408 };      // 104
 static const JAnim J_RUN = { 147, 170, 1, 2048 };     // 108
 static const JAnim J_HURT = { 453, 470, 0, 1024 };    // 121
+static const JAnim J_FALL[2] = { { 221, 245, 0, 1024 }, { 256, 280, 0, 1024 } };   // 111, 112 (0x6ceb3c: state 0x18)
 static const JAnim J_GUARD = { 445, 449, 0, 1536 };   // 119
 static const JAnim J_GUARD_HIT = { 486, 502, 0, 1536 };   // 123
 // The fall James (or Maria) dies in. The base table's 111 and 112 (0x6ceac4: 221-245, 256-280) are
@@ -278,7 +279,7 @@ static const PlayerDef PLAYERS[2] = {
 };
 
 enum { M_FREE, M_RAISE, M_READY, M_SWING, M_REBOUND, M_RECOVER, M_LOWER, M_SHOT, M_RELOAD, M_STOMP, M_SPRAY,
-       M_GUARD, M_HURT, M_HELD, M_DYING, M_DEAD };
+       M_GUARD, M_FALL, M_HURT, M_HELD, M_DYING, M_DEAD };
 
 static Character* s_james;       // main's player model: James, or Maria in Born From a Wish
 static bool s_maria;              // the model and weapons are Maria's
@@ -934,9 +935,21 @@ bool combat_held(void) { return s_mode == M_HELD; }
 // 0x542e00, which the enemies' senses ask (0x4a9aa0, 0x4a5fc0): James is in his damage motion (0x1fbad18)
 // or it ended less than 2 seconds ago (0x1fbacdc: 2.0 set by 0x547bf0 / 0x54e0f0 as state 0x19 ends, the
 // frame time taken off it by 0x556490). No attack starts meanwhile; one under way goes on.
+// 0x52eb40's falling state (0x18): clip 111, or 112 when he goes backwards.
+void combat_fall(bool back)
+{
+	if (!s_ok || s_maria || s_mode >= M_HURT)
+		return;
+	s_mode = M_FALL;
+	s_target = NULL;
+	s_attack_seq = false;
+	s_charge = s_free_charge = -1.0f;
+	play(&J_FALL[back]);
+}
+
 bool combat_busy(void)
 {
-	return s_mode == M_HURT || s_mode == M_HELD || s_lull > 0.0f || (s_mode == M_GUARD && s_cur == &J_GUARD_HIT);
+	return s_mode == M_FALL || s_mode == M_HURT || s_mode == M_HELD || s_lull > 0.0f || (s_mode == M_GUARD && s_cur == &J_GUARD_HIT);
 }
 
 // 0x542de0: the enemy James is kicking or stomping now.
@@ -2409,6 +2422,9 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		}
 		break;
 	}
+	case M_FALL:
+		if (s_end) { s_mode = M_FREE; play(&J_STAND); return false; }
+		break;
 	case M_GUARD:
 		aim_turn(b, dt);
 		if (s_cur == &J_GUARD_HIT) {
@@ -2603,7 +2619,7 @@ void combat_set_parts(int move_state)
 	case M_GUARD:
 		g = 3;
 		break;
-	case M_HURT: case M_HELD: case M_DYING: case M_DEAD: g = 2; break;
+	case M_FALL: case M_HURT: case M_HELD: case M_DYING: case M_DEAD: g = 2; break;
 	default: break;
 	}
 	int r = 3, l = 14;
@@ -2638,7 +2654,7 @@ void combat_set_parts(int move_state)
 const char* combat_status(void)
 {
 	static const char* names[] = { "free", "raise", "ready", "swing", "rebound", "recover", "lower",
-	                               "shot", "reload", "stomp", "spray", "guard", "hurt", "held", "dying", "dead" };
+	                               "shot", "reload", "stomp", "spray", "guard", "fall", "hurt", "held", "dying", "dead" };
 	// the candidates in sight, L when one is locked (the debug page shows the first 16 characters)
 	snprintf(s_line, sizeof s_line, "HP%3.0f %s %c%d g%d%s", s_hp, names[s_mode], s_target ? 'L' : 'c', s_ncand,
 	         WEAPONS[s_weapon].grip, s_attack_seq ? " seq" : "");
