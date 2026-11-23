@@ -57,34 +57,41 @@ float levels_gain(const char* dir, const char* name, int stream, float target, f
 void levels_limiter(LevelLimiter* l, s32* lr, int frames, u32 rate)
 {
 	const float ceil = 24576.0f;
-	float back = 32.0f / (0.08f * (float)(rate ? rate : 32000));   // per block towards 1
-	if (l->gain <= 0.0f || l->gain > 1.0f)
+	float back = 32.0f / (0.35f * (float)(rate ? rate : 32000));   // per block towards 1
+	if (!l->on) {
+		memset(l, 0, sizeof *l);
 		l->gain = 1.0f;
-	for (int i = 0; i < frames; i += 32) {
-		int n = frames - i < 32 ? frames - i : 32;
+		l->on = true;
+		for (int k = 0; k < LEVEL_LOOK; k++)
+			l->need[k] = 1.0f;
+	}
+	for (int i = 0; i + 32 <= frames; i += 32) {
 		s32* b = lr + 2 * i;
 		s32 peak = 0;
-		for (int k = 0; k < 2 * n; k++) {
+		for (int k = 0; k < 64; k++) {
 			s32 a = b[k] < 0 ? -b[k] : b[k];
 			peak = a > peak ? a : peak;
 		}
 		float need = (float)peak > ceil ? ceil / (float)peak : 1.0f;
+		// the block going out is the oldest held; the line from the gain now must be down to each later
+		// block's need where that block starts (the first two by the end of this one)
+		s32* o = l->held[l->at];
 		float g0 = l->gain, g1 = g0 + (1.0f - g0) * (back > 1.0f ? 1.0f : back);
-		if (need < g1) {
-			l->gain = need;                   // down at once, for the whole block
-			if (need >= 1.0f)
-				continue;
-			for (int k = 0; k < 2 * n; k++)
-				b[k] = (s32)((float)b[k] * need);
-		} else {
-			l->gain = g1;                     // back up, ramped across the block
-			if (g0 >= 1.0f && g1 >= 1.0f)
-				continue;
-			for (int j = 0; j < n; j++) {
-				float g = g0 + (g1 - g0) * (float)(j + 1) / (float)n;
-				b[2 * j] = (s32)((float)b[2 * j] * g);
-				b[2 * j + 1] = (s32)((float)b[2 * j + 1] * g);
-			}
+		for (int j = 0; j <= LEVEL_LOOK; j++) {
+			float v = j < LEVEL_LOOK ? l->need[(l->at + j) % LEVEL_LOOK] : need;
+			float lim = j <= 1 ? v : g0 + (v - g0) / (float)j;
+			g1 = lim < g1 ? lim : g1;
 		}
+		l->gain = g1;
+		s32 out[64];
+		for (int j = 0; j < 32; j++) {
+			float g = g0 + (g1 - g0) * (float)(j + 1) / 32.0f;
+			out[2 * j] = (s32)((float)o[2 * j] * g);
+			out[2 * j + 1] = (s32)((float)o[2 * j + 1] * g);
+		}
+		memcpy(o, b, sizeof l->held[0]);
+		l->need[l->at] = need;
+		l->at = (l->at + 1) % LEVEL_LOOK;
+		memcpy(b, out, sizeof out);
 	}
 }

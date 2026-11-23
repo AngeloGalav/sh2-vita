@@ -23,10 +23,14 @@
 // pack made before levels.py).
 float levels_gain(const char* dir, const char* name, int stream, float target, float max_peak, float fallback);
 
-// A peak limiter for the sound mixed in software: each block of 32 stereo frames is turned down at
-// once as far as keeps its peak at 3/4 of full scale, and the gain comes back over about 80 ms.
-// gain 0 (a zeroed struct) starts at 1.
-typedef struct { float gain; } LevelLimiter;
+// A peak limiter for the sound mixed in software, with a look-ahead: the sound comes out LEVEL_LOOK
+// blocks of 32 stereo frames (6 ms at 48 kHz) later, and the gain goes down in a straight line before a
+// peak, to keep it at 3/4 of full scale, and comes back over a third of a second. frames is a multiple of
+// 32 (a rest goes through as it is). A zeroed struct starts at gain 1, with silence. It turned each block
+// down at once until 2026-11-24: up to 80 steps a second of up to 6 dB on the forest's music (measured),
+// the crackle in loud bass.
+#define LEVEL_LOOK 9
+typedef struct { float gain; int at; s32 held[LEVEL_LOOK][64]; float need[LEVEL_LOOK]; bool on; } LevelLimiter;
 void levels_limiter(LevelLimiter* l, s32* lr, int frames, u32 rate);
 
 // A sample mixed in software, to 16 bits: as it is up to 3/4 of full scale, bent smoothly towards
