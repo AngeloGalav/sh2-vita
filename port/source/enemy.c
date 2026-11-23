@@ -2317,10 +2317,14 @@ static void mkn_init(Enemy* e, int status)
 // 0x4ba970 attack, 0x4bac00 damage, 0x4badc0 confuse, 0x4bae80 down and the common dying 0x4a96c0.
 // Damage and down follow the same en_common template as the Lying Figure's and share its code.
 
-static float nse_walk_rate(const Enemy* e)                     // 0x4b9e20, times the speed factor
+static float nse_walk_rate(const Enemy* e, const EnPlayer* p)  // 0x4b9e20, times the speed factor
 {
 	static const float t[5] = { 0.7f, 0.8f, 1.0f, 1.2f, 1.5f };
-	return t[s_diff] * e->speed_mul;
+	float r = t[s_diff] * (hp_rate(e) * 0.005f + 0.5f);
+	int li = light_index(p);
+	if (li <= 1 && s_diff >= 2) r *= 1.2f;
+	else if (li == 3 && s_diff <= 2) r *= 0.8f;
+	return r * e->speed_mul;
 }
 
 static float nse_turn_rate(const EnPlayer* p)                  // 0x4b9f50: radians per 1/60 s
@@ -2330,11 +2334,11 @@ static float nse_turn_rate(const EnPlayer* p)                  // 0x4b9f50: radi
 }
 
 // The walk speed factor (+0xa8) moves toward its target (+0xac) by at most 0.01 a PC frame.
-static void nse_speed_drift(Enemy* e, float dt)
+static void nse_speed_drift(Enemy* e, const EnPlayer* p, float dt)
 {
 	float d = e->speed_goal - e->speed_mul, m = 0.01f * pc_frames(dt);
 	e->speed_mul += d < -m ? -m : d > m ? m : d;
-	e->rate = nse_walk_rate(e);
+	e->rate = nse_walk_rate(e, p);
 }
 
 static void nse_wander(Enemy* e, const EnPlayer* p, float dt)          // 0x4ba3f0
@@ -2367,7 +2371,7 @@ static void nse_wander(Enemy* e, const EnPlayer* p, float dt)          // 0x4ba3
 		e->slv = 1;
 	}
 	if (e->anim == A_WALK)
-		nse_speed_drift(e, dt);
+		nse_speed_drift(e, p, dt);
 	steer(e, e->x + sinf(dir) * 1000.0f, e->z + cosf(dir) * 1000.0f);
 	approach_angle(&e->path_angle, e->mark_angle, nse_turn_rate(p) * dt * 60.0f);
 	e->yaw = e->path_angle;
@@ -2407,7 +2411,7 @@ static void nse_chase(Enemy* e, const EnPlayer* p, float dt)           // 0x4ba7
 	// 0x4a66c0: full speed when heading straight for James, half when he is behind
 	float off = fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw));
 	e->speed_goal = ((PI - off) / PI + 1.0f) * 0.5f;
-	nse_speed_drift(e, dt);
+	nse_speed_drift(e, p, dt);
 	approach_angle(&e->path_angle, e->mark_angle, nse_turn_rate(p) * dt * 60.0f);
 	e->yaw = e->path_angle;
 	recover_endurance(e, dt);
@@ -2422,13 +2426,16 @@ static void nse_attack_hit(Enemy* e, const EnPlayer* p)
 	float f = e->frame - NSE_ANIM[e->anim].start;
 	if (!e->attacking || f < (a3 ? 15.0f : 13.0f) || f > (a3 ? 18.99f : 16.99f))
 		return;
-	blow_maria(e, 700.0f, 1.0f, a3 ? 20.0f : 15.0f);
+	// 0x544170 sweeps the pipe's tip (bone 24, 250 out): in the overhead swing's frames it is at most 560
+	// from her, 40 degrees to one side to 14 to the other, in the jab's 790 straight ahead
+	float reach = a3 ? 560.0f : 790.0f, arc = a3 ? 0.6f : 0.35f;
+	blow_maria(e, reach, arc, a3 ? 20.0f : 15.0f);
 	if (e->attack_hit || !p->alive)
 		return;
 	float dx = p->x - e->x, dz = p->z - e->z;
 	float d = sqrtf(dx * dx + dz * dz);
 	float a = fabsf(wrap(atan2f(dx, dz) - e->yaw));
-	if (d < 250.0f + 450.0f + 130.0f && a < 1.0f) {
+	if (d < reach + 150.0f && a < arc) {
 		e->attack_hit = true;
 		hit_james(p, a3 ? 46 : 47, a3 ? 20.0f : 15.0f, e);
 	}
@@ -2438,19 +2445,23 @@ static void nse_attack(Enemy* e, const EnPlayer* p, float dt)          // 0x4ba9
 {
 	static const float prob[5] = { 0.1f, 0.5f, 0.7f, 0.9f, 1.0f };     // 0x4b9eb0
 	static const float rate[5] = { 0.5f, 0.8f, 1.0f, 1.1f, 1.2f };     // 0x4b9ef0
-	if (check_damage(e)) { e->attacking = false; go(e, SCU_DAMAGE); return; }
+	if (check_damage(e)) { e->attacking = false; size_upright(e, false); go(e, SCU_DAMAGE); return; }
 	if (e->slv == 0) {
 		if (rnd() >= prob[s_diff]) {
-			pose(e, A_STAND);              // hesitates
+			// hesitates; again straight after, the stand she is in has ended already (0x4a7b80 does not
+			// start its wait over), so she rolls again the next frame
+			if (e->anim != A_STAND || !e->anim_end)
+				pose(e, A_STAND);
 			e->slv = 2;
 		} else {
 			int a = sight_check(e, p, dt) == 4 && rnd() < (s_diff + 1.0f) * 0.2f ? 4 : 3;
 			anim_set(e, a);
 			e->frame = NSE_ANIM[a].start;
-			e->rate = rate[s_diff];
+			e->rate = rate[s_diff] * (hp_rate(e) * 0.005f + 0.5f);   // 0x4b9ef0
 			e->attacking = true;
 			e->attack_hit = e->maria_hit = false;
 			e->path_angle = e->yaw;
+			set_size(e, 300.0f, 800.0f, false);   // 0x4ba970: her column is wide while she swings
 			play_at(e, 12107 + (int)(rnd() * 1.99f));     // 0x4ba130, SE 0x2f4b / 0x2f4c
 			e->slv = 1;
 		}
@@ -2464,12 +2475,12 @@ static void nse_attack(Enemy* e, const EnPlayer* p, float dt)          // 0x4ba9
 			e->attacking = false;
 			e->slv = 0;
 			if (sight_check(e, p, dt) < 3)
-				go(e, SCU_CHASE);
+				{ size_upright(e, false); go(e, SCU_CHASE); }
 		}
 	} else if (e->anim_end) {
 		e->slv = 0;
 		if (sight_check(e, p, dt) < 3)
-			go(e, SCU_CHASE);
+			{ size_upright(e, false); go(e, SCU_CHASE); }
 	}
 	recover_endurance(e, dt);
 }
