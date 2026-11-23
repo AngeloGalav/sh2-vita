@@ -327,6 +327,7 @@ static const AttackInfo* s_stomp_atk;   // ATK_KICK or ATK_STOMP while M_STOMP
 static float s_hold;                    // grab meter (DAT_01fbacd4): frame times of struggling left
 static int s_stick_dir;                 // last circle pad direction (0 centre, 1..4), for flicks
 static float s_invuln, s_dead_t, s_flash;
+static float s_lull;                    // 0x1fbacdc (combat_busy)
 static float s_shot_t = -1.0f;         // seconds since the last shot, < 0 once its light is out
 static float s_die_t;                    // since the killing blow (combat_dying_time)
 static float s_hit_t = 99.0f;            // since the last blow that hurt (combat_hit_time)
@@ -740,7 +741,7 @@ void combat_reset(void)
 	s_hp_recover = 0.0f;
 	s_mode = M_FREE;
 	s_side = 0;
-	s_invuln = s_dead_t = s_flash = 0.0f;
+	s_invuln = s_dead_t = s_flash = s_lull = 0.0f;
 	s_shot_t = -1.0f;
 	s_target = NULL;
 	s_ncand = 0;
@@ -926,6 +927,14 @@ void combat_grab_james(float meter)
 
 bool combat_held(void) { return s_mode == M_HELD; }
 
+// 0x542e00, which the enemies' senses ask (0x4a9aa0, 0x4a5fc0): James is in his damage motion (0x1fbad18)
+// or it ended less than 2 seconds ago (0x1fbacdc: 2.0 set by 0x547bf0 / 0x54e0f0 as state 0x19 ends, the
+// frame time taken off it by 0x556490). No attack starts meanwhile; one under way goes on.
+bool combat_busy(void) { return s_mode == M_HURT || s_mode == M_HELD || s_lull > 0.0f; }
+
+// 0x542de0: the enemy James is kicking or stomping now.
+const Enemy* combat_stomp_enemy(void) { return s_mode == M_STOMP ? s_stomp_e : NULL; }
+
 // en_ike state 8 (0x4b7ff0): the game is over only when the lift has ended (DAT_01fbad17 = 2,
 // 0x4a63b0).
 void combat_carry_james(bool on, float x, float y, float z)
@@ -1089,20 +1098,12 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 		play(fall ? fall : &J_DIE);
 		return;
 	}
-	if (attack_id == 42 && s_mode >= M_RAISE && s_mode <= M_RELOAD) {
-		// The acid spray (kind 4, shBattleAttackByEnemyFog) burns without knocking the weapon down:
-		// James keeps fighting. Blows (kinds 2 and 3) make him flinch.
-		s_invuln = 1.0f;
-		sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);
-		return;
-	}
 	// 0x5350d0: a blow that lands while the damage motion still plays (0x1fbad18 set, cleared by the
 	// damage state 0x547900 / 0x54db90 at the motion's end) takes its health and nothing more; the
 	// motion is not started again, so a room of biting creepers cannot keep James from moving.
 	if (s_mode == M_HURT)
 		return;
 	s_mode = M_HURT;
-	s_invuln = 1.0f;     // a port stand-in: no such timer found in 0x5350d0 (STATUS section 3)
 	sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);   // injured (four or five takes)
 	const JAnim* hurt = damage_motion(attack_id, false, from_x, from_z);
 	play(hurt ? hurt : &J_HURT);
@@ -1976,6 +1977,8 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 	s_had_plank = plank;
 	if (s_invuln > 0.0f)
 		s_invuln -= dt;
+	if (s_lull > 0.0f)
+		s_lull -= dt;
 	if (s_flash > 0.0f)
 		s_flash -= dt;
 	if (s_shot_t >= 0.0f && (s_shot_t += dt) > 7.0f / 30.0f)
@@ -2352,7 +2355,7 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		break;
 	case M_HURT:
 		push_update(b, dt);
-		if (s_end) { s_mode = M_FREE; s_push_t = 0.0f; play(&J_STAND); return false; }
+		if (s_end) { s_mode = M_FREE; s_push_t = 0.0f; s_lull = 2.0f; play(&J_STAND); return false; }
 		break;
 	case M_HELD: {
 		// hurt pose held in its middle while he struggles

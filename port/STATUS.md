@@ -545,9 +545,8 @@ Ordered by weight. Each line names where the work starts.
 - James' damage and death (`combat.c` `damage_motion`): 0x534700's table picks the clip by attack, by
   a killing blow and by a blow from behind, from the stage's own `jms_stg_*.anm`. `die_range` and anime
   121 remain only for attacks or stages with no such clip, and for Maria (0x549a10 is not ported), and
-  the attacker-kind 0x204 case of 0x534700 uses the blow's direction. Not run on a console. After a blow James can't be hurt
-  again for a second (`s_invuln`), a timer with no PC address: 0x5350d0 shows none, and the PC's
-  damage motion (0x1fbad18) may be the whole of it. A swing does not play back off a wall
+  the attacker-kind 0x204 case of 0x534700 uses the blow's direction. Not run on a console. A blow during the motion takes its
+  health and nothing more, as 0x5350d0; `s_invuln` (a second) is left only where he struggles free of a hold. A swing does not play back off a wall
   (0x5350d0 with +0x124 2 or 3), only off an enemy.
 - Model parts (`combat_set_parts`, `demo.c`): James' left hand reads the port's states for the PC's
   upper-body ones, so walking into a wall counts as walking, being held as DAMAGE, a reload as ATTACK,

@@ -701,6 +701,8 @@ static int sight_check(Enemy* e, const EnPlayer* p, float dt)
 		e->alert += dt;
 		if (e->alert > 3.0f) e->alert = 3.0f;
 	}
+	if (!p->maria && combat_busy())
+		return res;                 // 0x542e00: no attack during his damage motion, nor for 2 s after
 	if (nse) {
 		if (los && d < 1500.0f && ang < 0.0872665f) return 3;
 		if (los && d < 900.0f && ang < 0.5235988f) return 4;
@@ -1864,7 +1866,7 @@ static int mkn_wake(const Enemy* e, const EnPlayer* p)
 	}
 	if (!near)
 		return d < 900.0f ? 1 : 0;
-	return d < 1000.0f ? 2 : 1;
+	return d < 1000.0f && (p->maria || !combat_busy()) ? 2 : 1;
 }
 
 // attacks 44 (anime 3, arm swing) / 45 (anime 4, kick): kind 2, ap 18, sp 10, reach 400, frames 19..22
@@ -2979,9 +2981,9 @@ static int red_sense(Enemy* e, const EnPlayer* p)
 		return 0;
 	if (e->anim == 1 && e->frame - RED_ANIM[1].start < 20.0f)
 		return 1;                       // not in the first steps of a walk
-	if (!p->maria && combat_held())
-		return 1;                       // 0x4a5fc0: James is busy
 	float a = wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw), d = e->p_dist;
+	if (!p->maria && combat_busy())     // 0x4a5fc0: James is busy; a side swing now and then (0.05)
+		return d < 500.0f && a < 0.5235988f && a > -0.6981317f && rnd() < 0.05f ? 4 : 1;
 	if (e->type == 2 && d < 500.0f && fabsf(a) < 0.5235988f) return 5;
 	if (e->cnt > 2 && d < 1500.0f && fabsf(a) < 0.1221730f) return 3;
 	if (d < 900.0f && fabsf(a) < 0.1745329f) return 2;
@@ -3438,7 +3440,7 @@ static int pap_sense(Enemy* e, const EnPlayer* p)
 	if (!p->alive || e->p_dist > 2500.0f || !line_of_sight(e, p))
 		return 0;
 	float a = fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw));
-	bool busy = !p->maria && combat_held();
+	bool busy = !p->maria && combat_busy();
 	if (!busy && a < 0.174533f && e->p_dist < 130.0f + 405.0f - (e->mlv == PAP_RUSH ? 100.0f : 0.0f))
 		return 2;
 	return a <= 0.174533f ? 1 : 0;
@@ -3842,7 +3844,7 @@ static int oni_sense(const Enemy* e, const EnPlayer* p)
 	if (!p->alive) return 0;
 	if (!line_of_sight(e, p)) return p->light ? 1 : 0;
 	if (e->p_dist > feel[s_diff] * (light_index(p) == 3 ? 0.75f : 1.0f)) return 0;
-	if (!p->maria && combat_held()) return 1;
+	if (!p->maria && combat_busy()) return 1;
 	if (e->type == 2) {
 		const Enemy* o = oni_partner(e);
 		if (o && (o->mlv == ONI_THRUST || o->mlv == ONI_SWINGS)) return 1;
@@ -4348,7 +4350,7 @@ static float bos_speed(void)                                   // 0x4b4590
 // 0x4b4300: 2 grab (400..700 away, 5 degrees, James' back half turned), 1 swipe (within 600).
 static int bos_can_attack(const Enemy* e, const EnPlayer* p)
 {
-	if (p->maria || combat_held() || !p->alive) return 0;
+	if (p->maria || combat_busy() || !p->alive) return 0;
 	float fa = fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw));
 	float fb = fabsf(wrap(p->yaw - e->yaw));
 	if (e->p_dist > 400.0f && e->p_dist < 700.0f && fa < 0.0873f && fb > 1.396f) return 2;
@@ -5474,7 +5476,7 @@ static void ike_update(Enemy* e, const EnPlayer* p, float dt)
 		// 0x4b84e0: touching James grabs, a clear line within 1000 and 10 degrees kicks (normal
 		// and up), beyond 2500 it loses him
 		float gap = e->p_dist - 130.0f - e->size * 0.8f;
-		bool busy = p->maria || combat_held() || !p->alive;
+		bool busy = p->maria || combat_busy() || !p->alive;
 		if (gap < 50.0f && !busy && !ike_other_grabbing(e)) { go_raw(e, IKE_GRAB); break; }
 		float a = fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw));
 		if (e->timer > 0) e->timer = e->timer > ticks ? e->timer - ticks : 0;
