@@ -172,8 +172,8 @@ n and n+1 are both clear and the pickup sets n+1. It is tested by 0x48b980 (`Ite
 same 400 radius and 30 degree cone as a look point, height window `py - 750 <= y <= py + 100`.
 `EventItemConditionCheck` leaves class 2, 3 and 6 pickups out on easy, 1, 3 and 5 on normal and 1, 2
 and 4 on hard (every Director's Cut pickup is class 0). Condition type 1 needs flag 251 (35 pickups in
-the town at night), type 2 lets the pickup be taken only while flag 108 is clear (four boxes in ap64),
-and type 3 hides the model on flag 232 and the pickup on flag 240 (hp210). The room loader 0x490080
+the town at night), type 2 lets the pickup be taken only once flag 108 is set (ap64's safe open, four boxes),
+and type 3 shows the model from flag 232 and lets the pickup be taken from flag 240 (hp210). The room loader 0x490080
 puts each pickup's model down (kind 1..7: 0x703, 0x724, 0x723, 0x700, 0x701, 0x733, 0x749) when the
 model test passes; in a dark room the pickup also needs the flashlight lit (0x48e520).
 Items live in rooms but often sit on furniture, so their y is commonly a few hundred units above

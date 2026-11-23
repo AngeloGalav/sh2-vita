@@ -103,8 +103,8 @@ static int old_cond_type(int flag)
 // EventItemConditionCheck (0x48cb20): whether a pickup is there. The room loader (0x490080) asks it
 // for the pickup's model (pickup false), EventCheckLookLine (0x48e520) for the pickup itself. The
 // action level leaves out classes 2, 3 and 6 on easy, 1, 3 and 5 on normal and 1, 2 and 4 on hard;
-// condition type 1 needs flag 251 (the town at night), type 2's pickup flag 108 clear, and type 3
-// flag 232 clear for its model and 240 for its pickup.
+// condition type 1 needs flag 251 (the town at night), type 2's pickup flag 108 (ap64's safe open),
+// and type 3 flag 232 for its model and 240 for its pickup.
 static bool item_there(const ItemRec* it, bool pickup)
 {
 	int cls = it->cond & 0x8000 ? it->cond & 7 : 0;
@@ -116,8 +116,8 @@ static bool item_there(const ItemRec* it, bool pickup)
 	}
 	switch (type) {
 	case 1: return ev_flag(251);
-	case 2: return !pickup || !ev_flag(108);
-	case 3: return !ev_flag(pickup ? 240 : 232);
+	case 2: return !pickup || ev_flag(108);
+	case 3: return ev_flag(pickup ? 240 : 232);
 	default: return true;
 	}
 }
