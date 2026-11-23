@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "sfx.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -96,7 +97,9 @@ static int s07_clock_time(Prog* p)
 }
 
 // The needles on the open clock (case 8 of 0x59c4b0): left / right turn the time, B leaves. The PC
-// plays SE 0x426c when the hands stop inside the 9:10 window, a hint kept here.
+// plays SE 0x426c when the hands stop inside the 9:10 window, a hint kept here. Its ticking (0x3e83, a
+// long looped clip) starts silent with the picture (case 3) and is heard only while the hands move
+// (0x5148f0: -960 otherwise); 0x515b60 stops it on leaving.
 static int clock_needles(Prog* p)
 {
 	if (!p_flag(83)) {
@@ -108,11 +111,16 @@ static int clock_needles(Prog* p)
 			if (t < 0) t += 0xb400;
 			if (t > 0xb400) t -= 0xb400;
 			CLOCK = (u16)t;
-			if (!p->work[0]) p_se(0x3e83);
+			if (!sfx_playing(0x3e83))
+				sfx_play(0x3e83, 1.0f, 0.0f);
+			sfx_set_volume(0x3e83, 1.0f);
 			p->work[0] = 1;
 		} else {
-			if (p->work[0] && CLOCK_OK)
-				p_se(0x426c);
+			if (p->work[0]) {
+				sfx_set_volume(0x3e83, 0.0f);
+				if (CLOCK_OK)
+					p_se(0x426c);
+			}
 			p->work[0] = 0;
 		}
 	}
@@ -123,7 +131,8 @@ static int clock_needles(Prog* p)
 	p_panel(buf);
 	if (p->down & KEY_B) {
 		p_panel(NULL);
-		p_se(0x3e83);
+		sfx_stop(0x3e83);
+		p->work[0] = 0;
 		return 1;
 	}
 	return 0;

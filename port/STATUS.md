@@ -355,6 +355,7 @@ Ordered by weight. Each line names where the work starts.
     - Map "too dark" for the rest of the game after the battery room (stage 30): flag 272 (the battery dead from the Spiral Key to the dry cell's use) only blocked the map, and the light went on working, so players left without the dry cell. Now the light is out while it is dead (0x48c840), with the PC's "I pressed the switch, but nothing happens." The port's own: only in stage 30 with the room still locked and the dry cell in hand, so older saves get the map back.
     - The safe's bullets (and the hospital's seven, stage 25) could be taken only while it was shut: `EventItemConditionCheck` (0x48cb20) was read the wrong way round for types 2 and 3.
     - Button bindings were saved but never read back: controls.txt's own first line stopped the reader.
+    - The clock in room 208 (issue 5): its ticking (0x3e83, 14 s) was started on every turn of the hands and never stopped. Now as the PC: heard while the hands move, stopped on leaving.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.
