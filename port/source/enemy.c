@@ -1789,6 +1789,9 @@ static void move_exec(Enemy* e, float adv, float dt)
 		}
 	} else {
 		e->x = nx, e->z = nz;
+		float ny;
+		if (s_col && e->slv < 9 && col_floor(s_col, nx, nz, e->y, 200.0f, &ny))
+			e->y = ny;
 	}
 }
 
@@ -3295,8 +3298,8 @@ static void red_grab(Enemy* e, const EnPlayer* p, float dt)
 // 0x4c05e0: the fight is over (time or HP ran out). Flag 144 sounds the siren (event 8, program 6). For 300
 // ticks he goes on walking and turning at James, and while James is on the flight (z over -99400) he still
 // swings and does not leave; then he walks down the stairs and out by the points at 0x893000 (x, y, z), from
-// the third on through the walls (+0x10 bit 0x10, which enMoveExec 0x4a9e60 takes as no collision), his
-// height going with them, sinks at the last one (+0x38, 500 a second) and raises flag 146 there (event 9,
+// the third on through the walls (+0x10 bit 0x10, which enMoveExec 0x4a9e60 takes as no collision), on the
+// stairs' own floor, sinks at the last one (+0x38, 500 a second) and raises flag 146 there (event 9,
 // program 7, which removes him; the door out unlocks with it). The port walked him against the walls and
 // gave up on each point after 8 seconds until 2026-11-23, which took up to a minute.
 static void red_leave(Enemy* e, const EnPlayer* p, float dt)
@@ -3311,7 +3314,7 @@ static void red_leave(Enemy* e, const EnPlayer* p, float dt)
 		e->attacking = false;
 		anim_set(e, 1);
 		e->path_angle = e->yaw;
-		set_timer(e, 300);
+		set_timer(e, 150);              // 0x4a6ba0(300), taken down twice a frame (here and in 0x4c0b00): 2.5 s
 		e->slv = 1;
 		return;
 	}
@@ -3355,7 +3358,7 @@ static void red_leave(Enemy* e, const EnPlayer* p, float dt)
 	float d = hypotf(t[0] - e->x, t[2] - e->z);
 	e->life += dt;
 	e->rate = fmaxf(red_walk_rate(e), 1.0f);
-	if (d < 50.0f || (e->slv < 6 && e->life > 4.0f)) {   // (the port still gives up on the first two)
+	if (d < 50.0f || (e->slv < 6 && e->life > 14.0f)) {   // (the port still gives up on the first two; the original takes 10 s to the first)
 		e->life = 0.0f;
 		if (++e->slv > 9) {
 			ev_flag_set(146, true);
@@ -3368,13 +3371,8 @@ static void red_leave(Enemy* e, const EnPlayer* p, float dt)
 	e->mark_angle = dir_to(e->x, e->z, t[0], t[2]);
 	approach_angle(&e->path_angle, e->mark_angle, red_turn() * dt * 60.0f);
 	e->yaw = e->path_angle;
-	if (e->slv >= 6) {                  // through the walls: its height on the way to the point's
-		float v = 14.3f * 30.0f * e->rate * dt;
-		if (d > 1.0f)
-			e->y += (t[1] - e->y) * fminf(v / d, 1.0f);
-		if (e->slv == 9)
-			e->y += 500.0f * dt;
-	}
+	if (e->slv == 9)
+		e->y += 500.0f * dt;            // +0x38: sinks (+0x10 bit 2: no floor)
 }
 
 // 0x4bf4f0: event control. Type 0 stands behind the bars; type 1 walks to the roof fence and raises
