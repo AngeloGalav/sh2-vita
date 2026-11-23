@@ -2298,11 +2298,41 @@ static void blood_frame(float dt)
 	mist_update(dt);
 }
 
+// James over a drop. 0x52eb40 looks for the floor from 250 above his feet to 1500 below; with it more
+// than 100 down he falls, by 9.8 m/s/s (0x6cdf8c), until it is within 100 again. Past 250 the PC also
+// puts him in his falling state (0x18): not ported, he falls in the pose he had, his legs held still.
+// The pool in Wood Side's courtyard (600 deep, its walls face inwards) is entered this way.
+static bool s_falling;
+static float s_fall_v, s_fall_y;
+
+static bool fall_update(float dt)
+{
+	float ny;
+	if (!s_falling)
+		return false;
+	if (!s_have_col || col_floor_climb(&s_col, s_px, s_pz, s_py, 160.0f, 100.0f, &ny) ||
+	    !col_floor_climb(&s_col, s_px, s_pz, s_py, 160.0f, 1500.0f, &s_fall_y)) {
+		s_falling = false;            // on a floor already (a door took him elsewhere)
+		return false;
+	}
+	s_fall_v += 9.8f * 500.0f * dt;
+	s_py += s_fall_v * dt;
+	if (s_py >= s_fall_y - 100.0f) {
+		s_py = s_fall_y;
+		s_falling = false;
+		float feet[3] = { s_px, s_py, s_pz };
+		sfx_footstep(1.0f, feet);
+	}
+	return true;
+}
+
 // James' legs (move.c, the PC's lower-body states): the circle pad walks and turns, the game keys
 // (controls.c) run, strafe and turn round. held is the game keys still free (combat.c took its own).
 // One step of James against the room: pushed out of the walls (0.13 m round him), then onto the
 // highest floor within a step up or down of his feet. False, leaving him where he was, when there is
 // no floor there or the step would cross a wall.
+static bool s_drop;                    // walk_step went over a drop
+
 static bool walk_step(float* x, float* y, float* z, float dx, float dz)
 {
 	float nx = *x + dx, nz = *z + dz, ny;
@@ -2323,12 +2353,19 @@ static bool walk_step(float* x, float* y, float* z, float dx, float dz)
 	}
 	if (nx == *x && nz == *z)
 		return false;
+	// over a drop (fall_update)
+	bool drop = col_floor_climb(&s_col, nx, nz, *y, 160.0f, 1500.0f, &ny);
 	// The open areas' tiles leave gaps of up to about 60 units between their floors (cb05 and cb52
 	// meet at x 19950 / 20000), which James walks over on the PC: with floor a little further on at
 	// the same height he goes on at his height.
 	float mx = nx - *x, mz = nz - *z, ml = sqrtf(mx * mx + mz * mz);
-	if (!col_floor(&s_col, *x + mx / ml * 100.0f, *z + mz / ml * 100.0f, *y, 40.0f, &ny))
+	if (!col_floor(&s_col, *x + mx / ml * 100.0f, *z + mz / ml * 100.0f, *y, 40.0f, &ny)) {
+		if (!drop)
+			return false;
+		*x = nx, *z = nz;
+		s_drop = true;
 		return false;
+	}
 	*x = nx, *z = nz;
 	return true;
 }
@@ -2557,7 +2594,14 @@ static void player_update(const circlePosition* cp, u32 held, float dt)
 	s_turn_speed = mo.turn_speed;
 	float ox = s_px, oz = s_pz;
 	if (s_have_col) {
+		if (fall_update(dt)) {
+			s_vel[0] = s_vel[1] = 0.0f;
+			return;
+		}
+		s_drop = false;
 		walk_move(&s_px, &s_py, &s_pz, mo.dx, mo.dz, true);
+		if (s_drop)
+			s_falling = true, s_fall_v = 0.0f;
 		unstick_update(in.x != 0.0f || in.y != 0.0f, hypotf(s_px - ox, s_pz - oz), dt);
 	} else {
 		s_px += mo.dx;
