@@ -2265,7 +2265,7 @@ static void mkn_init(Enemy* e, int status)
 	e->mlv = MKN_STAY;
 	e->slv = 0;
 	e->path_angle = e->mark_angle = e->yaw;
-	e->type = 0;
+	e->type = glb_set() ? 4 : 0;       // 0x4c15c0: indoors no 5000 leash, and it wanders on losing James
 	size_upright(e, true);
 	anim_set(e, A_WALK);
 	e->stx = e->x, e->stz = e->z;
