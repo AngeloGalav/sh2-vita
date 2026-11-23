@@ -127,7 +127,10 @@ void controls_init(const char* dir)
 		return;
 	char lay[8], act[24];
 	unsigned keys;
-	while (fscanf(f, "%7s %23s %x", lay, act, &keys) == 3) {
+	char line[96];
+	while (fgets(line, sizeof line, f)) {
+		if (line[0] == '#' || sscanf(line, "%7s %23s %x", lay, act, &keys) != 3)
+			continue;                // save()'s first line is a comment
 		int l = !strcmp(lay, "new") ? 1 : !strcmp(lay, "old") ? 0 : -1;
 		for (int a = 0; l >= 0 && a < ACT_COUNT; a++) {
 			char name[24];
