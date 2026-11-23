@@ -76,7 +76,7 @@ coordinates.
 | FixLyingFigureFootsteps | PlayWavSound.cpp | left out | Needs EE's `machi.wav`; enemies are frozen during scenes in the port, so the scene has no steps to fix |
 | AudioClipDetection | Wrappers/dsound | left out | Relies on DirectSound's volume ramp; on ndsp it would need a per-frame fade in the DSP callback |
 | ChainsawSoundFix | ChainsawSoundFix.cpp | already covered (hit) / left out (idle loop) | The hit sound plays once per enemy per swing in the port (`combat.c` `s_hit`), which is EE's first-frame-only rule. The rest fades in and trims the 48 kHz idle loop (0x1642) and the crank (0x14e8); the port's chainsaw has no idle loop, only the rev (11044) and the running sound (11045) |
-| LabyrinthElevatorVolumeFix | LabyrinthElevatorVolumeFix.cpp | left out | The lift's stage code is ported (`prog_stagefn.c`) without its sounds (0x4655 / 0x4656); when they are added, use dt and drop the 0.8 volume factor |
+| LabyrinthElevatorVolumeFix | LabyrinthElevatorVolumeFix.cpp | ported | `prog_stagefn.c` `lift_tick`: full volume, by the frame time |
 | MusicBoxVolume | MusicBoxVolume.cpp | left out | Needs EE's re-authored `hotel/bgm_112.aix` |
 | PlayUnusedAudio, VHSAudioFix | PlayUnusedAudio.cpp, VHSAudio.cpp | left out | Off by default in EE; VHSAudioFix needs EE's FMV pack |
 | EnableMasterVolume | dsound | not applicable | The 3DS has a hardware volume slider |

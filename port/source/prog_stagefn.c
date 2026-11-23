@@ -35,7 +35,7 @@ static int ring_inner(void) { return p_flag(319) | p_flag(320) << 1; }
 // the outer and about y by the inner ring, 0x522 about y by both) and works out which of its two
 // doors are open (table 0x8d41a4: 325 the south one, 326 the north one, as EvProgControlCube does);
 // the lift room (0x78) starts its timers again, or shows the lift at the bottom once it has gone down
-// (flag 605); the room behind the bars (0x89) has Maria there once she is found alive (327, until
+// (flag 653); the room behind the bars (0x89) has Maria there once she is found alive (327, until
 // 368; flag 328; the PC places character 0x106, which the port does not draw).
 static void labyrinth_room(int room)
 {
@@ -51,7 +51,7 @@ static void labyrinth_room(int room)
 		s_lift_gv = s_lift_step = s_lift_accel_end = s_lift_t = 0.0f;
 		s_lift_gate = s_lift_arr_t = s_lift_open = s_lift_ov = 0.0f;
 		if (p_flag(314)) {
-			p_set(605);                 // FLAGW_576 |= 0x2000: the gate stays open from here
+			p_set(653);                 // 0x1f7d630 |= 0x2000: the gate stays open from here
 			s_lift_y = -45600.0f;
 			s_lift_gate = s_lift_open = 450.0f;
 		} else {
@@ -595,7 +595,7 @@ static void lift_accel(float* v, float dt) { *v = fminf(*v + dt * 800.0f, 1000.0
 
 static void lift_tick(float dt)
 {
-	if (p_flag(605)) {
+	if (p_flag(653)) {
 		// 0x582f37: James came back to the room after the ride: nothing moves any more
 		s_lift_y = -45600.0f;
 		return;
@@ -639,7 +639,7 @@ static void lift_tick(float dt)
 		}
 		return;
 	}
-	sfx_set_volume(0x4654, s_lift_step / (500.0f * dt) * 0.8f);   // 0x58302b
+	sfx_set_volume(0x4654, s_lift_step / (500.0f * dt));   // 0x58302b, without its 0.8 (EE LabyrinthElevatorVolumeFix)
 	if (s_lift_step >= 500.0f * dt / 3.0f)
 		vcSetCamNoise(1);
 	// 0x5834ec: the step per frame (in units per frame at the frame time dt)
@@ -660,7 +660,8 @@ static void lift_tick(float dt)
 		s_lift_y = -45600.0f;
 		p_set(314);                     // 0x583345: FLAGW_288 |= 0x4000000
 		sfx_stop(0x4654);
-		s_lift_arr_t = s_lift_open = s_lift_ov = 0.0f;
+		s_lift_arr_t = s_lift_open = 0.0f;
+		s_lift_ov = s_lift_gv;          // 0x1d86214 keeps the speed the gate shut with
 		if (p_flag(28))
 			p_set(29);
 	}
@@ -670,7 +671,7 @@ static void lift_tick(float dt)
 // open), shaken by up to 0.9 of the ride's speed (_DAT_006e2be0 1.8) while they are not wide open.
 static void lift_models(float dt)
 {
-	float g = p_flag(605) ? 450.0f : !p_flag(312) ? 450.0f : !p_flag(314) ? s_lift_gate : s_lift_open;
+	float g = p_flag(653) ? 450.0f : !p_flag(312) ? 450.0f : !p_flag(314) ? s_lift_gate : s_lift_open;
 	float sh = dt > 0.0f && g != 450.0f ? s_lift_step * 1.8f / (500.0f * dt) : 0.0f;
 	for (int b = 0; b < 2; b++) {
 		float r[3];
