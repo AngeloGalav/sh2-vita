@@ -833,7 +833,7 @@ void combat_heal(float amount) { s_hp_recover += amount; }
 // is provisional (the PC's recovery step was not traced).
 static void recover_update(float dt)
 {
-	if (s_hp_recover <= 0.0f || s_hp <= 0.0f)
+	if (s_hp_recover <= 0.0f || s_mode >= M_DYING)
 		return;
 	float step_hp = 30.0f * dt;
 	step_hp = step_hp > s_hp_recover ? s_hp_recover : step_hp;
@@ -1028,7 +1028,7 @@ void combat_hold_damage(float ap, float dt)
 	s_hp -= s_test_god ? 0.0f : ap * dt * 30.0f;
 	if (s_hp <= 0.0f) {
 		if (enemy_difficulty() == 0) {
-			s_hp = 1.0f;
+			s_hp = 0.0f;                 // 0x559100: never on beginner
 			return;
 		}
 		s_hp = 0.0f;
@@ -1114,9 +1114,15 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 	bool guard = guarded(attack_id, from_x, from_z);
 	if (guard)
 		ap *= 0.1f;
-	s_hp -= s_test_god ? 0.0f : ap;
+	// 0x5350d0 tests the health before the blow takes from it: at 0 the next one kills (on beginner none
+	// does), and not one during the damage motion or guarded. Pyramid Head's long swing (51) sets it to -1
+	// first (0x5430f0).
+	if (attack_id == 51 && !s_test_god)
+		s_hp = -1.0f;
+	bool kills = !s_test_god && !guard && s_mode != M_HURT && (s_hp < 0.0f || (s_hp == 0.0f && enemy_difficulty() > 0));
+	s_hp = s_test_god ? s_hp : fmaxf(s_hp - ap, 0.0f);
 	s_hit_t = 0.0f;
-	if (s_hp <= 0.0f) {
+	if (kills) {
 		s_hp = 0.0f;
 		sfx_play(pdef()->snd_die, 1.0f, 0.0f);   // dying scream
 		s_mode = M_DYING;
