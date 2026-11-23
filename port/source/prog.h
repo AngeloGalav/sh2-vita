@@ -195,6 +195,10 @@ bool prog_player_locked(void);
 // Runs one frame. down/held are this frame's keys (for choices and puzzles). Returns true while the
 // game stays in event mode (the program has not finished).
 bool prog_update(u32 down, u32 held, float dt);
+// The stick's deflection (-1..1, y up) for the cursor over a puzzle's still; and where that cursor is
+// (-256..256, -240..240, y down), false without one.
+void prog_set_stick(float x, float y);
+bool prog_cursor(float* x, float* y);
 void prog_abort(void);
 // DramaDemoNumber (0x1f7d3c4) as the running program set it this frame (p_demo_number), 0 for none;
 // EventMain (0x48ecb0) clears it every frame before the program runs. bgm.c reads it.

@@ -3990,6 +3990,22 @@ static void draw_sprites(void)
 	}
 }
 
+// 0x4a25c0: the cursor over a puzzle's still, 24 by 32 units from its point, texels 96..143, 64..127 of
+// carsol's 256 x 128.
+static void draw_puzzle_cursor(void)
+{
+	float x, y;
+	if (!s_pic_shown || !prog_cursor(&x, &y))
+		return;
+	C3D_Tex* t = map_carsol();
+	float x0 = 200.0f + x * 0.78125f, y0 = 120.0f + y * 0.5859375f, x1 = x0 + 24.0f * 0.78125f, y1 = y0 + 32.0f * 0.5859375f;
+	float u0 = 96.0f / 256.0f, u1 = 143.0f / 256.0f, v0 = 64.0f / 128.0f, v1 = 127.0f / 128.0f;
+	MapVert v[6] = { { x0, y0, u0, v0 }, { x1, y0, u1, v0 }, { x1, y1, u1, v1 },
+	                 { x0, y0, u0, v0 }, { x1, y1, u1, v1 }, { x0, y1, u0, v1 } };
+	if (t)
+		ui_draw(t, v, 6, 0xffffffff);
+}
+
 // 0x49c0f0 / 0x49dbd0: a program marks the map; the map screen plays the marks by itself and the
 // program goes on once it has closed.
 static int s_mark_mode = -1;
@@ -5708,6 +5724,7 @@ after_world:
 		if (s_pic_shown)
 			draw_picture(ortho);
 		draw_sprites();
+		draw_puzzle_cursor();
 		map_draw();
 		inventory_draw_top();
 		memos_draw_top();
@@ -6278,6 +6295,7 @@ int main(void)
 					static const circlePosition still;
 					bool locked = prog_player_locked();
 					player_update(locked ? &still : &cp, locked ? 0 : move_keys(gheld, gdown, &cp), dt);
+					prog_set_stick(cp.dx / 154.0f, cp.dy / 154.0f);
 					prog_update(down, held, dt);
 					if (s_game_end >= 0 && !prog_running()) {
 						bool results = s_game_end > 0;      // backing out of Born From a Wish has none

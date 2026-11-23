@@ -412,22 +412,22 @@ static int s41_put_for_shelf(Prog* p) { (void)p; return 1; }
 static int s41_use_204_key(Prog* p) { return p_item_use(p, 0x2c, 0xe, 0x4a3b); }
 static int s41_use_elevator_key(Prog* p) { return p_item_use(p, 0x2d, 0xf, 0x4a3b); }
 
-static void button_panel(int sel, int n)
+// 0x579460 / 0x577540: the button under the cursor when it is pressed, -1 for none.
+static int button_pressed(Prog* p)
 {
-	char buf[200];
-	int k = snprintf(buf, sizeof buf, "\n   Buttons ");
-	for (int i = 0; i < n; i++)
-		k += snprintf(buf + k, sizeof buf - k, "%c%d%c", sel == i ? '[' : ' ', i + 1, sel == i ? ']' : ' ');
-	snprintf(buf + k, sizeof buf - k, "\n\n\n\n\n\n\n   D-pad: button  A: press  B: leave");
-	p_panel(buf);
-}
-
-// D-pad moves the cursor the PC's mouse / stick drives over the still (gPuzzleCursor*).
-static void button_cursor(Prog* p, int n)
-{
-	if (p->down & (KEY_DUP | KEY_DLEFT)) p->work[1] = (p->work[1] + n - 1) % n;
-	if (p->down & (KEY_DDOWN | KEY_DRIGHT)) p->work[1] = (p->work[1] + 1) % n;
-	button_panel(p->work[1], n);
+	static const float at[6][2] = { { 107.0f, -89.6f }, { 107.0f, -30.7f }, { 107.0f, 26.7f }, { 107.0f, 82.2f },
+	                                { 67.2f, 171.9f }, { 129.1f, 171.9f } };   // 0x8cd220, 0x8cb9ac
+	p_cursor(p);
+	if (!(p->down & KEY_A))
+		return -1;
+	for (int i = 0; i < 6; i++) {
+		float dx = p_cursor_x - at[i][0], dy = p_cursor_y - at[i][1];
+		if (dx * dx + dy * dy < 361.0f) {
+			p_se(0x4a49);
+			return i;
+		}
+	}
+	return -1;
 }
 
 // 0x57a790 EvProgElvatorButton: the employee elevator. Of its six buttons (0x579460) the third
@@ -437,16 +437,13 @@ static int s41_elevator(Prog* p)
 	switch (p->step) {
 	case 0:
 		p_lock(p, true);
-		p->work[1] = 0;
+		p_cursor_start();
 		p_picture_show("htl_p_htl_elevator");
 		p->step = 7;
 		// fallthrough
 	case 7:
-		button_cursor(p, 6);
-		if (p->down & KEY_A) {
-			p_se(0x4a49);
-			if (p->work[1] == 2 && !p_flag(401)) {
-				p_panel(NULL);
+		{
+			if (button_pressed(p) == 2 && !p_flag(401)) {
 				p_picture_hide();
 				float pos[3], yaw;      // 0x10: the PC turns him to 60 degrees (jms + 0x30 = 0x3f860a92)
 				p_player(pos, &yaw);
@@ -792,28 +789,21 @@ static int s43_elevator_water(Prog* p)
 	switch (p->step) {
 	case 0:
 		p_lock(p, true);
-		p->work[1] = 0;
+		p_cursor_start();
 		p_picture_show("htl_p_htl_elevator_2");
 		p->step = 7;
 		// fallthrough
 	case 7: {
-		button_cursor(p, 6);
-		if (p->down & KEY_B) {
-			p_panel(NULL);
+		if (p->down & KEY_B)
 			PROG_JUMP(p, 0xd);
-		}
-		if (!(p->down & KEY_A))
-			return 0;
-		p_se(0x4a49);
-		if (p->work[1] == 4) {
+		int b = button_pressed(p);
+		if (b == 4) {
 			p_set(22);                  // gGameFlag |= 0x400000
 			p_se(0x4a42);
-			p_panel(NULL);
 			PROG_JUMP(p, 0xd);
 		}
-		if (p->work[1] != 3)
+		if (b != 3)
 			return 0;
-		p_panel(NULL);
 		p_picture_hide();
 		p_se(0x4a43);
 		float pos[3], yaw;              // the PC sets x, z and yaw only (jms + 0x1c, 0x24, 0x30)

@@ -82,10 +82,7 @@ static const ProgFn s_stage16[4] = { NULL, s16_laura_side_road, s16_maria_unlock
 
 // EvProgElevatorButton (0x58d480 front side, 0x588e60 otherworld). Flags 17, 18, 19 say on which
 // floor the elevator stands (1F, 2F, 3F), the buttons set 21, 22, 23 for the floor wanted and the
-// stage's auto door events do the ride. The PC maps its five buttons per floor (0x58c820 /
-// 0x5885f0); the panel lists the floors the buttons lead to.
-static const char* const s_floor_name[3] = { "1F", "2F", "3F" };
-
+// stage's auto door events do the ride.
 static bool elevator_same_floor(void)
 {
 	return (p_flag(17) && p_flag(21)) || (p_flag(18) && p_flag(22)) || (p_flag(19) && p_flag(23));
@@ -98,7 +95,7 @@ static int elevator(Prog* p, bool otherworld)
 	switch (p->step) {
 	case 0:
 		p_lock(p, true);
-		p->work[1] = 0;
+		p_cursor_start();
 		p->step = 2, p->sub = 0;
 		// fallthrough
 	case 2:
@@ -106,27 +103,30 @@ static int elevator(Prog* p, bool otherworld)
 		p->step = 8, p->sub = 0;
 		// fallthrough
 	case 8: {
-		bool here = p_flag(17) || p_flag(18) || p_flag(19);
-		if (p->down & (KEY_DUP | KEY_DLEFT)) p->work[1] = (p->work[1] + 2) % 3;
-		if (p->down & (KEY_DDOWN | KEY_DRIGHT)) p->work[1] = (p->work[1] + 1) % 3;
-		char buf[200];
-		int n = snprintf(buf, sizeof buf, "\n");
-		for (int i = 2; i >= 0; i--)
-			n += snprintf(buf + n, sizeof buf - n, "   %c %s\n", p->work[1] == i ? '>' : ' ', s_floor_name[i]);
-		snprintf(buf + n, sizeof buf - n, "\n\n\n\n      D-pad: floor  A: press  B: leave");
-		p_panel(buf);
-		if (p->down & KEY_B) {
-			p_panel(NULL);
+		// 0x58c820 / 0x5885f0: 3F, 2F, 1F and, under them, the door's open button (which sends the car
+		// where it stands) and one that does nothing; on the car's own floor the floor's does nothing
+		static const short at[5][2] = { { 57, -128 }, { 57, -75 }, { 57, -22 }, { 29, 128 }, { 85, 128 } };   // 0x8da814
+		p_cursor(p);
+		if (p->down & KEY_B)
 			PROG_JUMP(p, 0xd);
-		}
 		if (!(p->down & KEY_A))
 			return 0;
+		int i = 0;
+		for (; i < 5; i++) {
+			float dx = (p_cursor_x - at[i][0]) * 1.25f, dy = p_cursor_y - at[i][1];
+			if (dx * dx + dy * dy < 400.0f)
+				break;
+		}
+		if (i == 5)
+			return 0;
 		p_se(0x4a49);
-		if (here)
-			p_set(21 + p->work[1]);
+		int here = p_flag(17) ? 0 : p_flag(18) ? 1 : p_flag(19) ? 2 : -1;
+		if (here >= 0 && i == 3)
+			p_set(21 + here);
+		else if (here >= 0 && i < 3 && 2 - i != here)
+			p_set(21 + 2 - i);
 		if (!elevator_pressed())
 			return 0;
-		p_panel(NULL);
 		p->timer = 0.0f;
 		p->step = 7, p->sub = 0;
 		return 0;

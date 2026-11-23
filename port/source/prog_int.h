@@ -74,6 +74,9 @@ int p_walk(Prog* p, float x, float z);              // 0x53b010 + 0x53b320: Jame
 int p_wait(Prog* p, float seconds);                 // timer on p->timer
 
 void p_lock(Prog* p, bool on);                      // JmsEventMode
+void p_cursor_start(void);                          // the cursor over a still, in its middle
+void p_cursor(Prog* p);                             // 0x4a25c0: one frame of it, every frame it shows
+extern float p_cursor_x, p_cursor_y;
 void p_picture_hide(void);                          // 0x4a24e0
 void p_fade(int type);
 void p_se(int id);

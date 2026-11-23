@@ -529,8 +529,46 @@ void p_lock(Prog* p, bool on) { p->locked = on; }
 void p_fade(int type) { if (s_host.fade) s_host.fade(type); }
 void p_se(int id) { if (s_host.se) s_host.se(id); }
 void p_panel(const char* text) { if (s_host.panel) s_host.panel(text); }
+
+// gPuzzleCursor* (0x4a25c0): the stick moves it at 153.6 units a second across and 192 down, its middle
+// half of the way dead as the PC's pad (101..154 of 255); the D-pad at full speed. The PC starts it under
+// the mouse, the port in the middle. The PC's
+// edges are 256 and 240; the still's top and bottom tenth are off the screen here (draw_picture), so 200.
+float p_cursor_x, p_cursor_y;
+static float s_stick[2];
+static int s_cursor_left;        // frames it still shows: it is asked for every frame
+
+void prog_set_stick(float x, float y) { s_stick[0] = x, s_stick[1] = y; }
+bool prog_cursor(float* x, float* y)
+{
+	if (!s_running || s_cursor_left <= 0)
+		return false;
+	s_cursor_left--;
+	*x = p_cursor_x, *y = p_cursor_y;
+	return true;
+}
+
+void p_cursor_start(void) { p_cursor_x = p_cursor_y = 0.0f; }
+
+void p_cursor(Prog* p)
+{
+	float d[2] = { 0.0f, 0.0f };
+	for (int k = 0; k < 2; k++) {
+		float v = (k ? -s_stick[1] : s_stick[0]) * 1.27f;
+		d[k] = v > 0.27f ? v - 0.27f : v < -0.27f ? v + 0.27f : 0.0f;
+	}
+	if (d[0] == 0.0f && d[1] == 0.0f) {
+		d[0] = (p->held & KEY_DRIGHT ? 1.0f : 0.0f) - (p->held & KEY_DLEFT ? 1.0f : 0.0f);
+		d[1] = (p->held & KEY_DDOWN ? 1.0f : 0.0f) - (p->held & KEY_DUP ? 1.0f : 0.0f);
+	}
+	p_cursor_x = fminf(fmaxf(p_cursor_x + d[0] * 153.6f * p->dt, -256.0f), 256.0f);
+	p_cursor_y = fminf(fmaxf(p_cursor_y + d[1] * 192.0f * p->dt, -200.0f), 200.0f);
+	s_cursor_left = 2;
+}
+
 void p_picture_hide(void)
 {
+	s_cursor_left = 0;
 	if (s_host.picture)
 		s_host.picture(NULL);
 	prog_overlay_picture(NULL);

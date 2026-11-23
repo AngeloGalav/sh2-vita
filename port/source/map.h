@@ -26,6 +26,8 @@ int map_open(const MapPlayer* p);
 // The player owns the map of where they are (0x49a7e0, 0x49adb0): map_open would return MAP_OPEN.
 bool map_area_known(const MapPlayer* p);
 void map_set_open_zoomed(bool in);   // Game Options "Map": Zoom In (true, default) or Zoom Out
+// data/pic/etc/carsol.tex, the sheet with the maps' arrows and the puzzles' cursor (NULL: not in the pack)
+C3D_Tex* map_carsol(void);
 bool map_is_open(void);
 // The marking animation a program starts (0x49c0f0 mode, then 0x49dbd0): modes 0..4. The screen
 // runs by itself (map_update returns false when it has closed); map_marking is true meanwhile.

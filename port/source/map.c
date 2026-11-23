@@ -410,6 +410,13 @@ static bool load_t3x(C3D_Tex* tex, const char* name)
 	return true;
 }
 
+C3D_Tex* map_carsol(void)
+{
+	if (!s_carsol_ok)
+		s_carsol_ok = load_t3x(&s_carsol, "carsol") ? 1 : -1;
+	return s_carsol_ok > 0 ? &s_carsol : NULL;
+}
+
 // The map's and its marker sheet's textures, kept while they stay the same (the screen and the
 // touch screen's small map share them; they are never drawn at the same time).
 static void textures_for(int m)
