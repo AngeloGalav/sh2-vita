@@ -815,6 +815,9 @@ static const Cue s_cues[] = {
 	{ "mar_dead_b", -1.0f, 0, 0x17 },    // 0x587f10 EvProgMariaKilled state 6
 	{ "mar_dead_b", 380.0f, 522, -1 },   // its state 0x18 (_DAT_00729388)
 	{ "tomatta", -1.0f, 527, 0x25 },     // 0x577fa0 EvProgVideoReplay state 6
+	{ "tomatta", -1.0f, 475, -1 },       // the same: the armchair towards the television (0x578950), the light,
+	{ "tomatta", -1.0f, 625, -1 },
+	{ "tomatta", -1.0f, 476, -1 },       // and the television's picture (0x558)
 };
 
 static void scene_cues(void)
