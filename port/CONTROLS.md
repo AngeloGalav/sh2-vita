@@ -13,19 +13,24 @@ page of the Options' Controls tab (`controls.c`, drawn in the Options screen's m
 
 ## PS Vita defaults
 
-| Action | Button |
-| --- | --- |
-| Move | Left stick |
-| Search camera, back when let go (targets while aiming) | Right stick |
-| Action | Cross |
-| Run (hold) | Square |
-| Aim (hold) / quick turn | R / L |
-| Map | Triangle or D-Pad right |
-| Flashlight | Circle |
-| Items | START |
-| Pause | SELECT, on release |
-| Look (also recentres the camera) / next weapon / quick heal | D-Pad up / down / left |
-| Strafe left / right | Rear pad's lower corners |
+| Button | In game | In menus |
+| --- | --- | --- |
+| Cross | Action / examine; with R held: attack | Confirm |
+| Circle | Flashlight on / off | Back |
+| Square | Run (with R held, standing: guard) | |
+| Triangle | Map | |
+| L | Camera behind James | Previous Options page |
+| R | Ready the weapon (aim) | Next Options page |
+| START | Inventory | Skip a movie (Cross skips too) |
+| SELECT | Pause menu | |
+| Left stick / D-Pad | Move | Move the cursor |
+| Right stick | Camera (targets while aiming) | |
+| Rear touch pad's lower corners | Strafe; both together turn James round | |
+
+The next weapon, quick heal and quick turn have no button by default; bind one in the Options (a D-Pad direction bound to an action no longer moves James).
+
+The layout is sh3-vita's (https://github.com/AngeloGalav/sh3-vita). L is the PC's Look: held, the search
+view ahead of James. The guard (0x533e60) is on the PC's run key with the weapon down; here it wants R too.
 
 The right stick is the game's search camera, through James' head (`main.c`, `search_view`). Bindings
 saved in `controls.txt` win over these. Test combinations, held with SELECT: L fog, R GPU cost test,

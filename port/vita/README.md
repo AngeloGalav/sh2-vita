@@ -63,10 +63,8 @@ installs it from there. `vita_log.txt` starts over at every launch, so run `pull
 Input: the 3DS's A is the console's confirm button (Cross or Circle as the system is set), B the
 other, X Triangle, Y Square, L / R, START / SELECT, the left stick the Circle Pad, the right stick
 the C-Stick (read with `sceCtrlPeekBufferPositive`: the "2" reads report the shoulders as L1 / R1).
-ZL / ZR are the rear touch pad's outer lower corners. The game's own default bindings on the Vita (`controls_default`, `SH2_VITA`): Cross acts,
-Square runs, Triangle the flashlight, Circle the items, R aims, L turns round, the D-Pad as on the
-3DS (look, next weapon, quick heal, map), the right stick changes target while aiming, the rear
-corners strafe. Prompts draw the PlayStation shapes; the Buttons page names them.
+ZL / ZR are the rear touch pad's outer lower corners. The game's own default bindings on the Vita are in `controls_default` (`SH2_VITA`) and in
+`port/CONTROLS.md`. Prompts draw the PlayStation shapes; the Buttons page names them.
 
 ## Status
 

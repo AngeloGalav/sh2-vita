@@ -96,22 +96,21 @@ The first time each shader is needed it is compiled and kept on the card, so the
 
 ## Controls
 
-| | Button |
-| --- | --- |
-| Move James | Left stick |
-| Search camera, back when let go | Right stick |
-| Check, open, pick up (attack while aiming) | Cross |
-| Run (hold) | Square |
-| Aim (hold) | R |
-| Quick turn | L |
-| Map | Triangle or D-Pad right |
-| Flashlight | Circle |
-| Items | START |
-| Pause | SELECT |
-| Search view | D-Pad up |
-| Next weapon | D-Pad down |
-| Quick heal | D-Pad left |
-| Strafe left / right | Rear touch pad's lower corners |
+| Button | In game | In menus |
+| --- | --- | --- |
+| Cross | Action / examine; with R held: attack | Confirm |
+| Circle | Flashlight on / off | Back |
+| Square | Run (with R held, standing: guard) | |
+| Triangle | Map | |
+| L | Camera behind James | Previous Options page |
+| R | Ready the weapon (aim) | Next Options page |
+| START | Inventory | Skip a movie (Cross skips too) |
+| SELECT | Pause menu | |
+| Left stick / D-Pad | Move | Move the cursor |
+| Right stick | Camera (targets while aiming) | |
+| Rear touch pad's lower corners | Strafe; both together turn James round | |
+
+The next weapon, quick heal and quick turn have no button by default; bind one in *Options*, *Controls*, *Buttons* (a D-Pad direction bound to an action no longer moves James).
 
 In menus, Cross confirms and Circle goes back, whatever the console's own setting. Actions can be rebound in *Options*, *Controls*, *Buttons*. More in [CONTROLS.md](port/CONTROLS.md).
 

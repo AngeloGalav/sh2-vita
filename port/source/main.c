@@ -6214,6 +6214,17 @@ int main(void)
 		} else if (s_cam.mode == CAM_PLAYER && screens_update(down, held, &cp, dt)) {
 			// the map screen or the memo list has the buttons; the game waits
 		} else if (s_cam.mode == CAM_PLAYER) {
+#ifdef SH2_VITA
+			{   // the D-Pad's directions that no action has move James too, as the stick pushed all the way
+				u32 dp = held & ~controls_bound();
+				int x = ((dp & KEY_DRIGHT) ? 1 : 0) - ((dp & KEY_DLEFT) ? 1 : 0);
+				int y = ((dp & KEY_DUP) ? 1 : 0) - ((dp & KEY_DDOWN) ? 1 : 0);
+				if (x || y) {
+					int full = x && y ? 110 : 156;
+					cp.dx = (s16)(x * full), cp.dy = (s16)(y * full);
+				}
+			}
+#endif
 			// the behind camera turns with the C-Stick on the New 3DS, and on either console with a
 			// drag on the touch screen (touchui_free_drag); Look sets it behind James again
 			s_orbit[0] = s_orbit[1] = 0.0f;

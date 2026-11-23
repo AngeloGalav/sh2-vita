@@ -42,6 +42,8 @@ void controls_init(const char* dir);
 u32 controls_default(ControlsLayout layout, ControlsAction act);
 // The buttons bound now (the player's or the default) in the active layout.
 u32 controls_keys(ControlsAction act);
+// Every button bound to an action.
+u32 controls_bound(void);
 const char* controls_name(ControlsAction act);
 void controls_menu_draw_pc(void);        // the Vita's Buttons page on the game screen
 

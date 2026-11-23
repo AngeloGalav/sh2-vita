@@ -49,20 +49,22 @@ u32 controls_default(ControlsLayout layout, ControlsAction act)
 	// actions. The New 3DS adds the PC's strafe keys on ZL / ZR (both together turn him round,
 	// 0x54b290) and the target keys on the C-Stick.
 #ifdef SH2_VITA
-	// The Vita's own defaults (the port's choice, as the 3DS's were): the left stick moves James and
-	// the right stick the camera (targets while aiming). Cross acts, Square runs, Triangle the map,
-	// Circle the flashlight (and back in menus), START the items, SELECT the pause menu, R aims, L
-	// turns round; the D-Pad holds Look (it also recentres the camera), the next weapon, quick heal and the map, the rear pad's outer lower
-	// corners the strafe keys
+	// The Vita's own defaults, as sh3-vita's (github.com/AngeloGalav/sh3-vita): the left stick and the
+	// D-Pad move James, the right stick the camera (targets while aiming). Cross acts, Square runs
+	// (guards with R held), Triangle the map, Circle the flashlight (and back in menus), START the items,
+	// SELECT the pause menu, R aims, L puts the camera behind James; the rear pad's outer lower corners
+	// strafe, both together turn him round. The next weapon, quick heal and quick turn have no button
+	// until the player binds one (a D-Pad direction bound to an action no longer moves James).
 	switch (act) {
 	case ACT_RUN: return KEY_Y;
 	case ACT_ACTION: return KEY_A;
 	case ACT_AIM: return KEY_R;
-	case ACT_TURN180: return KEY_L;
+	case ACT_LOOK: return KEY_L;
 	case ACT_FLASHLIGHT: return KEY_B;
 	case ACT_ITEMS: return KEY_START;
-	case ACT_MAP: return KEY_X | KEY_DRIGHT;
+	case ACT_MAP: return KEY_X;
 	case ACT_PAUSE: return KEY_SELECT;
+	case ACT_TURN180: case ACT_WEAPON_NEXT: case ACT_HEAL: return 0;
 	default: break;
 	}
 #endif
@@ -115,6 +117,14 @@ u32 controls_keys(ControlsAction act)
 				k &= ~C.user[l][a];
 	}
 	return l ? k : k & ~(KEY_ZL | KEY_ZR | KEY_CSTICK_UP | KEY_CSTICK_DOWN | KEY_CSTICK_LEFT | KEY_CSTICK_RIGHT);
+}
+
+u32 controls_bound(void)
+{
+	u32 k = 0;
+	for (int a = 0; a < ACT_COUNT; a++)
+		k |= controls_keys((ControlsAction)a);
+	return k;
 }
 
 static const char* const LAYOUT_KEY[2] = { "old", "new" };
