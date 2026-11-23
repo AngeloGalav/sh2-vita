@@ -586,6 +586,26 @@ static bool shown(const Place* p, float x, float z, float* d2)
 	return true;
 }
 
+int stagemdl_look_points(float (*out)[3], int max, float y)
+{
+	float me[3], yaw, d2;
+	p_player(me, &yaw);
+	int n = 0;
+	for (int i = 0; i < s_nplaces && n < max; i++) {
+		const Place* p = &s_places[i];
+		if (p->kind >> 8 != 7 || p->pos[1] < y - 750.0f - 600.0f || p->pos[1] > y - 750.0f + 1000.0f ||
+		    !shown(p, me[0], me[2], &d2) || d2 > 4000.0f * 4000.0f)
+			continue;
+		memcpy(out[n++], p->pos, sizeof p->pos);
+	}
+	for (int i = 0; i < N_NPC && n < max; i++)
+		if (k_npc[i].kind >> 8 == 1 && npc_shown(i, ev_stage(), me[0], me[2])) {
+			out[n][0] = k_npc[i].pos[0], out[n][1] = k_npc[i].pos[1] - 800.0f, out[n][2] = k_npc[i].pos[2];
+			n++;
+		}
+	return n;
+}
+
 void stagemdl_preload(int stage, float x, float z)
 {
 	stagemdl_update(stage);

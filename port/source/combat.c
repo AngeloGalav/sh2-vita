@@ -1247,7 +1247,7 @@ static bool clear_line(const CombatBody* b, const Enemy* e) { return clear_line_
 
 bool combat_look_target(const CombatBody* b, const float (*pts)[3], int npts, float out[3])
 {
-	if (s_mode == M_STOMP || s_mode >= M_HURT)
+	if (s_mode == M_STOMP || s_mode >= M_FALL)
 		return false;                    // 0x535720: not while kicking, hurt, held or dying
 	if (s_target && enemy_alive(s_target) && in_sight(b, s_target)) {
 		float cx, cz, r, top, bottom;

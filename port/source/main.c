@@ -2662,7 +2662,7 @@ static void head_update(const circlePosition* cp, u32 gheld, float dt, bool on)
 			tp = y * (y >= 0.0f ? 0.5f : 0.4f);
 		} else {
 			static float pts[33][3];
-			int n = ev_items_lying(pts, 32);
+			int n = stagemdl_look_points(pts, 32, s_py);
 			CombatBody body = { &s_px, &s_py, &s_pz, &s_yaw };
 			EnPlayer jp = combat_enplayer(&body, flash_lit()), mp;
 			if (maria_target(&jp, &mp))
