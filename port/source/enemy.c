@@ -3086,6 +3086,14 @@ static float red_walk_rate(const Enemy* e)
 	return t[s_diff] * (k * 0.75f + 0.25f);
 }
 
+// 0x4bebd0: his swings slow the same way.
+static float red_attack_rate(const Enemy* e)
+{
+	static const float t[5] = { 0.5f, 0.8f, 1.0f, 1.2f, 1.5f };
+	float k = e->endurance_max > 0.0f ? e->endurance / e->endurance_max : 1.0f;
+	return t[s_diff] * (k * 0.75f + 0.25f);
+}
+
 // 0x4beeb0: 0 James out of reach, 1 follow him, 2 swing (anime 3), 3 the long swing (anime 4, after
 // three attacks), 4 a short swing to the side (anime 5), 5 shove him away (stairwell only).
 static int red_sense(Enemy* e, const EnPlayer* p)
@@ -3207,7 +3215,9 @@ static void red_chase(Enemy* e, const EnPlayer* p, float dt)       // 0x4bf790
 	steer(e, p->x, p->z);
 	approach_angle(&e->path_angle, e->mark_angle, red_turn() * dt * 60.0f);
 	e->yaw = e->path_angle;
-	e->rate = red_walk_rate(e);
+	// 0x4a66c0: full speed facing James, half turned away
+	e->rate = red_walk_rate(e) *
+	          ((PI - fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw))) / PI + 1.0f) * 0.5f;
 	int s = red_sense(e, p);
 	if (s == 5) {
 		red_start_attack(e, 6);
@@ -3221,8 +3231,10 @@ static void red_attack(Enemy* e, const EnPlayer* p, float dt)      // 0x4bff10
 {
 	red_attack_hit(e, p);
 	// keeps turning to follow James (1 degree a frame in the long swing on hard)
-	float t = e->anim == 4 && s_diff > 2 ? 0.0174533f : red_turn();
+	// none at all in it below hard
+	float t = e->anim != 4 ? red_turn() : s_diff > 2 ? 0.0174533f : 0.0f;
 	approach_angle(&e->yaw, dir_to(e->x, e->z, p->x, p->z), t * dt * 60.0f);
+	e->rate = red_attack_rate(e);
 	e->path_angle = e->yaw;
 	if (!e->anim_end)
 		return;
@@ -3366,14 +3378,20 @@ static void red_update(Enemy* e, const EnPlayer* p, float dt)       // 0x4c0b00
 		if (check_damage(e)) {
 			if (e->type == 2) {
 				reduce_hp(e);
-				if (is_dead(e) && e->mlv != RED_LEAVE) go_raw(e, RED_LEAVE);
+				if (is_dead(e) && e->mlv != RED_LEAVE && !e->attacking) go_raw(e, RED_LEAVE);
 			} else {
 				e->endurance -= e->damage;
 				if (e->endurance < 0.0f) e->endurance = 0.0f;
 			}
+			{
+				static const float wait[5] = { 180, 90, 60, 30, 1 };
+				e->regain_wait = wait[s_diff];
+			}
 			reset_damage(e);
 			e->hb = 0.0f;
 		}
+		if (e->type == 2 && is_dead(e) && e->mlv != RED_LEAVE && !e->attacking && !combat_held())
+			go_raw(e, RED_LEAVE);           // a swing under way goes on first
 		switch (e->mlv) {
 		case RED_ATTACK: red_attack(e, p, dt); break;
 		case RED_GRAB: red_grab(e, p, dt); break;
@@ -3383,8 +3401,11 @@ static void red_update(Enemy* e, const EnPlayer* p, float dt)       // 0x4c0b00
 		}
 		if (!e->used)
 			return;
-		// endurance comes back at 200 a second
-		e->endurance += dt * 200.0f;
+		// endurance comes back at 200 a second, {180, 90, 60, 30, 1} ticks after the last hit (0x4bede0)
+		if (e->regain_wait > 0.0f)
+			e->regain_wait -= dt * 60.0f;
+		else
+			e->endurance += dt * 200.0f;
 		if (e->endurance > e->endurance_max) e->endurance = e->endurance_max;
 		// the stairwell fight lasts {20, 90, 180, 300, 600} seconds (+0xac)
 		if (e->type == 2 && e->mlv != RED_LEAVE) {
