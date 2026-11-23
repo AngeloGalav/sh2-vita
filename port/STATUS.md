@@ -357,6 +357,7 @@ Ordered by weight. Each line names where the work starts.
     - Button bindings were saved but never read back: controls.txt's own first line stopped the reader.
     - The clock in room 208 (issue 5): its ticking (0x3e83, 14 s) was started on every turn of the hands and never stopped. Now as the PC: heard while the hands move, stopped on leaving.
     - The red light in the corridor behind the bars (issue 5): 0x59c090 gives ap50 its fifth light only while Pyramid Head is there (69 and not 70) and ap42 its one from 69 on; the port had both always. `chrlight_points`.
+    - Pyramid Head's way out of the stairwell (issue 8): he walked into the walls and gave up on each point after 8 s. From the third point on the PC takes him through them, his height with him; he also walks, turns and swings for the 5 s before, and waits for James to be off the flight. `red_leave`.
     - Drops (issue 8, the pool in Wood Side's courtyard): 0x52eb40 lets James fall to a floor up to 1500 below; the port stopped him at 160. `fall_update` in `main.c`, everywhere. Not ported: the falling state's clip (0x18).
     - The action level never reached the enemies or James' health and combat (issue 9): `enemy_set_difficulty` ran only at boot, so every game played Normal there. Set on New Game, Born From a Wish and load now. Easy and Beginner games get James' 200 health.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
