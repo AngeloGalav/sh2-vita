@@ -690,6 +690,17 @@ bool room_load_mem(Room* room, const char* pack, const char* area, const char* n
 	return true;
 }
 
+static u32 s_shift_map;
+static float s_shift[3];
+
+void room_shift_set(u32 map_id, float x, float y, float z)
+{
+	s_shift_map = x != 0.0f || y != 0.0f || z != 0.0f ? map_id : 0;
+	s_shift[0] = x, s_shift[1] = y, s_shift[2] = z;
+}
+
+const float* room_shift(const Room* r) { return s_shift_map && r->map_id == s_shift_map ? s_shift : NULL; }
+
 void room_free(Room* room)
 {
 	parts_unregister(room->batches);

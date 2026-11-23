@@ -13,6 +13,8 @@
 #include "enemy.h"
 #include "collide.h"
 #include "stagemdl.h"
+#include "room.h"
+#include "game/view/sh2cam.h"
 #include "sfx.h"
 #include <math.h>
 
@@ -24,6 +26,7 @@ float prog_bf_elevator_door;            // 0x1d85d40 (prog_int.h)
 float prog_emp_elevator_door;           // 0x1d85f48 (prog_int.h)
 static float s_buzz_t;                  // 0x1d85f3c: the overweight buzzer's wait
 static float s_lift_gate = 450.0f, s_lift_gv, s_lift_t, s_lift_y, s_lift_step, s_lift_accel_end;
+static float s_lift_arr_t, s_lift_open, s_lift_ov, s_fan;   // 0x1d8621c, 0x1d86210, 0x1d86214
 
 static int ring_outer(void) { return p_flag(317) | p_flag(318) << 1; }   // EvProgControlCube's rings
 static int ring_inner(void) { return p_flag(319) | p_flag(320) << 1; }
@@ -46,10 +49,11 @@ static void labyrinth_room(int room)
 		ev_flag_set(326, table[a * 4 + b] > 1);
 	} else if (room == 0x78) {
 		s_lift_gv = s_lift_step = s_lift_accel_end = s_lift_t = 0.0f;
+		s_lift_gate = s_lift_arr_t = s_lift_open = s_lift_ov = 0.0f;
 		if (p_flag(314)) {
-			p_set(605);                 // FLAGW_576 |= 0x2000
+			p_set(605);                 // FLAGW_576 |= 0x2000: the gate stays open from here
 			s_lift_y = -45600.0f;
-			s_lift_gate = 450.0f;
+			s_lift_gate = s_lift_open = 450.0f;
 		} else {
 			s_lift_y = 0.0f;
 		}
@@ -384,6 +388,7 @@ static void frame_sounds(int stage, int room, const float* me, float yaw, float 
 static void room_enter(int stage, int room)
 {
 	s_armed = false;
+	vcSetCamNoise(0);                   // the port's own: a save loaded during the labyrinth lift's ride
 	for (int k = 0; k < 2; k++)         // the PC's keep sounds belong to the room that started them
 		if (s_after_load_sfx[k]) {
 			sfx_stop(s_after_load_sfx[k]);
@@ -577,18 +582,41 @@ static void well_wall_tick(int room)
 // 45600 units, speeding up by 6 units a frame each second to 500 a second plus a random 0..300
 // (600 at full speed) and slowing the same way near the bottom; at the bottom flag 314 opens the
 // way out and the save point, and with the prison map the labyrinth map's flag 29 is set too. The
-// PC moves the room's models; the port keeps the timing and the flags.
-static float s_lift_arr_t, s_lift_open, s_lift_ov, s_fan;   // 0x1d8621c, 0x1d86210, 0x1d86214
+// car stands still: the PC moves the shaft (map piece ps67, 0xb0043) up past it (0x47d710, with a
+// few units of sideways jitter; its 0xb0044 and 0xb0045 have no files), and the corridor at the
+// bottom, with the door out, is in that piece 45600 lower. Not ported: the pad's vibration (0x4f4930)
+// and 0x79b830, which the PC holds at 0 during the ride.
+#define LIFT_SHAFT 0xb0043
+static const float k_lift_gate_at[3] = { -19050.0f, -600.0f, -100000.0f };   // 0x8d4408
+static const float k_lift_car_at[3] = { -20000.0f, 0.0f, -100000.0f };       // 0x8d4418
+
+// A gate leaf's speed: 800 a second faster each second, up to 1000.
+static void lift_accel(float* v, float dt) { *v = fminf(*v + dt * 800.0f, 1000.0f); }
+
 static void lift_tick(float dt)
 {
-	if (p_flag(314)) {
-		// 0x582f41: at the bottom, 2 s later the gate goes up again (accelerating 800 a second to
-		// 1000) and lets James out (315) once it is 292.5 open, until 450
+	if (p_flag(605)) {
+		// 0x582f37: James came back to the room after the ride: nothing moves any more
 		s_lift_y = -45600.0f;
-		if ((s_lift_arr_t += dt) >= 2.0f && s_lift_open < 450.0f) {
-			s_lift_ov = s_lift_ov + dt * 800.0f > 1000.0f ? 1000.0f : s_lift_ov + dt * 800.0f;
-			s_lift_open += dt * s_lift_ov;
-			if (s_lift_open >= 292.5f)
+		return;
+	}
+	if (p_flag(314)) {
+		// 0x582f41: at the bottom, 2 s later the gate goes up again and lets James out (315) once it
+		// is 292.5 open, until 450; the camera shakes for half a second
+		s_lift_y = -45600.0f;
+		if (s_lift_arr_t == 0.0f) {
+			sfx_play_at(0x4656, 1.0f, k_lift_car_at);
+			vcSetCamNoise(3);
+		}
+		s_lift_arr_t += dt;
+		if (s_lift_arr_t > 0.5f)
+			vcSetCamNoise(0);
+		if (s_lift_arr_t > 2.0f && s_lift_open < 450.0f) {
+			if (s_lift_open == 0.0f)
+				sfx_play_at(0x4655, 1.0f, k_lift_gate_at);
+			lift_accel(&s_lift_ov, dt);
+			s_lift_open = fminf(s_lift_open + dt * s_lift_ov, 450.0f);
+			if (s_lift_open > 292.5f)
 				p_set(315);             // FLAGW_288 |= 0x8000000
 		}
 		return;
@@ -599,16 +627,21 @@ static void lift_tick(float dt)
 		return;
 	}
 	if (!p_flag(313)) {
+		if (s_lift_gate == 450.0f) {
+			sfx_play_at(0x4653, 1.0f, k_lift_gate_at);
+			sfx_play(0x4654, 0.0f, 0.0f);   // the ride's sound, silent until it moves
+		}
 		if (s_lift_gate > 0.0f) {
-			s_lift_gv = s_lift_gv + dt * 800.0f > 1000.0f ? 1000.0f : s_lift_gv + dt * 800.0f;
-			s_lift_gate -= dt * s_lift_gv;
-			if (s_lift_gate < 0.0f)
-				s_lift_gate = 0.0f;
-		} else if ((s_lift_t += dt) >= 2.0f) {
+			lift_accel(&s_lift_gv, dt);
+			s_lift_gate = fmaxf(s_lift_gate - dt * s_lift_gv, 0.0f);
+		} else if ((s_lift_t += dt) > 2.0f) {
 			p_set(313);                 // FLAGW_288 |= 0x2000000
 		}
 		return;
 	}
+	sfx_set_volume(0x4654, s_lift_step / (500.0f * dt) * 0.8f);   // 0x58302b
+	if (s_lift_step >= 500.0f * dt / 3.0f)
+		vcSetCamNoise(1);
 	// 0x5834ec: the step per frame (in units per frame at the frame time dt)
 	float jitter = (float)(p_rand() % (s_lift_step >= 500.0f * dt ? 600 : 300)) * dt;
 	s_lift_y -= jitter + s_lift_step;
@@ -626,9 +659,28 @@ static void lift_tick(float dt)
 	if (s_lift_y <= -45600.0f) {
 		s_lift_y = -45600.0f;
 		p_set(314);                     // 0x583345: FLAGW_288 |= 0x4000000
+		sfx_stop(0x4654);
+		s_lift_arr_t = s_lift_open = s_lift_ov = 0.0f;
 		if (p_flag(28))
 			p_set(29);
 	}
+}
+
+// 0x5831aa: the lift's two gate leaves (model 0x530, bones 0 and 1) stand apart by the opening (450
+// open), shaken by up to 0.9 of the ride's speed (_DAT_006e2be0 1.8) while they are not wide open.
+static void lift_models(float dt)
+{
+	float g = p_flag(605) ? 450.0f : !p_flag(312) ? 450.0f : !p_flag(314) ? s_lift_gate : s_lift_open;
+	float sh = dt > 0.0f && g != 450.0f ? s_lift_step * 1.8f / (500.0f * dt) : 0.0f;
+	for (int b = 0; b < 2; b++) {
+		float r[3];
+		for (int i = 0; i < 3; i++)
+			r[i] = ((float)(p_rand() % 1000) / 1000.0f - 0.5f) * sh;
+		stagemdl_bone_move(0x530, b, r[0], r[1], (b ? g : -g) + r[2]);
+	}
+	bool riding = p_flag(313) && !p_flag(314);
+	room_shift_set(LIFT_SHAFT, riding ? (float)(p_rand() % 6 - 3) : 0.0f, s_lift_y,
+	               riding ? (float)(p_rand() % 6 - 3) : 0.0f);
 }
 
 // Stage 44 (0x5769b0): in the corridor before the last door (room 0xba) Mary's voice starts after
@@ -765,11 +817,7 @@ void prog_stagefn_tick(int stage, float dt)
 				stagewalls_add(0x8d3938);
 			}
 			lift_tick(dt);
-			// 0x5831aa: the lift's two gate leaves (model 0x530, bones 0 and 1) apart by the opening
-			// (450 open; the PC also shakes them while it rides, which the port leaves out)
-			float g = !p_flag(312) ? 450.0f : !p_flag(314) ? s_lift_gate : s_lift_open;
-			stagemdl_bone_move(0x530, 0, 0.0f, 0.0f, -g);
-			stagemdl_bone_move(0x530, 1, 0.0f, 0.0f, g);
+			lift_models(dt);
 		} else if (room == 0x84 && !p_flag(330)) {
 			// the wire across the way until the cutter takes it (0x8d3de8)
 			stagewalls_add(0x8d3de8);

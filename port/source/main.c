@@ -3219,6 +3219,29 @@ static bool room_visible(const Room* r, const C3D_Mtx* clip)
 }
 
 static C3D_Mtx s_clip_mtx;     // projection * view of the frame, for room_visible
+static C3D_Mtx s_room_mv;      // the frame's view, for a map piece stage code has moved (room_shift)
+
+// One group of one room; a piece stage code has moved (room_shift, 0x47d710) with its own matrix and
+// the view volume moved the other way, as its boxes are where it was loaded.
+static u32 draw_room_at(const Room* r, int group)
+{
+	const float* sh = room_shift(r);
+	if (!sh)
+		return draw_room_group(r, group);
+	float keep[5];
+	for (int k = 0; k < 5; k++) {
+		keep[k] = s_frustum[k][3];
+		s_frustum[k][3] += s_frustum[k][0] * sh[0] + s_frustum[k][1] * sh[1] + s_frustum[k][2] * sh[2];
+	}
+	C3D_Mtx mv = s_room_mv;
+	Mtx_Translate(&mv, sh[0], sh[1], sh[2], true);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uModelView, &mv);
+	u32 calls = draw_room_group(r, group);
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uModelView, &s_room_mv);
+	for (int k = 0; k < 5; k++)
+		s_frustum[k][3] = keep[k];
+	return calls;
+}
 
 // The primary room and the resident neighbours, one group of every room at a time.
 // 0x5b4f10 draws the map straight away (0x47d7f0, before the frame's ordering table with the
@@ -3231,7 +3254,13 @@ static u32 draw_room_pass(int group)
 	u32 calls = 0;
 	bool vis[MAX_NB];
 	for (int k = 0; k < s_nnb; k++)
-		vis[k] = room_visible(&s_nb[k], &s_clip_mtx);
+	{
+		C3D_Mtx clip = s_clip_mtx;
+		const float* sh = room_shift(&s_nb[k]);
+		if (sh)
+			Mtx_Translate(&clip, sh[0], sh[1], sh[2], true);
+		vis[k] = room_visible(&s_nb[k], &clip);
+	}
 	// The PC draws with D3DRS_CULLMODE D3DCULL_CW: 0x406ef0 turns culling off for its screen quad
 	// and puts CW back after it, and nothing else in the exe changes it. Many camera roads stand
 	// outside a room and look in through a wall that only faces inwards (the closet of hotel room
@@ -3251,10 +3280,10 @@ static u32 draw_room_pass(int group)
 	}
 	if (s_map_test == 4 || s_map_test == 5)
 		C3D_FogGasMode(GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
-	calls += draw_room_group(&s_cur, group);
+	calls += draw_room_at(&s_cur, group);
 	for (int k = 0; k < s_nnb && s_map_test != 6; k++)
 		if (vis[k])
-			calls += draw_room_group(&s_nb[k], group);
+			calls += draw_room_at(&s_nb[k], group);
 	if ((s_map_test == 4 || s_map_test == 5) && s_cam.mode == CAM_PLAYER)
 		C3D_FogGasMode(GPU_FOG, GPU_PLAIN_DENSITY, false);
 	C3D_CullFace(GPU_CULL_NONE);
@@ -5510,6 +5539,7 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 		lighting_frame(mv, s_cam.mode == CAM_PLAYER);
 		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uProjection, proj);
 		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, s_uModelView, mv);
+		s_room_mv = *mv;
 		Mtx_Multiply(&s_clip_mtx, proj, mv);
 		frustum_set(&s_clip_mtx, s_clip_far);
 		if (!stereo_eye())

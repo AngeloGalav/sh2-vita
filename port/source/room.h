@@ -88,6 +88,11 @@ int room_texture_ids(const u8* data, long size, u32* out, int max);
 int texcache_ids(const char* area, u32* out, int max);
 void room_free(Room* room);
 
+// 0x47d710: stage code moving a whole map piece (its model matrix), by map id; 0x47d7a0 puts it back.
+// Only the labyrinth lift's shaft (ps67) is moved on the PC. room_shift: where r stands, or NULL.
+void room_shift_set(u32 map_id, float x, float y, float z);
+const float* room_shift(const Room* r);
+
 // Texture cache shared by rooms of one area (textures are keyed by SH2 texture id).
 void texcache_clear(void);
 // A door reads the new room's map textures from their 256 level, the size packs had before, so the

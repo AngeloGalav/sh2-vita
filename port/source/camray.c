@@ -293,8 +293,10 @@ float camray_cast(const float a[3], const float b[3])
 		if (!r || !r->vertices || !r->n_batches)
 			continue;
 		const Grid* g = find(r, false);
+		const float* sh = room_shift(r);     // the room's triangles are where they were loaded
+		float o[3] = { a[0] - (sh ? sh[0] : 0.0f), a[1] - (sh ? sh[1] : 0.0f), a[2] - (sh ? sh[2] : 0.0f) };
 		if (g && g->state == G_READY)
-			best = room_grid(r, g, a, d, best);
+			best = room_grid(r, g, o, d, best);
 	}
 	return best;
 }
