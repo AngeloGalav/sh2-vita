@@ -881,7 +881,7 @@ bool combat_dead(void) { return (s_mode == M_DEAD && s_dead_t > 1.5f && !s_carri
 EnPlayer combat_enplayer(const CombatBody* b, bool light)
 {
 	EnPlayer p = { *b->x, *b->y, *b->z, *b->yaw, light, s_mode < M_DYING,
-	               (s_mode == M_SWING && s_atk_heavy) || s_mode == M_STOMP };
+	               s_mode == M_STOMP };
 	return p;
 }
 
@@ -1918,18 +1918,10 @@ static void ee_queue_update(u32 held, bool action_down, float dt)
 // down undecided goes on being timed in M_READY.
 static void ee_queue_fire(const CombatBody* b, u32 held)
 {
-	if (s_queue && (held & KEY_R)) {
-		if (s_stompable && s_weapon != W_KNIFE)
-			start_stomp(s_queue == 2 || !s_hold_to_stomp);
-		else
-			start_swing(b, false, s_queue == 2);
-	} else if (s_qhold >= 0.0f && (held & KEY_A)) {
-		bool stomp = s_stompable && s_weapon != W_KNIFE;
-		if (stomp && !s_hold_to_stomp)
-			start_stomp(true);
-		else
-			s_charge = s_qhold, s_charge_stomp = stomp;
-	}
+	if (s_queue && (held & KEY_R))
+		start_swing(b, false, s_queue == 2);
+	else if (s_qhold >= 0.0f && (held & KEY_A))
+		s_charge = s_qhold, s_charge_stomp = false;
 	s_queue = 0;
 	s_qhold = -1.0f;
 }
@@ -2012,8 +2004,9 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 			cycle_weapon();
 			return false;
 		}
-		// 0x557100: the weapon comes up only from the states whose upper row allows status 0x1a;
-		// walking, running and the quick turn go on until they end
+		// 0x557100: the weapon comes up from standing, and from every walk, back-off, strafe and run (it
+		// ORs 0x4000000 into their rows itself for a grip whose flags have bit 1 or 2, and with the weapon
+		// down those are 0xff); not from the quick turn
 		if ((held & KEY_R) && move_can_aim()) {
 			lock_on(b);                      // 0x533ca0: locked as he readies
 			s_raise_press = action_down;
@@ -2048,7 +2041,8 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 			return false;
 		}
 		// Maria too (Born From a Wish), with what she stomps with when aiming (not her knife).
-		if (action_down && s_stompable && (s_weapon <= W_SPRAY || is_bare() || is_gun()) && move_can_aim()) {
+		if (action_down && s_stompable && (s_weapon <= W_SPRAY || is_bare() || is_gun()) &&
+		    move_can_aim() && (move_standing() || enemy_alive(s_stompable))) {   // the port's bodies: standing only
 			if (s_hold_to_stomp) {
 				s_free_charge = 0.0f;
 			} else {
@@ -2097,18 +2091,9 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 			break;
 		}
 		if (action_down || action_again) {
-			// 0x5569b0 takes the kick / stomp branch before it looks at the grip: 0x533c10 sets
-			// DAT_01fbad00 from 0x542a10 (a downed enemy at his feet) whatever James holds, so every
-			// one of his weapons stomps, the plank too. Maria's knife keeps to her own attacks.
-			// Held on, the low pressure of 0x1fbab0f makes the melee swing the light one (0x533ff0);
-			// the stomp reads the key's own pressure and stays the stomp (0x534210).
-			bool stomps = s_weapon <= W_SPRAY || is_bare() || is_gun();
-			if (stomps && s_stompable) {
-				if (s_hold_to_stomp && action_down)
-					s_charge = 0.0f, s_charge_stomp = true;
-				else
-					start_stomp(true);
-			} else if (is_melee()) {
+			// 0x5569b0 offers the kick / stomp only with the weapon down (0x556a05: upper status below 0x12
+			// or over 0x1d); with it up Action is always the weapon's own attack.
+			if (is_melee()) {
 				if (s_swap_light_heavy && action_down)
 					s_charge = 0.0f, s_charge_stomp = false;
 				else

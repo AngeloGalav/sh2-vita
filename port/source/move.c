@@ -146,8 +146,10 @@ bool move_can_aim(void)
 {
 	int s = M.state;
 	return s == MV_STAND || s == MV_RELAX || s == MV_TIRED || s == MV_ALERT || s == MV_LROUND || s == MV_RROUND ||
-	       s == MV_HOLD;
+	       s == MV_HOLD || moving(s);
 }
+
+bool move_standing(void) { return move_can_aim() && !moving(M.state); }
 
 int move_pc_status(int s)
 {

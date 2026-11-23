@@ -143,9 +143,10 @@ or looks round, and while he is kicking, hurt, held or dying.
 
 ## Aiming (combat.c)
 
-The weapon comes up only while James stands, idles or turns on the spot: walking, running, backing
-off and the quick turn go on until they end (the upper rows of 0x6cf7f8 that allow status 0x1a,
-0x557100). Holding Aim locks on to a target as it comes up (0x533ca0): the nearest enemy in his sight
+The weapon comes up from standing and turning on the spot, and from every walk, back-off, strafe and
+run: 0x557100 ORs 0x4000000, which the upper rows of 0x6cf7f8 lack there, into them itself for a grip
+whose flags have bit 1 or 2, and with the weapon down they are 0xff. Only the quick turn goes on until
+it ends. Holding Aim locks on to a target as it comes up (0x533ca0): the nearest enemy in his sight
 with nothing of the room in between, one on its feet before one on the floor (0x542560). With a lock
 James turns to it by 0.3235 x 15 of the gap a second (0x5568c0) while he aims and attacks, and the
 stick turns him not at all; without one the stick turns him in the stance at 2.4 rad/s, 3.6 with run
@@ -175,10 +176,11 @@ which shrink with the light and the action level (0x52f2c0, in metres x 500):
 The lock holds while the target lives and any candidate stays in clear sight (0x533c10); lowering
 the weapon or changing it drops it. While aiming, Target left / right move it to the nearest other
 enemy on that side (0x542740). The strafe buttons strafe, as on the PC.
-With Aim held, Attack with an enemy lying on the floor ahead of James within 600 units (0x542a10)
-kicks or stomps it, whatever James holds (0x5569b0 picks that branch before it looks at the weapon),
-and the kick turns him to it (0x558f40). With the Enhanced Edition's Hold to Stomp,
-a tap kicks and holding Attack for 0.2 s stomps.
+With the weapon down, Action with an enemy lying on the floor (or a creeper) ahead of James within 600
+units (0x542a10) kicks or stomps it, standing, walking or running, and the kick turns him to it
+(0x558f40). With the weapon up it never does (0x5569b0: upper status below 0x12 or over 0x1d). With the
+Enhanced Edition's Hold to Stomp, a tap kicks and holding Attack for 0.2 s stomps. The port's own
+stomps on bodies James killed want him standing.
 The attack windows were checked against the exe's sh2_attack_list (0x6ec568): the plank's swings 12
 to 15, 8 to 11 and 8 to 10, the kicks 7 to 10 and the stomps 3 to 9 for every weapon the port has
 (0x53b190 picks kick type 0, 1 or 2 for bare hands and the handgun, the long guns and the plank, all

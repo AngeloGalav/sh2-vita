@@ -90,5 +90,6 @@ const char* move_status(void);
 // upper body take status 0x1a (standing, idling, turning on the spot, already holding). Walking,
 // running, backing off and the quick turn have to end first (0x557100).
 bool move_can_aim(void);
+bool move_standing(void);                // the same, but not walking or running
 // The PC's lower status number of the state (the camera's anim status, 0x1fba8e8).
 int move_pc_status(int state);
