@@ -1686,8 +1686,7 @@ static void scu_dying(Enemy* e)
 // enDyingExec 0x4a96c0 sets +0x148 bit 2). The PC centres it on the root bone (0x4a7370, bone
 // 0x8927f0[kind]) once an anime has played 10 frames; in these kinds' anims the root stays within
 // 70 units of the feet point, lying or standing, so the port keeps it on the feet.
-// Port: only these four kinds have it so far; a creeper on a wall or the ceiling has none here
-// (its column hangs from there on the PC, flag 0x40), and the other kinds keep move_exec's stop.
+// Port: these and Pyramid Head so far; the other kinds keep move_exec's stop.
 static bool push_column(const Enemy* e, float* r, int* weight)
 {
 	if (!e->used || !enemy_alive(e))
@@ -1695,12 +1694,12 @@ static bool push_column(const Enemy* e, float* r, int* weight)
 	int w;
 	switch (e->kind) {
 	case EN_KIND_SCU: case EN_KIND_MKN: case EN_KIND_NSE: w = 2; break;
-	case EN_KIND_TYU:
-		if (e->mlv == TYU_WALL || e->mlv == TYU_CEILING)
+	case EN_KIND_RED:                  // 0x4bf2d0: 3; not while he holds James up (bit 8)
+		if (e->ctrl != 1 || combat_held())
 			return false;
-		w = 1;
+		w = 3;
 		break;
-	default: return false;
+	default: return false;             // a creeper's has no radius (+0x10 bit 0x10): James walks over them
 	}
 	if (e->size <= 0.0f)
 		return false;
@@ -1774,8 +1773,8 @@ static void move_exec(Enemy* e, float adv, float dt)
 	// it slid along with him at his speed and stayed in its strike's reach (console, 2026-11-13).
 	float mind = 130.0f + e->size * 0.8f;
 	float dx = nx - s_px, dz = nz - s_pz, d = sqrtf(dx * dx + dz * dz);
-	if (!push_column(e, NULL, NULL) && e->kind != EN_KIND_ARM && d < mind && d < hypotf(e->x - s_px, e->z - s_pz) &&
-	    (!enemy_is_down(e) || e->kind == EN_KIND_TYU)) {
+	if (!push_column(e, NULL, NULL) && e->kind != EN_KIND_ARM && e->kind != EN_KIND_TYU && e->kind != EN_KIND_RED && d < mind && d < hypotf(e->x - s_px, e->z - s_pz) &&
+	    !enemy_is_down(e)) {
 		if (d < 1.0f) return;
 		nx = s_px + dx / d * mind;
 		nz = s_pz + dz / d * mind;
@@ -2586,9 +2585,8 @@ static float tyu_speed(void)                   // 0x4ad9e0: units per second
 	return t[s_diff] * 1250.0f;
 }
 
-// Gap between the creeper's body and James' (the PC measures to the bodies, the port's p_dist is
-// centre to centre).
-static float tyu_gap(const Enemy* e) { return e->p_dist - 130.0f - e->size * 0.8f; }
+// 0x4a5fb0: James is kicking or stomping this very one (0x542de0); within 300 of him it stands still for it.
+static bool tyu_under_foot(const Enemy* e) { return combat_stomp_enemy() == e && e->p_dist < 300.0f; }
 
 // 0x4ad8b0: 2 James is right in front (bite), 1 close enough to chase, 0 neither. Creepers ignore
 // James on beginner and in the dark without the flashlight.
@@ -2598,9 +2596,9 @@ static int tyu_sense(const Enemy* e, const EnPlayer* p)
 	if (s_diff == 0 || light_index(p) == 3 || !p->alive)
 		return 0;
 	float a = fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw));
-	if (tyu_gap(e) < 150.0f && a < 1.0471976f)
+	if (e->p_dist < 150.0f && a < 1.0471976f)
 		return 2;
-	return tyu_gap(e) <= chase[s_diff] ? 1 : 0;
+	return e->p_dist <= chase[s_diff] ? 1 : 0;
 }
 
 static void tyu_move(Enemy* e, float speed, float dt)
@@ -2630,6 +2628,8 @@ static void tyu_wander(Enemy* e, const EnPlayer* p, float dt)          // 0x4af6
 		e->path_angle = wrap(e->path_angle + rnd() * 1.0471976f);
 	steer(e, e->x + sinf(e->path_angle) * 500.0f, e->z + cosf(e->path_angle) * 500.0f);
 	tyu_move(e, tyu_speed(), dt);
+	if (tyu_under_foot(e))
+		e->vx = e->vz = 0.0f;
 	int s = tyu_sense(e, p);
 	if (s == 2) go_raw(e, TYU_ATTACK);
 	else if (s == 1) go_raw(e, TYU_CHASE);
@@ -2649,8 +2649,8 @@ static void tyu_chase(Enemy* e, const EnPlayer* p, float dt)           // 0x4afa
 	int s = tyu_sense(e, p);
 	if (s == 2) go_raw(e, TYU_ATTACK);
 	else if (s == 0) go_raw(e, TYU_WANDER);
-	if (tyu_gap(e) < 0.0f)
-		e->vx = e->vz = 0.0f;          // 0x4a5fb0: at James' feet, stop pushing
+	if (tyu_under_foot(e))
+		e->vx = e->vz = 0.0f;
 }
 
 // 0x4afd00: after a bite it scuttles off sideways round James until it is out of chasing range.
@@ -2668,6 +2668,11 @@ static void tyu_flee(Enemy* e, const EnPlayer* p, float dt)
 		return;
 	}
 	tyu_move(e, tyu_speed(), dt);
+	if (tyu_under_foot(e)) {
+		e->vx = e->vz = 0.0f;
+		go_raw(e, TYU_WANDER);
+		return;
+	}
 	if (tyu_sense(e, p) == 0)
 		go_raw(e, TYU_WANDER);
 }
@@ -2684,8 +2689,10 @@ static void tyu_attack(Enemy* e, const EnPlayer* p, float dt)
 		e->vx = e->vz = 0.0f;
 		e->slv = 1;
 	}
-	blow_maria(e, 300.0f + e->size * 0.8f, PI, 5.0f);
-	if (!e->attack_hit && p->alive && tyu_gap(e) < 300.0f) {
+	// 0x544870: 0..300 along the bite's bone, against James' column (150)
+	blow_maria(e, 300.0f, 1.0471976f, 5.0f);
+	if (!e->attack_hit && p->alive && e->p_dist < 300.0f + 150.0f &&
+	    (e->p_dist < 150.0f || fabsf(wrap(dir_to(e->x, e->z, p->x, p->z) - e->yaw)) < 1.0471976f)) {
 		e->attack_hit = true;
 		hit_james(p, 57, 5.0f, e);
 	}
@@ -6802,6 +6809,8 @@ void enemy_damage(Enemy* e, int attack_id, float ap, float sp, float dir_x, floa
 			go(e, SCU_CONFUSE);
 		if (e->kind == EN_KIND_SCU || e->kind == EN_KIND_MKN || e->kind == EN_KIND_NSE)
 			return;
+		if (e->kind == EN_KIND_TYU)
+			ap = e->hp;              // 0x4ae3e0: the spray kills a creeper at once
 	}
 	hit_sound(e, attack_id);
 	e->damage += ap;
