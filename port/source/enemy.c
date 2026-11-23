@@ -1741,10 +1741,11 @@ static void move_exec(Enemy* e, float adv, float dt)
 	else if (e->kind == EN_KIND_ONI)
 		stride = e->anim == 1 ? 9.6f : 0.0f;    // feet 12 / 13 (0x892798)
 	else if (e->kind == EN_KIND_ARM)
-		// a planted hand: about 590 a step (anime 2, 3). 0x4a6e40 holds the body to the planted hand;
-		// the strikes (4, 5) swing the other arm and stay where they are. They carried the step's
-		// 590 too, so every strike crawled it after James and kept him in reach (console 2026-11-13)
-		stride = e->anim == 2 || e->anim == 3 ? 34.7f : 0.0f;
+		// a planted hand: about 590 a step. 0x4a6e40 holds the body to the planted hand, in the strikes (4, 5)
+		// as in the steps (2, 3): their hand bones have the same keys (arm.anm, bones 11 and 12). A strike
+		// that lands and the forced step after it carry the body past James and out of its 120 degrees.
+		// (They stayed in place from 2026-11-13 to 2026-11-23: what had kept it on James was the stop.)
+		stride = e->anim >= 2 && e->anim <= 5 ? 34.7f : 0.0f;
 	else if (e->anim == 0 || e->anim == A_WALK)
 		stride = e->kind == EN_KIND_MKN ? MKN_WALK_STRIDE : SCU_WALK_STRIDE;
 	else if (e->kind == EN_KIND_MKN)
@@ -4867,6 +4868,51 @@ static int arm_decide(const Enemy* e, const EnPlayer* p)
 	return arm_grate(e->x + fx * 500.0f, e->z + fz * 500.0f, p->y) ? 2 : 1;
 }
 
+// 0x4ac460: another Mandarin within 1000, less than 90 degrees off its heading: to the Turn state, away
+// from it (+0xd5).
+static bool arm_crowded(Enemy* e)
+{
+	for (int i = 0; i < ENEMY_MAX; i++) {
+		const Enemy* o = &s_en[i];
+		if (o == e || !o->used || o->kind != EN_KIND_ARM || o->dead_flag)
+			continue;
+		float dx = o->x - e->x, dy = o->y - e->y, dz = o->z - e->z;
+		float off = wrap(e->yaw - atan2f(dx, dz));
+		if (dx * dx + dy * dy + dz * dz > 1000.0f * 1000.0f || fabsf(off) >= PI / 2.0f)
+			continue;
+		set_timer(e, 0);
+		e->amb_n = 0;
+		e->ival2 = off >= 0.0f ? 1 : -1;
+		e->ival3 = 0;
+		go_raw(e, ARM_TURN);
+		return true;
+	}
+	return false;
+}
+
+// 0x4ace40: three clips long it turns 3 degrees a tick away from the other one, striking where it may.
+static void arm_turn(Enemy* e, const EnPlayer* p, float dt)
+{
+	if (check_damage(e)) { e->attacking = false; go_raw(e, ARM_DAMAGE); return; }
+	if (e->slv == 0) { e->anim_end = true; e->slv = 1; }
+	if (e->anim_end) {
+		if (e->ival3++ >= 3) { e->attacking = false; go_raw(e, ARM_WANDER); return; }
+		bool strike = arm_decide(e, p) == 2;
+		e->ival = e->ival == 0 ? 1 : 0;
+		e->attacking = strike;
+		e->attack_hit = e->maria_hit = false;
+		anim_set(e, (strike ? 5 : 3) - e->ival);
+		e->frame = ARM_ANIM[e->anim].start;
+		e->anim_end = false;
+		if (strike) play_at(e, 12252 + (int)(rnd() * 1.99f));
+	}
+	float yaw = wrap(e->yaw + (float)e->ival2 * 0.05236f * dt * 60.0f);
+	if (s_col && !ray_clear(e, yaw, 500.0f))
+		yaw = e->yaw;
+	e->yaw = e->path_angle = e->mark_angle = yaw;
+	e->rate = arm_rate(e);
+}
+
 static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 {
 	e->p_dist = hypotf(p->x - e->x, p->z - e->z);
@@ -4878,11 +4924,18 @@ static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 		if (e->slv == 0) { e->anim_end = true; e->slv = 1; e->ival = -1; }
 		if (e->attacking) {
 			float f = frame_in(e);
-			if (f <= 16.0f) swing_hit(e, p, e->anim == 4 ? 0x46 : 0x47, 10.0f, 450.0f + 300.0f, 1.0f);
+			// 0x544730: two segments of 450 from the flailing tips (bones 13, 14); they come over the
+			// floor on these frames only, at most 600 from the body
+			bool over = e->anim == 4 ? (f >= 1.0f && f < 4.0f) || (f >= 8.0f && f < 11.0f) || (f >= 12.0f && f < 17.0f)
+			                         : f < 3.0f || (f >= 7.0f && f < 10.0f) || (f >= 11.0f && f < 16.0f);
+			if (over && e->hold <= 0.0f)
+				swing_hit(e, p, e->anim == 4 ? 0x46 : 0x47, 10.0f, 600.0f, 1.0f);
 			if (e->attack_hit || e->maria_hit)
 				e->flags &= ~EF_STRIKE;          // 0x4a6000: the strike landed
 		}
 		if (e->anim_end) {
+			if (arm_crowded(e))
+				break;                       // 0x4ac460: turns away from another one first
 			// 0x4acc00: a strike decision counts up +0xd1, any other clears it. Out of tracking or
 			// striking, a change of mind, a strike that landed (bit 4 clear: none pending) or a fifth
 			// strike in a row turns it away for 180 ticks (3 s) of plain crawling.
@@ -4911,11 +4964,13 @@ static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 		{
 			float tx = e->slv == 1 ? e->x + sinf(e->yaw) * 1000.0f : p->x;
 			float tz = e->slv == 1 ? e->z + cosf(e->yaw) * 1000.0f : p->z;
-			if (e->slv == 1 && hypotf(e->x - e->stx, e->z - e->stz) > 2500.0f) tx = e->stx, tz = e->stz;
+			// the port's own: back towards where it was placed, but not while it turns away from James
+			if (e->slv == 1 && e->timer == 0 && hypotf(e->x - e->stx, e->z - e->stz) > 2500.0f) tx = e->stx, tz = e->stz;
 			walk_to(e, tx, tz, 0.05236f, dt);
 		}
 		e->rate = arm_rate(e);
 		break;
+	case ARM_TURN: arm_turn(e, p, dt); break;
 	case ARM_DAMAGE:
 		if (e->slv == 0) {
 			reduce_hp(e);
