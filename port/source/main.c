@@ -2434,6 +2434,16 @@ static void unstick_update(bool want, float moved, float dt)
 // A stage program walking James to a point (host_walk_to)
 static struct { bool asked, walking; float x, z, t; } s_auto;
 
+// 0x59c090, stage 7's code by room record: ap50's red light (the fifth) is on while Pyramid Head stands
+// behind the bars (0x48c9d0 gives 4: flag 69 and not 70), ap42's only one from flag 69 on.
+static void record_lights(void)
+{
+	if (s_env.map_id == 0x90032)
+		chrlight_points(ev_flag(69) && !ev_flag(70) ? 5 : 4);
+	else if (s_env.map_id == 0x9002a)
+		chrlight_points(ev_flag(69) ? 1 : 0);
+}
+
 static void player_update(const circlePosition* cp, u32 held, float dt)
 {
 	if (boat_active()) {
@@ -2772,8 +2782,10 @@ static void draw_james(const C3D_Mtx* proj, const C3D_Mtx* view)
 	// in the viewer.
 	bool own = s_cam.mode == CAM_PLAYER && !s_chr_begun;
 	if (s_cam.mode == CAM_PLAYER) {
-		if (own)
+		if (own) {
+			record_lights();
 			chrlight_begin(view, s_env.amb, s_flash_level, bright_scale(), &s_chrflash);
+		}
 		float at[3] = { s_px, s_py, s_pz };
 		chrlight_at(at, true);
 	} else {
@@ -2844,6 +2856,7 @@ static void draw_demo(const C3D_Mtx* proj, const C3D_Mtx* view)
 		C3D_FogGasMode(GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
 	demo_set_lighting(&s_lenv, a, bright_scale());
 	demo_light_hook(demo_light_scale);
+	record_lights();
 	chrlight_begin(view, s_env.amb, s_flash_level, bright_scale(), &s_chrflash);
 	s_chr_begun = true;
 	shadow_mark_begin();

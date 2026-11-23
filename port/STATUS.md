@@ -356,6 +356,7 @@ Ordered by weight. Each line names where the work starts.
     - The safe's bullets (and the hospital's seven, stage 25) could be taken only while it was shut: `EventItemConditionCheck` (0x48cb20) was read the wrong way round for types 2 and 3.
     - Button bindings were saved but never read back: controls.txt's own first line stopped the reader.
     - The clock in room 208 (issue 5): its ticking (0x3e83, 14 s) was started on every turn of the hands and never stopped. Now as the PC: heard while the hands move, stopped on leaving.
+    - The red light in the corridor behind the bars (issue 5): 0x59c090 gives ap50 its fifth light only while Pyramid Head is there (69 and not 70) and ap42 its one from 69 on; the port had both always. `chrlight_points`.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
 - Some animation errors in play. Later.

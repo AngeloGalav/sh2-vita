@@ -44,6 +44,7 @@ static struct {
 	C3D_LightEnv own;
 	C3D_Light light[CL_LIGHTS];
 	Slot s[NSLOT];
+	u8 pt_first, pt_count, pt_on;    // the record's point lights' slots, and how many are on
 	Slot fl;                         // the flashlight as a character spot (dark rooms)
 	bool active, james_light;
 	C3D_Mtx view;
@@ -123,6 +124,7 @@ void chrlight_init(C3D_LightEnv* env)
 void chrlight_load(const char* pack_dir, const char* map, const char* variant)
 {
 	memset(L.s, 0, sizeof L.s);
+	L.pt_first = L.pt_count = 0, L.pt_on = NSLOT;
 	char path[160];
 	snprintf(path, sizeof path, "%s/chrlight.txt", pack_dir);
 	const char* text = text_cached(path);   // read once: this runs on every tile change
@@ -186,6 +188,7 @@ void chrlight_load(const char* pack_dir, const char* map, const char* variant)
 		falloff(s, sv[2], sv[3]);
 		s->s_a = 1.0f, s->s_b = sv[0] * -0.8f;
 	}
+	L.pt_first = (u8)at, L.pt_count = (u8)np;
 	for (int i = 0; i < np + nfp && q + 9 <= v + n; i++, q += 9) {
 		bool fake = i >= np;
 		int idx = fake ? fake_at++ : at++;           // fake points overwrite from index 2 (0x508f8d)
@@ -217,6 +220,13 @@ void chrlight_load(const char* pack_dir, const char* map, const char* variant)
 	}
 	for (int i = 0; i < NSLOT; i++)
 		slot_luts(&L.s[i]);
+}
+
+void chrlight_points(int n) { L.pt_on = (u8)n; }
+
+static bool point_off(int slot)
+{
+	return slot >= L.pt_first + L.pt_on && slot < L.pt_first + L.pt_count;
 }
 
 void chrlight_begin(const C3D_Mtx* view, const float ambient[3], float level, float bright, const ChrFlash* fl)
@@ -367,7 +377,7 @@ void chrlight_at(const float pos[3], bool james)
 	int n = 0;
 	for (int i = 0; i < NSLOT; i++) {
 		Slot* s = &L.s[i];
-		if (s->kind != K_POINT && s->kind != K_SPOT)
+		if ((s->kind != K_POINT && s->kind != K_SPOT) || point_off(i))
 			continue;
 		float d[3] = { pos[0] - s->pos[0], pos[1] - s->pos[1], pos[2] - s->pos[2] };
 		float dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
@@ -451,7 +461,7 @@ bool chrlight_lit(const float pos[3])
 	float best = 0.0f;
 	for (int i = 0; i < NSLOT; i++) {
 		const Slot* s = &L.s[i];
-		if (s->kind != K_POINT && s->kind != K_SPOT)
+		if ((s->kind != K_POINT && s->kind != K_SPOT) || point_off(i))
 			continue;
 		float d[3] = { pos[0] - s->pos[0], pos[1] - s->pos[1], pos[2] - s->pos[2] };
 		float dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
