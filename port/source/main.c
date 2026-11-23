@@ -6281,6 +6281,7 @@ int main(void)
 					}
 					CombatBody body = { &s_px, &s_py, &s_pz, &s_yaw };
 					u32 free_held = move_keys(gheld, gdown, &cp);
+					combat_guard_key((gheld & KEY_B) != 0);
 					{
 						// 0x52e110 on beginner and easy: Action held readies the weapon at an enemy
 						// ahead, unless the press meets an event (EventCheckLookLine 0x48e520)

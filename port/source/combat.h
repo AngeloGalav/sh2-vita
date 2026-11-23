@@ -109,6 +109,8 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z);
 // ENEMIES.md); the hold attack drains `ap` per PC frame (1/30 s) meanwhile.
 void combat_grab_james(float meter);
 bool combat_held(void);
+// The run button as it is held (not Walk/Run Control's reading of it): with Aim held it guards.
+void combat_guard_key(bool held);
 bool combat_busy(void);                  // no enemy starts an attack on him (0x542e00)
 const Enemy* combat_stomp_enemy(void);   // the one he is kicking or stomping (0x542de0)
 bool combat_has_ammo(void);              // any owned gun with rounds in it or spare (0x4a6340)

@@ -54,6 +54,8 @@ static const JAnim J_STAND = { 1, 10, 1, 256 };       // 101
 static const JAnim J_WALK = { 51, 74, 1, 1408 };      // 104
 static const JAnim J_RUN = { 147, 170, 1, 2048 };     // 108
 static const JAnim J_HURT = { 453, 470, 0, 1024 };    // 121
+static const JAnim J_GUARD = { 445, 449, 0, 1536 };   // 119
+static const JAnim J_GUARD_HIT = { 486, 502, 0, 1536 };   // 123
 // The fall James (or Maria) dies in. The base table's 111 and 112 (0x6ceac4: 221-245, 256-280) are
 // the knockdown that lower state 0x18 plays (0x531a00 / 0x52fae0, which of the two by 0x52eb40's
 // direction), and both end on their feet again: 112 lies flat from about frame 260 and is standing by
@@ -276,7 +278,7 @@ static const PlayerDef PLAYERS[2] = {
 };
 
 enum { M_FREE, M_RAISE, M_READY, M_SWING, M_REBOUND, M_RECOVER, M_LOWER, M_SHOT, M_RELOAD, M_STOMP, M_SPRAY,
-       M_HURT, M_HELD, M_DYING, M_DEAD };
+       M_GUARD, M_HURT, M_HELD, M_DYING, M_DEAD };
 
 static Character* s_james;       // main's player model: James, or Maria in Born From a Wish
 static bool s_maria;              // the model and weapons are Maria's
@@ -930,7 +932,10 @@ bool combat_held(void) { return s_mode == M_HELD; }
 // 0x542e00, which the enemies' senses ask (0x4a9aa0, 0x4a5fc0): James is in his damage motion (0x1fbad18)
 // or it ended less than 2 seconds ago (0x1fbacdc: 2.0 set by 0x547bf0 / 0x54e0f0 as state 0x19 ends, the
 // frame time taken off it by 0x556490). No attack starts meanwhile; one under way goes on.
-bool combat_busy(void) { return s_mode == M_HURT || s_mode == M_HELD || s_lull > 0.0f; }
+bool combat_busy(void)
+{
+	return s_mode == M_HURT || s_mode == M_HELD || s_lull > 0.0f || (s_mode == M_GUARD && s_cur == &J_GUARD_HIT);
+}
 
 // 0x542de0: the enemy James is kicking or stomping now.
 const Enemy* combat_stomp_enemy(void) { return s_mode == M_STOMP ? s_stomp_e : NULL; }
@@ -1080,12 +1085,35 @@ static void push_update(CombatBody* b, float dt)
 	*b->x = nx, *b->z = nz;
 }
 
+// The guard (0x533e60): James facing the attacker (their yaws more than 90 degrees apart), one of these
+// attacks (and the acid, 42, on beginner and easy): a tenth of the damage (0x69e7c8) and the guarded
+// flinch (state 0x15, clip 123) in place of the damage motion, with no 2 seconds after it. On the PC he
+// guards with the weapon down and the run key held; here with Aim and run held, standing (the Vita's
+// controls, STATUS section 3).
+static bool s_guard_key;
+void combat_guard_key(bool held) { s_guard_key = held; }
+
+static bool can_guard(void) { return WEAPONS[s_weapon].grip != 8; }   // not the great knife
+
+static bool guarded(int id, float from_x, float from_z)
+{
+	if (s_mode != M_GUARD)
+		return false;
+	if (!((id >= 0x2c && id <= 0x31) || id == 0x34 || id == 0x3b || id == 0x3e || id == 0x43 ||
+	      (id == 0x2a && enemy_difficulty() < 2)))
+		return false;
+	return (from_x - s_body_pos[0]) * sinf(s_body_yaw) + (from_z - s_body_pos[2]) * cosf(s_body_yaw) > 0.0f;
+}
+
 void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 {
 	if (s_god)
 		return;
 	if (s_mode >= M_DYING || s_mode == M_HELD || s_invuln > 0.0f)
 		return;
+	bool guard = guarded(attack_id, from_x, from_z);
+	if (guard)
+		ap *= 0.1f;
 	s_hp -= s_test_god ? 0.0f : ap;
 	s_hit_t = 0.0f;
 	if (s_hp <= 0.0f) {
@@ -1103,6 +1131,11 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 	// motion is not started again, so a room of biting creepers cannot keep James from moving.
 	if (s_mode == M_HURT)
 		return;
+	if (guard) {
+		sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);
+		play(&J_GUARD_HIT);
+		return;
+	}
 	s_mode = M_HURT;
 	sfx_play(pdef()->snd_hurt + (int)(s_hp) % pdef()->n_hurt, 1.0f, 0.0f);   // injured (four or five takes)
 	const JAnim* hurt = damage_motion(attack_id, false, from_x, from_z);
@@ -2077,6 +2110,12 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		}
 		change_target(b, down);           // 0x54f100
 		aim_turn(b, dt);
+		if (s_guard_key && !s_maria && can_guard() && abs(cp->dx) < 40 && abs(cp->dy) < 40) {
+			s_charge = -1.0f;
+			s_mode = M_GUARD;
+			play(&J_GUARD);
+			break;
+		}
 		if (s_charge >= 0.0f) {
 			// tap or hold (EE timers): decided on release, or once A has been held 0.2 s
 			s_charge += dt;
@@ -2328,6 +2367,26 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		}
 		break;
 	}
+	case M_GUARD:
+		aim_turn(b, dt);
+		if (s_cur == &J_GUARD_HIT) {
+			if (s_end)
+				play(&J_GUARD);
+			break;
+		}
+		if (s_guard_key && (held & KEY_R) && abs(cp->dx) < 40 && abs(cp->dy) < 40)
+			break;
+		if (is_bare()) {
+			s_mode = (held & KEY_R) ? M_READY : M_FREE;
+			play(&J_STAND);
+			return s_mode == M_READY;
+		}
+		s_mode = (held & KEY_R) ? M_READY : M_LOWER;
+		if (s_mode == M_LOWER)
+			s_target = NULL;
+		play(s_mode == M_READY ? (is_melee() ? &md()->ready[s_side] : &w->aim)
+		                       : (is_melee() ? &md()->lower[s_side] : &w->lower));
+		break;
 	case M_LOWER:
 		if (held & KEY_R) {
 			lock_on(b);
@@ -2499,6 +2558,7 @@ void combat_set_parts(int move_state)
 		break;
 	case M_RAISE: case M_LOWER: g = 1; break;
 	case M_READY: case M_SWING: case M_REBOUND: case M_RECOVER: case M_SHOT: case M_RELOAD: case M_SPRAY:
+	case M_GUARD:
 		g = 3;
 		break;
 	case M_HURT: case M_HELD: case M_DYING: case M_DEAD: g = 2; break;
@@ -2536,7 +2596,7 @@ void combat_set_parts(int move_state)
 const char* combat_status(void)
 {
 	static const char* names[] = { "free", "raise", "ready", "swing", "rebound", "recover", "lower",
-	                               "shot", "reload", "stomp", "spray", "hurt", "held", "dying", "dead" };
+	                               "shot", "reload", "stomp", "spray", "guard", "hurt", "held", "dying", "dead" };
 	// the candidates in sight, L when one is locked (the debug page shows the first 16 characters)
 	snprintf(s_line, sizeof s_line, "HP%3.0f %s %c%d g%d%s", s_hp, names[s_mode], s_target ? 'L' : 'c', s_ncand,
 	         WEAPONS[s_weapon].grip, s_attack_seq ? " seq" : "");
