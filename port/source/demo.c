@@ -1660,6 +1660,55 @@ static void char_place(int i, float t, float p[3])
 	p[0] += S.h->add_x, p[2] += S.h->add_z;
 }
 
+// EvProgMaryBeforeBattle (0x43eac0, 0x43fe30, 0x440c80, 0x574860), after DramaDemoMain has placed the
+// characters: from its scene's frame on Mary (0x109) and the boss (0x206), who comes in on her place, are
+// on screen in turn. On the frames of the first list (0x7b312c and its copies, frames from there) the boss
+// is 50000 below, on the others Mary is, with the boss 10 up and 2.5 nearer; on the second list's, 161
+// later, the boss hangs upside down from the ceiling (+0x2c = pi, 0x7b317c). True: upside down.
+static const struct { const char* key; float from; } s_mary[] = {
+	{ "end_suicide_a", 1976.0f }, { "mry_yarinaoshi_a", 1910.0f }, { "end_maria_a", 2765.0f }, { "end_rebirth_a", 1797.0f },
+};
+
+float demo_mary_from(void)
+{
+	for (int i = 0; S.active && i < 4; i++)
+		if (!strcmp(S.key, s_mary[i].key))
+			return s_mary[i].from;
+	return -1.0f;
+}
+
+static bool mary_swap(int kind, float p[3])
+{
+	static const s8 hidden[] = {
+		1, 3, 4, 6, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20, 21, 22, 23, 24, 25, 27, 28, 30, 31, 32, 33, 34, 36, 37, 38, 40,
+		41, 43, 44, 46, 47, 50, 51, 54, 57, 58, 59, 61, 62, 63, 65, 67, 68, 70, 72, 75, 77, 79, 80, 82, 87, 90, 101, 103,
+		110, 116,
+	};
+	static const s8 above[] = { 0, 4, 7, 9, 12, 14, 16, 19, 21, 23, 24, 27 };
+	if (kind != 0x206 && kind != 0x109)
+		return false;
+	float from = demo_mary_from(), f = S.cur - 1.0f - from;
+	if (from < 0.0f || f < 0.0f)
+		return false;
+	bool mary = false, up = false;
+	for (u32 i = 0; i < sizeof hidden; i++)
+		mary = mary || (hidden[i] <= f && f < hidden[i] + 1);
+	for (u32 i = 0; i < sizeof above; i++)
+		up = up || (above[i] + 161 <= f && f < above[i] + 162);
+	if (kind == 0x109) {
+		if (!mary)
+			p[1] += 50000.0f;
+		return false;
+	}
+	if (mary)
+		p[1] += 50000.0f;
+	else
+		p[1] -= 10.0f, p[2] -= 2.5f;
+	if (up)
+		p[0] += 6.0f, p[1] -= 2134.0f, p[2] += 294.0f;
+	return up;
+}
+
 // 0x536190 looks for kind 0x103, then 0x102; the in-game James kinds (0x100, 0x101) are the player's own
 // character on the PC, so a scene that has one of those moves the player and the lamp with him.
 const Character* demo_lamp_james(float pos[3], float* yaw)
@@ -1698,10 +1747,13 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 			continue;
 		float p[3];
 		char_place(i, t, p);
+		bool upside = mary_swap(dc->rec->kind, p);
 		C3D_Mtx model, mv;
 		Mtx_Identity(&model);
 		Mtx_Translate(&model, p[0], p[1], p[2], true);
 		Mtx_RotateY(&model, (float)M_PI, true);
+		if (upside)
+			Mtx_RotateX(&model, (float)M_PI, true);
 		Mtx_Multiply(&mv, view, &model);
 		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
 		float mf = pose_char(dc);

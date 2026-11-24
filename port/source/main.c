@@ -5594,7 +5594,7 @@ static void filters_frame(void)
 		motion = 0x40;
 		break;
 	case PROG_FILTER_MARY:               // 0x574860 from frame 1797, as the three others of that scene
-		if (t >= 1797.0f)
+		if (demo_mary_from() >= 0.0f && t >= demo_mary_from())
 			motion = 0x40;
 		break;
 	}
