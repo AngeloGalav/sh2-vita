@@ -1,4 +1,7 @@
 #include "prog_int.h"
+#include "gamecam.h"
+#include "stagemdl.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -410,39 +413,55 @@ static int s34_get_great_knife(Prog* p) { return p_item_get(p, 0xf, 0x26); }
 
 // 0x581e20 EvProgControlCube: the cube room. Two rings turn in quarter steps: the outer one's
 // position is flags 317 / 318, the inner one's 319 / 320; the table at 0x8d41a4 then opens the
-// ways out (flag 325 one door, 326 the other).
+// ways out (flag 325 one door, 326 the other). The camera shows the cube (0x8d41e0, 0x8d41f0) and the
+// models turn to the rings at 3 rad/s (the outer's at 1.5 quarters a second); a press waits for its ring.
+// James stands to one side meanwhile. The fades of 0.3 s in and out (0x4ee620) are not ported.
 static int s34_control_cube(Prog* p)
 {
 	static const u8 table[16] = { 2, 1, 2, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0 };
+	static const float eye[3] = { 20300.0f, -860.0f, -23600.08f }, at[3] = { 20170.0f, -770.0f, -23780.0f };
+	static float sv[3], sv_yaw, ta, tb;      // 0x1d86208.. (James' place), the rings as shown, in quarters
 	int a = p_flag(317) | p_flag(318) << 1;
 	int b = p_flag(319) | p_flag(320) << 1;
 	switch (p->step) {
 	case 0:
 		p_lock(p, true);
+		p_player(sv, &sv_yaw);
+		p_place(20270.0f, sv[1], -22600.0f, -3.1415927f);
+		ta = (float)a, tb = (float)b;
 		p->step = 8;
 		// fallthrough
 	case 8:
-		if (p->down & KEY_DUP) { a = (a + 1) & 3; p_se(0x4970); p_se(0x4972); }
-		if (p->down & KEY_DDOWN) { a = (a + 3) & 3; p_se(0x4970); p_se(0x4972); }
-		if (p->down & KEY_DRIGHT) { b = (b + 1) & 3; p_se(0x4971); p_se(0x4972); }
-		if (p->down & KEY_DLEFT) { b = (b + 3) & 3; p_se(0x4971); p_se(0x4972); }
+	{
+		gamecam_event(eye, at, 0.2f, 400.0f);
+		bool sa = ta == (float)a, sb = tb == (float)b;
+		if (sa && (p->down & KEY_DUP)) { a = (a + 1) & 3; p_se(0x4970); p_se(0x4972); }
+		else if (sa && (p->down & KEY_DDOWN)) { a = (a + 3) & 3; p_se(0x4970); p_se(0x4972); }
+		if (sb && (p->down & KEY_DRIGHT)) { b = (b + 1) & 3; p_se(0x4971); p_se(0x4972); }
+		else if (sb && (p->down & KEY_DLEFT)) { b = (b + 3) & 3; p_se(0x4971); p_se(0x4972); }
 		ev_flag_set(317, a & 1);
 		ev_flag_set(318, a >> 1 & 1);
 		ev_flag_set(319, b & 1);
 		ev_flag_set(320, b >> 1 & 1);
 		ev_flag_set(325, table[a * 4 + b] != 0);
 		ev_flag_set(326, table[a * 4 + b] > 1);
-		{
-			char buf[200];
-			snprintf(buf, sizeof buf, "\n   Outer ring  %d / 4\n   Inner ring  %d / 4\n\n\n\n\n"
-			         "   Up/Down: outer  Left/Right: inner\n   B: leave", a + 1, b + 1);
-			p_panel(buf);
+		for (int k = 0; k < 2; k++) {            // the short way round
+			float* t = k ? &tb : &ta;
+			float to = (float)(k ? b : a), d = to - *t, st = p->dt * (k ? 3.0f / 1.5707964f : 1.5f);
+			d = d > 2.0f ? d - 4.0f : d < -2.0f ? d + 4.0f : d;
+			if (fabsf(d) <= st)
+				*t = to;
+			else
+				*t = fmodf(*t + (d > 0.0f ? st : -st) + 4.0f, 4.0f);
 		}
-		if (!(p->down & KEY_B))
+		stagemdl_turn(0x521, ta * 1.5707964f, tb * 1.5707964f, 0.0f);
+		stagemdl_turn(0x522, 0.0f, tb * 1.5707964f, 0.0f);
+		if (!(p->down & KEY_B) || ta != (float)a || tb != (float)b)
 			return 0;
+		p_place(sv[0], sv[1], sv[2], sv_yaw);
+	}
 		// fallthrough
 	default:
-		p_panel(NULL);
 		p_lock(p, false);
 		return 1;
 	}
