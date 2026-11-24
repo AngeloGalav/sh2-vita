@@ -281,6 +281,7 @@ static struct {
 	DemoChar chars[DEMO_MAX_CHARS];
 	char key[32];
 	u32 cues;                  // the s_cues already done in this scene
+	u32 can_ticks;             // kanzume's can opener: the second its sound last played
 	char status[64];
 } S;
 
@@ -846,6 +847,13 @@ static void scene_cues(void)
 	if (!strcmp(S.key, "tomatta") && S.cur - 1.0f > 5950.0f && !(S.cues >> 31)) {
 		S.cues |= 1u << 31;
 		radio_set_mode(3);
+	}
+	// 0x57d570 EvProgGetLightbulb state 0x16: the can opener, once a second at 0.8 (stand-in: the program
+	// goes on with it, 0.3 softer each time, while the can's picture shows)
+	if (!strcmp(S.key, "kanzume") && (int)((S.cur - 1.0f) / 30.0f) != (int)S.can_ticks) {
+		static const float at[3] = { -60360.0f, -595.5f, -18637.0f };   // 0x8cf388
+		S.can_ticks = (u32)((S.cur - 1.0f) / 30.0f);
+		sfx_play_at(0x44c5, 0.8f, at);
 	}
 }
 
