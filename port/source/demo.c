@@ -1835,6 +1835,10 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		// stands in for it and the scene's is not drawn over it.
 		if (!dc->model || (!S.next.visible[i] && stagemdl_npc_kind_here(dc->rec->kind)))
 			continue;
+		// 0x599ab0 (stage 9): the closet scene's first Mannequin is out of the picture while James hides
+		// (from 359, the Enhanced Edition's FogAdjustments.cpp; the exe has 360)
+		if (S.h->demo_no == 0xe && dc->rec->kind == 0x201 && dc->rec->id == 0 && S.cur - 1.0f >= 359.0f && S.cur - 1.0f < 1696.0f)
+			continue;
 		float p[3];
 		char_place(i, t, p);
 		bool upside = mary_swap(dc->rec->kind, p);
