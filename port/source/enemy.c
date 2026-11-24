@@ -5049,6 +5049,44 @@ static void arm_turn(Enemy* e, const EnPlayer* p, float dt)
 	e->rate = arm_rate(e);
 }
 
+// 0x544730: a segment of 450 from the hand's tip, tested each frame of a strike. It comes over the floor on
+// few of them, always to the body's right: one frame of the strike 5254, three times three of 5255, here as
+// the part over the floor ahead of and right of the body (logged in sh2-nx, 157 strikes; the two segments
+// the PC sends are the same one). James' column is 130 wide here.
+static void arm_strike(Enemy* e, const EnPlayer* p, float f)
+{
+	static const struct { u8 anim, frame; s16 f0, r0, f1, r1; } T[] = {
+		{ 4, 14, 371, 193, 528, 197 },
+		{ 5, 0, 302, 238, 364, 252 }, { 5, 1, 209, 246, 238, 253 }, { 5, 2, 199, 264, 254, 285 },
+		{ 5, 7, -71, 291, -54, 338 }, { 5, 8, -120, 241, -110, 165 }, { 5, 9, -145, 296, -142, 347 },
+		{ 5, 11, -234, 297, -239, 350 }, { 5, 12, -293, 261, -396, 307 }, { 5, 13, -310, 292, -320, 347 },
+	};
+	if (e->hold > 0.0f)
+		return;
+	float s = sinf(e->yaw), c = cosf(e->yaw);
+	for (u32 i = 0; i < sizeof T / sizeof *T; i++) {
+		if (T[i].anim != e->anim || (int)f != T[i].frame)
+			continue;
+		for (int who = 0; who < 2; who++) {
+			float tx = p->x, tz = p->z, ty, tr = 130.0f;
+			if (who ? e->maria_hit || !maria_column(&tx, &ty, &tz, &tr) : e->attack_hit || !p->alive || p->maria)
+				continue;
+			float dx = tx - e->x, dz = tz - e->z, jf = dx * s + dz * c, jr = dx * c - dz * s;
+			float vf = T[i].f1 - T[i].f0, vr = T[i].r1 - T[i].r0;
+			float k = ((jf - T[i].f0) * vf + (jr - T[i].r0) * vr) / (vf * vf + vr * vr);
+			k = k < 0.0f ? 0.0f : k > 1.0f ? 1.0f : k;
+			if (hypotf(jf - T[i].f0 - vf * k, jr - T[i].r0 - vr * k) > 130.0f)
+				continue;
+			if (who) {
+				blow_maria(e, 600.0f, PI, 10.0f);
+			} else {
+				e->attack_hit = true;
+				hit_james(p, e->anim == 4 ? 0x46 : 0x47, 10.0f, e);
+			}
+		}
+	}
+}
+
 static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 {
 	e->p_dist = hypotf(p->x - e->x, p->z - e->z);
@@ -5060,12 +5098,7 @@ static void arm_update(Enemy* e, const EnPlayer* p, float dt)
 		if (e->slv == 0) { e->anim_end = true; e->slv = 1; e->ival = -1; }
 		if (e->attacking) {
 			float f = frame_in(e);
-			// 0x544730: two segments of 450 from the flailing tips (bones 13, 14); they come over the
-			// floor on these frames only, at most 600 from the body
-			bool over = e->anim == 4 ? (f >= 1.0f && f < 4.0f) || (f >= 8.0f && f < 11.0f) || (f >= 12.0f && f < 17.0f)
-			                         : f < 3.0f || (f >= 7.0f && f < 10.0f) || (f >= 11.0f && f < 16.0f);
-			if (over && e->hold <= 0.0f)
-				swing_hit(e, p, e->anim == 4 ? 0x46 : 0x47, 10.0f, 600.0f, 1.0f);
+			arm_strike(e, p, f);
 			if (e->attack_hit || e->maria_hit)
 				e->flags &= ~EF_STRIKE;          // 0x4a6000: the strike landed
 		}
