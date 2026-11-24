@@ -623,7 +623,7 @@ and 8 (0x4791e0, 0x477a60), so no separate near and far blur and no glow pass. H
 stage 5 scenes 6 and 7, stage 7 scene 10, the hospital's turn, Mary's corridor. Not hooked: 0x4a7d80's
 enemy states, 0x5994c0, 0x578e00, 0x5817d0, 0x583650, 0x587140, 0x5841b0. Not run on a console.
 
-The radio (`radio.c`, 0x48cbc0): the switch and level are not kept in the save (0x1f7d407, 0x1f7d408), `RadioNoise`'s
+The radio (`radio.c`, 0x48cbc0): the switch and level are kept in the save since 2026-11-24; `RadioNoise`'s
 story states (0x48c9d0) are not ported, and a body's 0.8 in its death throes (0x4a6ce0) is left out.
 Not run on a console.
 

@@ -1374,7 +1374,8 @@ typedef struct {
 	u8 place;                        // version 6: the save point (m_card_x_msg_e.mes place name)
 	u8 weapon;                       // the weapon in hand (0x1f7d409): 0 not saved (older files),
 	                                 // 0xff bare hands, else its item
-	u8 pad[2];
+	u8 radio;                        // 0x80, 0x10 switched on, its level 0..15 (0x1f7d407, 0x1f7d408); 0 not saved (older files)
+	u8 pad;
 	float boat[2];                   // version 7: the boat stage's time and top speed (prog_boat_get)
 } SaveFile;
 
@@ -1417,6 +1418,7 @@ static bool save_game(void)
 	prog_boat_get(sv.boat);
 	enemy_killed_get(sv.killed);
 	sv.hp = combat_hp();
+	sv.radio = (u8)(0x80 | (radio_on() ? 0x10 : 0) | (radio_volume() & 15));
 	sv.weapon = combat_weapon_item() ? (u8)combat_weapon_item() : 0xff;
 	FILE* f = slot_open(s_slot, "wb");
 	if (!f)
@@ -4556,7 +4558,7 @@ static int s_title_sub;          // the title's level screens (defined with them
 // Returns false to exit the app.
 static bool continue_game(void)
 {
-	radio_reset(10);                 // stand-in: the switch and level aren't in the port's save
+	radio_reset(10);
 	static SaveFile sv;
 	if (!read_save(&sv))
 		return false;
@@ -4579,6 +4581,11 @@ static bool continue_game(void)
 	if (sv.version >= 7)
 		prog_boat_set(sv.boat);
 	boat_reset();
+	if (sv.radio & 0x80) {
+		radio_set_volume(sv.radio & 15);
+		if (!(sv.radio & 0x10) && radio_on())
+			radio_toggle();
+	}
 	enemy_killed_reset();
 	if (sv.version >= 4) {
 		enemy_killed_set(sv.killed);       // before the warp: entering the room spawns enemies
