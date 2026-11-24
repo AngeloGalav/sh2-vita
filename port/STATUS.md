@@ -496,7 +496,8 @@ Ordered by weight. Each line names where the work starts.
 - EvProgUseDryCell (0x586f40) spawns the creeper room's rows after the item message, where the PC
   creates them before it, and the PC's 0x148 bit 0x400 on them is not ported.
 - Stage 7 room 208 (0x59bca0): the per-frame volume of sound 16000 is left to the distance curve.
-  Model 0x557's bit-1 switch (0x50b340) is not ported.
+  The televisions' pictures (models 0x557 and 0x558 with 0x50b340's bit) take the film grain's texture
+  (0x50d680, `noise_screen`, unlit here); not run on a console. They showed their own grey gradient.
 - Maria's wall column ignores the 150 height the PC uses when 0x1fb3b4c is set.
 - Characters (`chr.c`): transparent parts (hair, fringes) are drawn after the opaque ones in file
   order, where the PC sorts their triangles far to near across the model (0x503e10). Opaque parts are

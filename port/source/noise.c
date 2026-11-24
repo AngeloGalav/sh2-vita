@@ -113,6 +113,29 @@ static void refill(C3D_Tex* t)
 	C3D_TexFlush(t);
 }
 
+C3D_Tex* noise_screen(void)
+{
+	static C3D_Tex tex[2];
+	static int cur, ok;
+	if (!ok) {
+		ok = -1;
+		for (int i = 0; i < 2; i++) {
+			if (!C3D_TexInit(&tex[i], SIZE, SIZE, GPU_L4))
+				return NULL;
+			C3D_TexSetFilter(&tex[i], GPU_NEAREST, GPU_NEAREST);
+			C3D_TexSetWrap(&tex[i], GPU_REPEAT, GPU_REPEAT);
+		}
+		ok = 1;
+	}
+	if (ok < 0)
+		return NULL;
+	if (!stereo_eye()) {
+		cur ^= 1;
+		refill(&tex[cur]);
+	}
+	return &tex[cur];
+}
+
 static void states(C3D_Tex* t)
 {
 	C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);

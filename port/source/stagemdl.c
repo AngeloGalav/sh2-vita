@@ -1,6 +1,7 @@
 #include "stagemdl.h"
 #include "shadow.h"
 #include "chr.h"
+#include "noise.h"
 #include "chrlight.h"
 #include "demo.h"
 #include "events.h"
@@ -693,6 +694,13 @@ void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		pose(m->chr, p->kind, s_play);
 		shadow_cast_placed(m->chr, &model, p->kind);   // its .kg1's shadow, as the PC's characters (shadow.c)
 		chrlight_at(p->pos, false);
-		chr_draw(m->chr, uBones);
+		// 0x50d680: the televisions' pictures (0x557 in Woodside's 208, 0x558 in the hotel's 312) take the
+		// film grain's texture, whose colour is 0xde99, once 0x50b340 has set their bit: 69 and 476, which
+		// also show them
+		C3D_Tex* grain = p->kind == 0x557 || p->kind == 0x558 ? noise_screen() : NULL;
+		if (grain)
+			chr_draw_screen(m->chr, uBones, grain, 0xded2ce);
+		else
+			chr_draw(m->chr, uBones);
 	}
 }

@@ -596,6 +596,16 @@ void chr_pose_blend(Character* c, const Anim* a, float frame, ChrBlend* b, float
 static bool s_mirrored;
 void chr_set_mirrored(bool on) { s_mirrored = on; }
 
+static C3D_Tex* s_screen;
+static u32 s_screen_rgb;
+
+void chr_draw_screen(Character* c, int uBones, C3D_Tex* tex, u32 rgb)
+{
+	s_screen = tex, s_screen_rgb = rgb;
+	chr_draw(c, uBones);
+	s_screen = NULL;
+}
+
 void chr_draw(Character* c, int uBones)
 {
 	C3D_BufInfo* bi = C3D_GetBufInfo();
@@ -637,11 +647,24 @@ void chr_draw(Character* c, int uBones)
 			prev = d;
 		}
 		bool textured = d->texture_slot < c->n_textures && c->tex_ok[d->texture_slot];
-		if (textured && (int)d->texture_slot != tex_slot) {
+		if (s_screen) {
+			if (env_mode != 2) {
+				C3D_TexBind(0, s_screen);
+				C3D_TexEnv* env = C3D_GetTexEnv(0);
+				C3D_TexEnvInit(env);
+				C3D_TexEnvSrc(env, C3D_RGB, GPU_TEXTURE0, GPU_CONSTANT, 0);
+				C3D_TexEnvSrc(env, C3D_Alpha, GPU_CONSTANT, 0, 0);
+				C3D_TexEnvFunc(env, C3D_RGB, GPU_MODULATE);
+				C3D_TexEnvFunc(env, C3D_Alpha, GPU_REPLACE);
+				C3D_TexEnvColor(env, 0xff000000u | (s_screen_rgb & 0xff) << 16 | (s_screen_rgb & 0xff00) | s_screen_rgb >> 16);
+				C3D_TexEnvInit(C3D_GetTexEnv(1));
+				env_mode = 2;
+			}
+		} else if (textured && (int)d->texture_slot != tex_slot) {
 			C3D_TexBind(0, &c->tex[d->texture_slot]);
 			tex_slot = (int)d->texture_slot;
 		}
-		if ((int)textured != env_mode) {
+		if (!s_screen && (int)textured != env_mode) {
 			// stage 0 doubles the half-strength lighting (chr_light_color) and clamps it to 1, as
 			// the fragment lighting's own sum would be (x4 for a quarter-strength one, chr_light_range);
 			// stage 1 puts the texture on it

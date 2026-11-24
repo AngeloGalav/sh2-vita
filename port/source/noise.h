@@ -25,6 +25,9 @@ bool noise_on(void);
 void noise_draw(void);
 // The same whether the option is on or not (the game over's grain, gameover.c).
 void noise_draw_always(void);
+// A texture of fresh grain every frame, for the televisions' screens (0x50d680 draws the models 0x557 and
+// 0x558 with 0x478520's texture in place of their own). NULL without memory.
+C3D_Tex* noise_screen(void);
 // Over a movie (movie.c's program: float x, y and float u, v, an ortho projection, y up), on the
 // picture only (x0, y0)-(x1, y1) as the Enhanced Edition keeps it off the black bars.
 void noise_draw_movie(float x0, float y0, float x1, float y1);

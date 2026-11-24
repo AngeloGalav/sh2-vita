@@ -110,6 +110,8 @@ void chr_pose_blend(Character* c, const Anim* a, float frame, ChrBlend* b, float
 // Draws with the skinning shader bound; uBones is the uniform location of bones[]. Lit by the bound
 // light environment (the shader outputs normal quaternions), whose colours must come from the two
 // setters below: chr_draw's combiner doubles the lighting and clamps it to 1.
+// The same with one texture on all of it, unlit and tinted (0xRRGGBB): a television's picture.
+void chr_draw_screen(Character* c, int uBones, C3D_Tex* tex, u32 rgb);
 void chr_draw(Character* c, int uBones);
 // Drawn through a reflection the triangles turn the other way: culling follows (demo_mirror).
 void chr_set_mirrored(bool on);
