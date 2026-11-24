@@ -57,6 +57,10 @@ MOTIONS = [
     (0x12c2, 0x6e4f58, 0x12c0, 0x12c2, 'chr/edi/hhh_edi.mdl', 'demo/bp_edi_2/hhh_edi.anm', 'edi', 'hhh_edi_bowl'),
     (0x282d, 0x6db230, 0x282a, 0x282d, 'chr/item/b_piz.mdl', 'demo/bp_edi_2/b_piz.anm', 'item', 'b_piz_bowl'),
     (0x12c3, 0x6e4f58, 0x12c0, 0x12c3, 'chr/edi/hhh_edi.mdl', 'demo/killer_edi_e/hhh_edi.anm', 'edi', 'hhh_edi_dead'),
+    # Angela through the Abstract Daddy's fight (EvProgAngelaAttackPapa 0x580e30, list 0x8d2fb0) and on the
+    # burning stairs after her scene (EvProgAngelaInFire 0x575630, list 0x8c9b44), 0x5407c0
+    (0xf3f, 0x6e5c20, 0xf3c, 0xf3f, 'chr/agl/agl.mdl', 'demo/papa_agl/agl.anm', 'agl', 'agl_papa'),
+    (0xf41, 0x6e5c20, 0xf3c, 0xf40, 'chr/agl/agl.mdl', 'demo/fire_agl/agl.anm', 'agl', 'agl_fire'),
 ]
 
 # (model, anm, output folder, output name): the whole .anm

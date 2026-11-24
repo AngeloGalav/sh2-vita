@@ -81,6 +81,10 @@ static float s_play = -1.0f;      // seconds into the music box's tune, < 0 when
 //   0x591dd0 (stage 15, room 0xb, 159 on and 251 off): Eddie with the pizza (0x42e, 0x53b8a0 motion 0x282d),
 //     0x540650 motion 0x12c2
 //   0x57f480 (stage 37, room 0x90, 378 on): Eddie dead, 0x540650 motion 0x12c3, and his revolver (0x42a)
+//   0x580e30 EvProgAngelaAttackPapa, 0x581090 (stage 35, room 0x8a, 333 on and 335 off): Angela through the
+//     Abstract Daddy's fight, 0x5407c0 motion 0xf3f
+//   0x575630 EvProgAngelaInFire (stage 47, 482 on): Angela on the burning stairs, motion 0xf41, once
+// A negative rate: the record's loop is 0, the motion plays once and holds its last frame.
 // The rate is the record's speed (2048 is 30 frames a second, as boat.c). A model with a motion keeps the
 // turn the room function gives it; the revolver, which has none, is a stay object (stay_turned).
 typedef struct {
@@ -106,6 +110,8 @@ static const Npc k_npc[] = {
 	{ 15, 0xb, 0x42e, 159, 251, 0, "item", "b_piz", "b_piz_bowl", 7.5f, { 15094.127f, -441.493835f, 17609.9648f }, 3.1415927f },    // 0x8dd934
 	{ 37, 0x90, 0x108, 378, 0, 0, "edi", "hhh_edi", "hhh_edi_dead", 30.0f, { 140814.766f, 424.165009f, -100284.82f }, 3.1415927f }, // 0x8cfd0c
 	{ 37, 0x90, 0x42a, 378, 0, 0, "item", "i_colt", NULL, 30.0f, { 140490.766f, -7.18504620f, -100389.664f }, 0.0f },               // 0x8cfd2c
+	{ 35, 0x8a, 0x107, 333, 335, 0, "agl", "agl", "agl_papa", 30.0f, { 20925.5352f, 425.188263f, 60553.9375f }, 3.1415927f },      // 0x8d3028
+	{ 47, -1, 0x107, 482, 0, 0, "agl", "agl", "agl_fire", -1.875f, { -100233.477f, -2562.906f, -75598.5781f }, 3.1415927f },        // 0x8c9b80, speed 128
 };
 #define N_NPC ((int)(sizeof k_npc / sizeof k_npc[0]))
 
@@ -556,8 +562,13 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		if (n->anim) {
 			const Anim* a = &s_npc[i].anim;
 			float len = (float)(a->frames ? a->frames : 1);
-			s_npc[i].t = scene_has ? 0.0f : fmodf(s_npc_clock * n->fps, len);
-			chr_pose_loop(&s_npc[i].chr, a, s_npc[i].t, 0, (int)a->frames - 1);
+			if (n->fps < 0.0f) {             // once: from when it came up
+				s_npc[i].t = fminf(s_npc[i].t - dt * n->fps, len - 1.0f);
+				chr_pose(&s_npc[i].chr, a, s_npc[i].t);
+			} else {
+				s_npc[i].t = scene_has ? 0.0f : fmodf(s_npc_clock * n->fps, len);
+				chr_pose_loop(&s_npc[i].chr, a, s_npc[i].t, 0, (int)a->frames - 1);
+			}
 		} else {
 			pose(&s_npc[i].chr, n->kind, -1.0f);
 		}
