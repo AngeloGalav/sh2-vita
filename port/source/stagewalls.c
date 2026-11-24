@@ -205,6 +205,10 @@ void stagewalls_tick(int stage, int room, const float* me)
 		if (room == 0x66 && f(283))
 			ADD(0x8d5f88);
 		break;
+	case 33:  // 0x5843b0: the door across the way until it is opened (309)
+		if (room == 0x77 && !f(309))
+			ADD(0x8d47f8);
+		break;
 	case 35:  // 0x581580
 		if (room == 0x8a) {
 			if (f(335)) {

@@ -52,6 +52,7 @@ LISTS = (
     0x8bdce0,                                                   # 0x53fe40, the boat (stage 38)
     0x8cbd30,                                                   # 0x578950, stage 42
     0x8cb7a0,                                                   # 0x577690, stage 43
+    0x8d47f8,                                                   # 0x5843b0, stage 33
 )
 MAX_PLANES = 64     # no list has more than 20; a list running on would be a misread
 
