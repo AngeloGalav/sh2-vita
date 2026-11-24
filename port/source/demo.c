@@ -827,6 +827,8 @@ static const Cue s_cues[] = {
 	{ "clock_close", 50.0f, 0, -1, 0x3e8b, { -58808.852f, -606.0f, 22913.494f } },
 	{ "clock_push", 30.0f, 0, -1, 0x3e84, { -58722.551f, 0.0f, 23009.684f } },            // 0x59a6b0 EvProgTryMoveClock
 	{ "dust", 60.0f, 0, -1, 0x3e85, { -103202.05f, -97.754f, 8977.81f } },                // 0x59b1e0 EvProgUseCannedJuice
+	{ "go_to_ura_a", 132.0f, 213, -1 },  // 0x58b910 EvProgHospitalBack1st: the room's parts and sound turn
+	{ "go_to_ura_b", 430.0f, 214, -1 },  // 0x58ba80 EvProgHospitalBack2nd
 };
 
 static void scene_cues(void)
