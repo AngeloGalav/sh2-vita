@@ -53,6 +53,7 @@ LISTS = (
     0x8cbd30,                                                   # 0x578950, stage 42
     0x8cb7a0,                                                   # 0x577690, stage 43
     0x8d47f8,                                                   # 0x5843b0, stage 33
+    0x7b3bf0, 0x7b3830, 0x7b3b50,                               # 0x440ad0, stage 48 (49..51 have copies)
 )
 MAX_PLANES = 64     # no list has more than 20; a list running on would be a misread
 

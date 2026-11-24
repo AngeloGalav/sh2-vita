@@ -249,6 +249,11 @@ void stagewalls_tick(int stage, int room, const float* me)
 		if (room == 0xb8 && !f(478))
 			ADD(0x8cb7a0);
 		break;
+	case 48: case 49: case 50: case 51:   // 0x440ad0, 0x441ac0, 0x43fc80, 0x575450: the four have copies of these
+		if (f(507)) ADD(0x7b3bf0);        // the boss' platform, once Mary has fallen
+		if (f(503)) ADD(0x7b3830);        // the stairs behind James
+		if (f(504)) ADD(0x7b3b50);
+		break;
 	default: break;
 	}
 }
