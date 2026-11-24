@@ -587,7 +587,7 @@ static void room_enter(int stage, int room)
 		break;
 	case 36:
 		// 0x5803c0: the ropes hang lower where they were pulled (355..360); the corpses' room takes the pulls
-		// back when no key is there (343..348) and sets 365.
+		// back when no key is there (343..348) and sets 365. The manacles' bars are up once 367 is set.
 		if (room == 0x8c)
 			for (int i = 0; i < 6; i++)
 				stagemdl_lift(0x41c, i, p_flag(355 + i) ? 155.5f : 0.0f);
@@ -601,7 +601,8 @@ static void room_enter(int stage, int room)
 					p_set(365);
 					p_enemy_list();
 				}
-		}
+		} else if (room == 0x86)
+			stagemdl_lift(0x43a, 0, p_flag(367) ? -1000.0f : 0.0f);
 		break;
 	case 56:
 		// 0x571a30: leaving the candle's light (710) for another room puts it out
