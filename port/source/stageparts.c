@@ -308,7 +308,7 @@ void stageparts_tick(int stage, int room, float dt)
 		break;
 	case 35:  // 0x581580: the scene set pieces of scenes 0x43 and 0x44
 		if (room == 0x8a) {
-			if (scene_no(0x43) || (scene_no(0x44) && !f(328))) {
+			if (scene_no(0x43) || (scene_no(0x44) && demo_timer() >= 951.0f && demo_timer() <= 1651.0f)) {
 				on(0x63, 0);
 				on(0x63, 1);
 				for (int b = 0; b < 6; b++)
