@@ -6390,6 +6390,18 @@ float enemy_nearest(float x, float z)
 	return best;
 }
 
+// 0x5803c0: the Enemy_List rows id..id + n - 1 are not dead any more, and those present go, to come again
+void enemy_revive(int id, int n)
+{
+	for (int k = id; k < id + n && k < MAX_LIST; k++) {
+		s_killed[k >> 5] &= ~(1u << (k & 31));
+		s_regen[k] = 0;
+		for (int i = 0; i < ENEMY_MAX; i++)
+			if (s_en[i].used && s_en[i].list_id == k)
+				s_en[i].used = false;
+	}
+}
+
 // 0x515690's test: an active enemy (0x2xx, +0x148 & 0x400, not dead) within range of James across the floor.
 // Stand-in: every live one counts as active, but the creepers' nests and Pyramid Head behind the bars (stage 7).
 bool enemy_near(float range)

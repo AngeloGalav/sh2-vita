@@ -606,7 +606,8 @@ static void room_enter(int stage, int room)
 		break;
 	case 36:
 		// 0x5803c0: the ropes hang lower where they were pulled (355..360); the corpses' room takes the pulls
-		// back when no key is there (343..348) and sets 365. The manacles' bars are up once 367 is set.
+		// back when no key is there (343..348) and sets 365, and the four Lying Figures of the corridor come
+		// again (0x1f7d9f8 & 0xfffe1fff, ids 205..208). The manacles' bars are up once 367 is set.
 		if (room == 0x8c)
 			for (int i = 0; i < 6; i++)
 				stagemdl_lift(0x41c, i, p_flag(355 + i) ? 155.5f : 0.0f);
@@ -617,6 +618,7 @@ static void room_enter(int stage, int room)
 			for (int i = 355; !key && i <= 360; i++)
 				if (p_flag(i)) {
 					p_clear(i);
+					enemy_revive(205, 4);
 					p_set(365);
 					p_enemy_list();
 				}
