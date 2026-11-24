@@ -12,6 +12,7 @@
 #include "stagemdl.h"
 #include "movie.h"
 #include "prog.h"
+#include "radio.h"
 #include "sfx.h"
 #include "stereo.h"
 
@@ -840,6 +841,11 @@ static void scene_cues(void)
 			bgm_set_page(c->page);
 		if (c->se)
 			sfx_play_at(c->se, 1.0f, c->at);
+	}
+	// 0x577fa0 state 0x16: the radio late in the revelation scene (0x1f7d584 = 3, _DAT_00712f48)
+	if (!strcmp(S.key, "tomatta") && S.cur - 1.0f > 5950.0f && !(S.cues >> 31)) {
+		S.cues |= 1u << 31;
+		radio_set_mode(3);
 	}
 }
 
