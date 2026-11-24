@@ -1,5 +1,7 @@
 #include "prog_int.h"
 #include "demo.h"
+#include <stdio.h>
+#include <string.h>
 
 // Stage programs of Born From a Wish (stages 53..58, Director's Cut only): Maria in the Baldwin
 // mansion and Blue Creek. Flags, items, messages and SE ids are the PC's. The PS2 beta has no
@@ -137,6 +139,8 @@ static bool boards_line_up(void)
 
 static int s55_board_puzzle(Prog* p)
 {
+	static char text[400];
+	static const char* labels[4];
 	static const char* const turns[4] = {
 		"Insert as is.", "Turn 90 degrees to the right and insert.", "Turn 180 degrees and insert.",
 		"Turn 90 degrees to the left and insert.",
@@ -162,7 +166,22 @@ static int s55_board_puzzle(Prog* p)
 		}
 		PROG_JUMP(p, 0x11);
 	case 0x11:                      // which way round (message 0x5b holds the four answers)
-		if (!p_choice(p, -1, turns, 4))
+		if (p->sub < 2) {               // the answers are message 0x5b's lines, when the pack kept them apart
+			const char* m = ev_stage_message(0x5b);
+			snprintf(text, sizeof text, "%s", m ? m : "");
+			char* line = text;
+			int k = 0;
+			for (; line && k < 4; k++) {
+				char* end = strchr(line, '\n');
+				if (end)
+					*end = 0;
+				labels[k] = line;
+				line = end ? end + 1 : NULL;
+			}
+			if (k < 4 || line)
+				memcpy(labels, turns, sizeof labels);
+		}
+		if (!p_choice(p, -1, labels, 4))
 			return 0;
 		p_set(682 + 9 * p->work[1] + p->answer);
 		p->step = 0x1b, p->sub = 0;

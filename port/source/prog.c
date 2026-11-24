@@ -850,7 +850,10 @@ int p_system_message(Prog* p, int msg) { return p_message_text(p, ev_system_mess
 // answer with MesState(). Here the text is shown first and the choice follows in the panel.
 int p_question(Prog* p, int msg)
 {
-	static const char* const yes_no[2] = { "Yes", "No" };
+	static const char* yes_no[2];        // 0x47fed0: the common messages 0 and 1, in the game's language
+	yes_no[0] = ev_system_message(0), yes_no[1] = ev_system_message(1);
+	if (!yes_no[0] || !yes_no[1])
+		yes_no[0] = "Yes.", yes_no[1] = "No.";
 	return p_choice(p, msg, yes_no, 2);
 }
 

@@ -5194,9 +5194,40 @@ static float draw_message_lines(const char* page, int more)
 	return y + (float)(lines * h);
 }
 
-static void draw_message_top(const char* page)
+static void draw_message_top(const char* page) { draw_message_lines(page, 0); }
+
+// A question's answers: Yes and No centred at 200 and 312 (0x47fed0), or a list, a line each (ff f9), centred
+// on the widest. All are the text's white; what is chosen has a bar behind it, 0x1020c0 at 16 to 80 of 255, up
+// and down once a second (0x4813b0, 0x481420).
+static void choice_bar(float x0, float y, float x1)
 {
-	draw_message_lines(page, 0);
+	float t = (float)((osGetTime() % 1000) / 1000.0);
+	u32 c = 0x1020c000u | (u32)(16.0f + 128.0f * (t > 0.5f ? 1.0f - t : t));
+	const u32 k[4] = { c, c, c, c };
+	float h = (float)font_line_height(FONT_BIG);
+	font_quad_px(NULL, 200.0f + (x0 - 256.0f) * 0.625f, 120.0f + (y + 1.0f - 256.0f) * 0.46875f,
+	             200.0f + (x1 - 256.0f) * 0.625f, 120.0f + (y + h + 1.0f - 256.0f) * 0.46875f, 0, 0, 0, 0, k);
+}
+
+static void draw_choice(const char* question, const char* const* labels, int n, int chosen)
+{
+	int h = font_line_height(FONT_BIG);
+	float w = 0.0f, y = 318.0f;              // message 0x5b of stage 55: 288, and a line
+	for (int i = 0; i < n; i++)
+		w = fmaxf(w, font_width(FONT_BIG, labels[i]));
+	bool row = n == 2 && w <= 104.0f;
+	if (question)
+		y = draw_message_lines(question, row ? 1 : n);
+	u32 white, dummy;
+	font_pc_color(0, &white, &dummy);
+	for (int i = 0; i < n; i++) {
+		float x = row ? (i ? 312.0f : 200.0f) : 256.0f - (w + 2.0f) * 0.5f, ly = row ? y : y + (float)(i * h);
+		int al = row ? FONT_CENTER : FONT_LEFT;
+		if (chosen == i)                     // 0x4817a0, 0x481720
+			choice_bar(row ? x - w * 0.5f - 4.0f : x, ly, row ? x + w * 0.5f + 4.0f : x + w + 2.0f);
+		font_text(FONT_BIG, x + 1.6f, ly + 2.1f, labels[i], al, 0x000000c0, 0x000000c0);
+		font_text(FONT_BIG, x, ly, labels[i], al, white, white);
+	}
 }
 
 // ---------------------------------------------------------------- movies: music under them, subtitles over them
@@ -5275,6 +5306,12 @@ static void draw_test_name(float dt)
 	font_text(FONT_SMALL, 40, 40, t, FONT_LEFT, 0xffff60ff, 0xffff60ff);
 }
 
+// A stage program's question shows where messages do, with its answers; a list of them needs no question.
+static bool choice_on_top(void)
+{
+	return s_msg_top && font_ready() && prog_choice_waiting() && (prog_choice_question() || prog_choice_waiting() > 2);
+}
+
 static void draw_top_text(void)
 {
 	if (!s_msg_top || !font_ready() || s_paused)
@@ -5285,34 +5322,13 @@ static void draw_top_text(void)
 		draw_message_top(s_opt.subtitles ? sub : NULL);
 	} else if (s_msg_page && !s_inv_open && !s_save_prompt) {
 		draw_message_top(s_msg_page);
-	} else if (prog_choice_question() && !s_inv_open && !s_save_prompt) {
-		// a stage program's question where messages are, its answers in a row under it, the chosen white
+	} else if (choice_on_top() && !s_inv_open && !s_save_prompt) {
 		const char* const* labels;
 		int* answer;
 		const char* title;
 		int n = prog_choice(&labels, &answer, &title);
-		const char* q = ev_msg_expand(prog_choice_question());
-		draw_message_top(q);
-		int lines = 1;
-		for (const char* c = q; *c && *c != '\f'; c++)
-			lines += *c == '\n';
-		int h = font_line_height(FONT_BIG);
-		float y = 476.0f - (float)((lines + 4) * h / 2);
-		if (lines > 3)
-			y -= (float)((lines - 3) * h / 2);
-		y += (float)(lines * h) + (float)h * 0.5f;
-		float gap = 48.0f, w = 0.0f;
-		for (int i = 0; i < n; i++)
-			w += font_width(FONT_BIG, labels[i]) + (i ? gap : 0.0f);
-		float x = 256.0f - w * 0.5f;
-		u32 white, dummy;
-		font_pc_color(0, &white, &dummy);
-		for (int i = 0; i < n; i++) {
-			u32 c = answer && *answer == i ? white : 0x808080ffu;
-			font_text(FONT_BIG, x + 1.6f, y + 2.1f, labels[i], FONT_LEFT, 0x000000c0, 0x000000c0);
-			font_text(FONT_BIG, x, y, labels[i], FONT_LEFT, c, c);
-			x += font_width(FONT_BIG, labels[i]) + gap;
-		}
+		const char* q = prog_choice_question();
+		draw_choice(q ? ev_msg_expand(q) : NULL, labels, n, answer ? *answer : 0);
 	}
 }
 
@@ -6833,7 +6849,7 @@ int main(void)
 			const char* title;
 			int n = s_paused || s_inv_open ? 0 : prog_choice(&labels, &answer, &title);
 #ifdef SH2_VITA
-			if (s_msg_top && font_ready() && prog_choice_question())
+			if (choice_on_top())
 				n = 0;                   // draw_top_text shows it with its question, as the PC's box does
 #endif
 			if (n)
