@@ -6222,13 +6222,14 @@ static bool condition_ok(int cond)
 	case 0x140: return ev_flag(146);
 	case 0x180: return ev_flag(68) && !ev_flag(70);
 	case 0x1c0: return !ev_flag(68) || ev_flag(70);
-	case 0x200: return !(ev_flag(68) && !ev_flag(70));   // also needs the flashlight (always on here)
+	case 0x200: return !(ev_flag(68) && !ev_flag(70)) && ev_have_item(18);
 	case 0x380: return ev_flag(251) && !ev_flag(619);    // the town after the hospital (xoo nurses)
 	case 0x3c0: return !ev_flag(482);
 	case 0x040: return ev_flag(43) && !ev_flag(251);
 	case 0x0c0: return ev_flag(483);                     // the hotel Pyramid Heads' bodies
 	case 0x240: return ev_flag(335);                     // the Abstract Daddy's body
-	case 0x280: return ev_flag(365);                     // (and James past an x the port ignores)
+	case 0x280: return ev_flag(365) && s_px >= 58600.0f;    // 0x6a9d74
+	case 0x580: return s_px >= -24600.0f;                   // 0x6a9d70
 	case 0x2c0: return !ev_flag(329) || ev_flag(330);
 	case 0x300: return ev_flag(154) && !ev_flag(251);
 	case 0x340: return !ev_have_item(55);                // not while the dry cell is held (0x1f7d3e4 bit 23)
@@ -6240,7 +6241,7 @@ static bool condition_ok(int cond)
 	case 0x540: return ev_flag(446);
 	case 0x5c0: return ev_flag(711);
 	case 0x600: return ev_flag(720);
-	default: return true;                                  // other tests are not ported yet
+	default: return true;
 	}
 }
 
@@ -6401,6 +6402,8 @@ bool enemy_near(float range)
 	}
 	return false;
 }
+
+void enemy_james_at(float x, float z) { s_px = x, s_pz = z; }
 
 void enemy_init(const char* pack)
 {

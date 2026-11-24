@@ -476,9 +476,7 @@ Ordered by weight. Each line names where the work starts.
   the total, at their alpha over that chance up to twice. On the fogged roads that is about a third
   of the area 2D draws, so the near fog is patchier and slightly thinner than in 2D. The PC draws one
   view.
-- Enemy spawn conditions: `condition_ok` (`enemy.c`, the Enemy_List row test 0x48f5b0) handles about 20
-  of the codes in bits 6..15 and treats the rest as "spawn". Most likely place for an enemy the PC would
-  not put there.
+- Enemy spawn conditions (`condition_ok`, 0x48f5b0) are all ported. Not run on a console.
 - Stage 17 has no program table (`prog_hospital.c`, `{ 1, NULL }`); stage 4's game mode switch
   (0x59fcd0) is not ported (`prog_town.c`). Two other NULL entries are an empty function and code no
   event runs.

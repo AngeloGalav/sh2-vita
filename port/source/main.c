@@ -683,6 +683,7 @@ static void load_current(void)
 		}
 		perf_part("ld_tiles", t0);
 		t0 = svcGetSystemTick();
+		enemy_james_at(s_px, s_pz);
 		enemy_room_enter(ev_stage(), s_have_col ? &s_col : NULL);
 		blood_clear();
 		mist_clear();
