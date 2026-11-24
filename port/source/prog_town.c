@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "gamecam.h"
 #include "radio.h"
 #include <stddef.h>
 
@@ -425,10 +426,11 @@ static int subtitles(Prog* p, const u16 (*t)[2], int n, int first, float end_fra
 static int s14_park_arrival(Prog* p)
 {
 	static const u16 t[2][2] = { { 45, 150 }, { 150, 255 } };      // 0x8e0a3c
+	static const float eye[3] = { 24230.0f, 150.0f, 77580.0f }, at[3] = { 24070.496f, 725.8007f, 78381.875f };   // 0x8e0a08
 	PROG_BEGIN(p)
 		p_lock(p, true);
 		p_place(23445.4f, 1991.93f, 78547.12f, 0.4093992f);
-	PROG_STEP(p, 10, subtitles(p, t, 2, 0x6f, 270.0f))     // _DAT_0069c5bc
+	PROG_STEP(p, 10, (gamecam_event(eye, at, -0.19635f, 0.0f), subtitles(p, t, 2, 0x6f, 270.0f)))     // _DAT_0069c5bc
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -459,9 +461,10 @@ static int s14_after_maria(Prog* p)
 {
 	static const u16 t1[6][2] = { { 60, 165 }, { 165, 270 }, { 270, 375 }, { 420, 510 }, { 540, 645 }, { 645, 720 } };
 	static const u16 t2[1][2] = { { 30, 135 } };
+	static const float eye[3] = { -83614.547f, -630.0f, -4860.0f }, at[3] = { -83970.555f, -776.7337f, -5782.8882f };   // 0x8e0a5c
 	PROG_BEGIN(p)
 		p_lock(p, true);
-	PROG_STEP(p, 0x1e, subtitles(p, t1, 6, 0x61, 750.0f))
+	PROG_STEP(p, 0x1e, (gamecam_event(eye, at, 0.0f, 0.0f), subtitles(p, t1, 6, 0x61, 750.0f)))
 		p->timer = 0.0f;
 	PROG_STEP(p, 0x20, subtitles(p, t2, 1, 0x67, 150.0f))
 		p_lock(p, false);
