@@ -935,12 +935,49 @@ bool combat_held(void) { return s_mode == M_HELD; }
 // 0x542e00, which the enemies' senses ask (0x4a9aa0, 0x4a5fc0): James is in his damage motion (0x1fbad18)
 // or it ended less than 2 seconds ago (0x1fbacdc: 2.0 set by 0x547bf0 / 0x54e0f0 as state 0x19 ends, the
 // frame time taken off it by 0x556490). No attack starts meanwhile; one under way goes on.
+static bool s_event_motion;       // M_FALL plays an event's motion
+
+void combat_event_motion(int id)
+{
+	if (!s_ok || s_maria || s_mode >= M_HURT)
+		return;
+	stage_motion_sync(false);
+	for (int i = 0; i < s_stg_clips; i++) {
+		const StageClip* c = &s_stg_clip[i];
+		if (c->id != id || c->last >= s_anim.frames)
+			continue;
+		static JAnim clip;
+		clip = (JAnim){ c->first, c->last, 0, (s16)c->speed };
+		s_mode = M_FALL;
+		s_event_motion = true;
+		s_target = NULL;
+		s_attack_seq = false;
+		play(&clip);
+		return;
+	}
+}
+
+bool combat_event_playing(void) { return s_event_motion && s_mode == M_FALL; }
+
+void combat_event_tick(float dt)
+{
+	if (!combat_event_playing())
+		return;
+	step(dt);
+	if (s_end) {
+		s_mode = M_FREE;
+		s_event_motion = false;
+		play(&J_STAND);
+	}
+}
+
 // 0x52eb40's falling state (0x18): clip 111, or 112 when he goes backwards.
 void combat_fall(bool back)
 {
 	if (!s_ok || s_maria || s_mode >= M_HURT)
 		return;
 	s_mode = M_FALL;
+	s_event_motion = false;
 	s_target = NULL;
 	s_attack_seq = false;
 	s_charge = s_free_charge = -1.0f;

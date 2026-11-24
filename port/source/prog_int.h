@@ -74,6 +74,8 @@ int p_demo(Prog* p, int demo);                      // waits for prog_demo_reque
 int p_walk(Prog* p, float x, float z);              // 0x53b010 + 0x53b320: James walks to a point
 int p_wait(Prog* p, float seconds);                 // timer on p->timer
 
+void p_motion(int id);                              // 0x53adb0
+bool p_motion_done(void);                           // 0x5394c0
 void p_lock(Prog* p, bool on);                      // JmsEventMode
 void p_cursor_start(void);                          // the cursor over a still, in its middle
 void p_cursor(Prog* p);                             // 0x4a25c0: one frame of it, every frame it shows

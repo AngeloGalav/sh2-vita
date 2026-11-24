@@ -479,6 +479,7 @@ static int s35_papa_attack_angela(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_set(606);                     // FLAGW_576 |= 0x40000000
+		p_motion(20002);                // 0x4e22: he starts at the scream
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_ANGELA_SCREAM))
 		p_lock(p, false);
 	PROG_END(p)

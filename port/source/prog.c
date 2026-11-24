@@ -527,6 +527,9 @@ bool prog_update(u32 down, u32 held, float dt)
 
 // ---------------------------------------------------------------- engine services
 
+// 0x53adb0: James plays one of the stage's own motions (20001, 20002, ...); 0x5394c0: it has played out.
+void p_motion(int id) { combat_event_motion(id); }
+bool p_motion_done(void) { return !combat_event_playing(); }
 void p_lock(Prog* p, bool on) { p->locked = on; }
 void p_fade(int type) { if (s_host.fade) s_host.fade(type); }
 void p_se(int id) { if (s_host.se) s_host.se(id); }

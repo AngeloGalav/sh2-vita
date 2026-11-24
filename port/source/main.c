@@ -6239,6 +6239,7 @@ int main(void)
 #endif
 		} else if (s_cam.mode == CAM_PLAYER && demo_active()) {
 			enemy_event_tick(dt);
+			combat_event_tick(dt);
 			prog_scene_tick(ev_stage(), dt);
 			if (demo_update(down, dt))
 				demo_finish();
@@ -6296,6 +6297,7 @@ int main(void)
 					static const circlePosition still;
 					bool locked = prog_player_locked();
 					player_update(locked ? &still : &cp, locked ? 0 : move_keys(gheld, gdown, &cp), dt);
+					combat_event_tick(dt);
 					prog_set_stick(cp.dx / 154.0f, cp.dy / 154.0f);
 					prog_update(down, held, dt);
 					if (s_game_end >= 0 && !prog_running()) {

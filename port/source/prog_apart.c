@@ -281,9 +281,11 @@ static int s07_anyone_cry(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+		p_motion(20002);                    // he starts and looks about (0x4e22)
 		p_se(0x9c49);
 	PROG_STEP(p, 0x1b, p_wait(p, 2.0f))      // _DAT_0063158c
 	PROG_STEP(p, 0x1c, p_message(p, 0))
+	PROG_STEP(p, 0x1d, p_motion_done())
 		p_lock(p, false);
 	PROG_END(p)
 }
