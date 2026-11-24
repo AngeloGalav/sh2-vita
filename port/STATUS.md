@@ -393,7 +393,7 @@ Ordered by weight. Each line names where the work starts.
     - Scenes have shadows: the lamp's volumes in the dark rooms (the lamp is the scene's James'), the drop shadows in the lit ones, with the scenes' exceptions (0x5aeb90, 0x5add90). Stand-ins: James casts none under a lamp, and the bones left out (0x5ae060), the reach by scene (0x5ac5d0, 0x5ac740) and the other lights (0x5ad1e0) are not ported.
     - The closet scene: the first Mannequin is out of it while James hides (0x599ab0), from frame 359 as the Enhanced Edition has it, and his shots light the room (0x545810).
     - The moths of Wood Side's room 202 (0x59bba0, 0x4ab430, 0x4abf40; reported from play): five pairs round the hole in the wall, drawn to the beam. All moths, Mary's too, are one draw of cut-out quads (`enemy_moths_draw`). Works on a console.
-    - The pulled ropes hang lower and come back (0x5803c0, flag 365), the manacles' bars rise (367), the boards turn in the tombstone (0x572b20), the trap room's noise (0x4278, 0x587690).
+    - The pulled ropes hang lower and come back (0x5803c0, flag 365), the manacles' bars rise (367), the boards turn in the tombstone (0x572b20), the trap room's noise (0x4278, 0x587690), the bowling ball (0x591a40) in its scene.
     - Found and not ported: pad vibration (0x4f4930); nothing else of weight. The stairwell's shot has its light (0x5964e0).
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).

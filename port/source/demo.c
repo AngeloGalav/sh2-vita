@@ -1858,6 +1858,8 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		float p[3];
 		char_place(i, t, p);
 		bool upside = mary_swap(dc->rec->kind, p);
+		if (S.h->demo_no == 0x1a && dc->rec->kind == 0x42f && S.cur - 1.0f < 700.0f)
+			p[1] += 500.0f;                // 0x591a40: the ball is under the floor until it is wanted
 		C3D_Mtx model, mv;
 		Mtx_Identity(&model);
 		Mtx_Translate(&model, p[0], p[1], p[2], true);
