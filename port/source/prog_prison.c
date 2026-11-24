@@ -177,6 +177,7 @@ static const ProgFn s_stage30[8] = {
 static int s31_eddie_kill_human(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x17, p_demo(p, DEMO_EDDIE_KILL_HUMAN))
 		p_place(-60117.0f, 0.0f, 61186.5f, -2.7617927f);
 		p_lock(p, false);
@@ -359,6 +360,7 @@ static int s33_5th_layer_start(Prog* p)
 static int s33_6th_layer_start(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_6F_START))
 		p_place(-20025.2f, 0.0f, -48801.734f, 3.1415927f);
 		p_lock(p, false);
@@ -396,6 +398,7 @@ static const ProgFn s_stage33[6] = {
 static int s34_7th_layer_start(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_7F_START))
 		p_place(-17647.85f, 0.0f, -100067.65f, -1.5707964f);
 		p_lock(p, false);
@@ -496,6 +499,7 @@ static int s35_papa_attack_angela(Prog* p)
 static int s35_angela_attack_papa(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_PAPA_ATTACK))
 		p_place(20071.975f, 0.0f, 59529.0f, 0.579536f);
 		p_lock(p, false);
@@ -506,6 +510,7 @@ static int s35_angela_attack_papa(Prog* p)
 static int s35_after_papa(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_ANGELA_ATTACK))
 		p_place(20007.475f, 0.0f, 60215.0f, -1.9300585f);
 		p_lock(p, false);

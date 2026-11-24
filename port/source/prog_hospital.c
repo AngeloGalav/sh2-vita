@@ -238,6 +238,7 @@ static int s18_hospital_exit(Prog* p)
 static int s18_laura_deceive_1(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 		p_bgm_page(0x12);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_LAURA_DECEIVE_1))
 		p_lock(p, false);
@@ -338,6 +339,7 @@ static const ProgFn s_stage19[7] = {
 static int s20_lost_maria(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_LOST_MARIA))
 		p_place(100265.0f, 0.0f, 58701.0f, -1.8386f);
 		p_set(186);                     // FLAGW_160 |= 0x4000000
@@ -652,6 +654,7 @@ static int s20_use_elevator_key(Prog* p) { return p_item_use(p, 0x25, 0x11, 0x4a
 static int s20_from_roof(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_FROM_ROOF))
 		p_place(21156.65f, 0.0f, 99800.0f, 3.1415927f);
 		p_lock(p, false);

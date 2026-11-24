@@ -273,6 +273,7 @@ static int s40_laura_piano(Prog* p)
 		p_set(636);                     // FLAGW_608 |= 0x10000000
 		p_lock(p, true);
 		p_bgm_page(0x21);
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x17, p_demo(p, DEMO_LAURA_PIANO))
 		p_set(528);                     // FLAGW_512 |= 0x10000 during the demo
 	PROG_STEP(p, 2, p_picture(p, "htl_p_laura_letter"))

@@ -93,7 +93,7 @@ void p_place_keep_yaw(float x, float y, float z);
 void p_player(float pos[3], float* yaw);
 void p_panel(const char* text);
 void p_save_menu(void);
-void p_flashlight(bool on);
+void p_flashlight(bool on);                         // gFlashlightSwitch; on: 0x48c8b0, which a dozen scenes' programs call first
 void p_enemy_list(void);   // the Enemy_List rows whose condition holds now and are not present
 void p_figure(int status, float x, float y, float z, float yaw, float delay);   // 0x48fcc0 Lying Figure; status < 0 removes it
 void p_game_end(int ending);

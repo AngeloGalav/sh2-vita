@@ -15,6 +15,7 @@
 static int s06_vomit_eddie(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_GERO_EDDIE))
 		p_set(87);                      // FLAGW_64 |= 0x800000: Eddie talked to
 	PROG_END(p)
@@ -222,6 +223,7 @@ static int s07_anyone_in_hole(Prog* p)
 		if (p->answer)
 			PROG_JUMP(p, 0xd);
 		p_set(540);                     // FLAGW_512 bit 28 while the demo runs
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_HOLE))
 	PROG_STEP(p, 9, p_item_get(p, 0x1c, 0x13))
 		p_set(79);                      // FLAGW_64 |= 0x8000: the hole is empty
@@ -235,6 +237,7 @@ static int s07_anyone_in_hole(Prog* p)
 static int s07_noone_in_hole(Prog* p)
 {
 	PROG_BEGIN(p)
+		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_HOLE_EMPTY))
 	PROG_STEP(p, 9, p_message(p, 3))
 		p_lock(p, false);
