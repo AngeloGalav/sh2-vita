@@ -144,8 +144,11 @@ void stageparts_tick(int stage, int room, float dt)
 		}
 		break;
 	case 9:   // 0x5994f0
-		if (room == 0x13)
+		if (room == 0x13) {
 			by(0x13, f(91), 0, -1);
+			if (!f(91))
+				shadow_map_off(0x12, 0x21);
+		}
 		break;
 	case 10:  // 0x598770
 		// EE MapMeshToggle's hook is at the function's end (0x598843), after the PC's own list: the hint
