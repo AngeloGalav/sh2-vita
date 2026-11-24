@@ -1092,13 +1092,16 @@ static const ProgFn s_stage47[3] = { NULL, s47_angela_in_fire, s47_fire_damage }
 
 // ================================================================ stages 48..51: the endings
 
-// EvProgMaryBeforeBattle (0x43fe30, 0x440c80, 0x43eac0, 0x574860): the last corridor, flag 531.
+// EvProgMaryBeforeBattle (0x43fe30, 0x440c80, 0x43eac0, 0x574860): the last corridor, flag 531 (the
+// music; Maria's, 0x440c80, sets it 600 frames into the scene, demo.c).
 static int end_before_battle(Prog* p)
 {
 	PROG_BEGIN(p)
-		p_set(531);                     // FLAGW_512 |= 0x80000
+		if (ev_stage() != 49)
+			p_set(531);                 // FLAGW_512 |= 0x80000
 		p_filter(PROG_FILTER_MARY);
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_MARY_BEFORE_BATTLE))
+		p_set(531);
 		p_filter(PROG_FILTER_NONE);
 		p_lock(p, false);
 	PROG_END(p)
