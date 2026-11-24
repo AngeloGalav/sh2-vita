@@ -220,7 +220,7 @@ static float s_t25, s_t28, s_t32, s_mv[3], s_mv_dir;   // 0x1d862f8, 0x1d862bc, 
 
 static void frame_sounds(int stage, int room, const float* me, float yaw, float dt)
 {
-	static float s_boiler_t;
+	static float s_boiler_t, s_water_t;
 	switch (stage) {
 	case 4:
 		forest_sounds(me, yaw, dt);
@@ -243,6 +243,20 @@ static void frame_sounds(int stage, int room, const float* me, float yaw, float 
 			static const float eye[3] = { -20820.0f, -530.0f, -101460.0f };                // 0x8e3c74
 			static const float look[3] = { -20820.996f, -529.975f, -101459.93f };          // 0x8e3c84
 			gamecam_event(eye, look, 0.098f, 0.0f);
+		}
+		break;
+	case 12:                             // 0x596660: the water in the stairwell (EvProgApartBossEnd starts it)
+		if (sfx_playing(0x3e95)) {
+			s_water_t += dt;
+			float v = s_water_t < 4.5f ? fminf(s_water_t * 2.0f, 1.0f) : 1.0f - (s_water_t - 4.5f) * 0.6667f;
+			if (v < 0.0f) {
+				sfx_stop(0x3e95);
+				p_set(526);
+			} else {
+				sfx_set_volume(0x3e95, v);
+			}
+		} else {
+			s_water_t = 0.0f;
 		}
 		break;
 	case 11:                             // 0x5974d0

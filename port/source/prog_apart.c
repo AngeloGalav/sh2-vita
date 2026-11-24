@@ -778,6 +778,8 @@ static int s12_apart_boss_end(Prog* p)
 	PROG_BEGIN(p)
 		p_lock(p, true);
 		p_se(0x4a4f);
+		// the water going down the stairwell, silent until 0x596660 brings it up (prog_stagefn.c)
+		sfx_play_at(0x3e95, 0.0f, (const float[3]){ 98804.953f, -450.0f, -98578.195f });   // 0x8e2074
 		p_set(147);                     // FLAGW_128 |= 0x80000
 	PROG_STEP(p, 0x16, boss_end_shot(p))
 		p_set(148);
