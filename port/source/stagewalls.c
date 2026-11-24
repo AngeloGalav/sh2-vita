@@ -126,6 +126,16 @@ static void town_west_tile(int id)
 	}
 }
 
+// 0x573f50 (stage 54)
+static void wish_town_tile(int id)
+{
+	switch (id) {
+	case 0x01: ADD(0x8c7a80); ADD(0x8c7b70); break;
+	case 0x21: ADD(0x8c7940); ADD(0x8c79e0); break;
+	default: break;
+	}
+}
+
 static bool s_all_tiles;
 void stagewalls_all_tiles(bool on) { s_all_tiles = on; }
 
@@ -254,6 +264,7 @@ void stagewalls_tick(int stage, int room, const float* me)
 		if (f(503)) ADD(0x7b3830);        // the stairs behind James
 		if (f(504)) ADD(0x7b3b50);
 		break;
+	case 54: town_tiles(me, 0x212, wish_town_tile); break;
 	default: break;
 	}
 }

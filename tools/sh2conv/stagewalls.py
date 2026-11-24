@@ -54,6 +54,7 @@ LISTS = (
     0x8cb7a0,                                                   # 0x577690, stage 43
     0x8d47f8,                                                   # 0x5843b0, stage 33
     0x7b3bf0, 0x7b3830, 0x7b3b50,                               # 0x440ad0, stage 48 (49..51 have copies)
+    0x8c7a80, 0x8c7b70, 0x8c7940, 0x8c79e0,                     # 0x573f50, stage 54, by tile
 )
 MAX_PLANES = 64     # no list has more than 20; a list running on would be a misread
 
