@@ -152,10 +152,11 @@ void stageparts_tick(int stage, int room, float dt)
 			s_knife_floor = true;
 		if (room == 0x24 && scene())
 			s_knife_floor = false;
+		// EE MapMeshToggle's hook is at the function's end (0x598843), after the PC's own list: the hint
+		// on 109's door comes on top of it, in every room, variant 1 once James has met Eddie (0x55)
+		on(0x5c, f(0x55) ? 1 : 0);
 		if (room == 0x22) {
-			// EE MapMeshToggle replaces this room's list (the PC's 0x4e switch) with part 0x5c,
-			// variant 1 once James has met Eddie (flag 0x55)
-			on(0x5c, f(0x55) ? 1 : 0);
+			by(0x4e, f(142), 0, 1);     // 105's dresser: the coins' drawer open, or shut
 		} else if (room == 0x24) {
 			on(0x57, -1);
 			if (!f(85) || f(109))
