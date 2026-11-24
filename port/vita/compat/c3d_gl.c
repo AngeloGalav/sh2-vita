@@ -1205,6 +1205,7 @@ typedef struct {
 	u8 border_mask;                  // texture units clamped to their border (GL has no such wrap)
 	u8 halffog;                      // the fog drawn at half size (half_fog_begin): 1 + the depth test, 0 off
 	u8 fog_float;                    // its colour work in float (s_fog_float)
+	u8 cut0;                         // the first texture's alpha from its full size (the map's cut-outs)
 } FragKey;
 
 typedef struct {
@@ -1503,6 +1504,15 @@ static Program* build(const FragKey* k)
 			APPEND("if (o_tc%d.x < 0.0 || o_tc%d.x > 1.0 || o_tc%d.y < 0.0 || o_tc%d.y > 1.0) t%d = float4(0.0);\n",
 			       i, i, i, i, i);
 	}
+	// The PC samples one level of its map textures (0x457460): what its alpha test leaves out is the full
+	// size's. The smaller levels blend an atlas cell with the next one, so the leaves' quads, clear along
+	// their edges at the full size, were seen along nearly all of them a level down: a green line round them.
+	if (k->cut0 && used[0]) {
+		if ((k->rt_mask | vflip) & 1)
+			APPEND("t0.a = tex2Dlod(tex0, float4(o_tc0.xy, 0.0, 0.0)).a;\n");
+		else
+			APPEND("t0.a = tex2Dlod(tex0, float4(o_tc0.x, 1.0 - o_tc0.y, 0.0, 0.0)).a;\n");
+	}
 	APPEND("float4 t3 = float4(0.0);\n");
 	if (k->pt_on) {
 		const char* tc = k->pt_tc ? "o_tc1" : "o_tc0";
@@ -1797,6 +1807,14 @@ static Program* current_program(void)
 	k.fog = G.fog_mode == GPU_FOG && G.fog_lut;
 	k.fog_flip = k.fog && G.fog_flip;
 	k.alpha_func = G.alpha_test && !alpha_test_moot() ? (u8)(G.alpha_func + 1) : 0;
+	static int world = -2;
+	if (world == -2) {
+		world = -1;
+		for (int i = 0; i < c3d_vertex_program_count; i++)
+			if (!strcmp(c3d_vertex_programs[i].name, "world"))
+				world = i;
+	}
+	k.cut0 = G.program == world && G.alpha_test && G.tex[0] && G.tex[0]->maxLevel > 0;
 	if (G.proctex) {
 		k.pt_on = 1;
 		k.pt_tc = (u8)G.proctex_tc;
