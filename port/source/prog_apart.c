@@ -28,6 +28,11 @@ static int s06_vomit_eddie_after(Prog* p)
 {
 	PROG_BEGIN(p)
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_GERO_EDDIE_AFTER))
+		if (!p_flag(87)) {              // James turns away from the door (+0x30 = 0xc023be79)
+			float pos[3], yaw;
+			p_player(pos, &yaw);
+			p_place(pos[0], pos[1], pos[2], -2.5585f);
+		}
 	PROG_END(p)
 }
 
