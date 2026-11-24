@@ -176,6 +176,7 @@ int enemy_difficulty(void);
 float enemy_nearest(float x, float z);
 // The moths (Mary's, room 202's), after the opaque scene; bind sets the flat world program (main.c).
 void enemy_moths_draw(const C3D_Mtx* proj, const C3D_Mtx* view, void (*bind)(const C3D_Mtx* proj, const C3D_Mtx* view));
+bool enemy_near(float range);             // a live enemy within range of James across the floor
 const char* enemy_status(void);          // debug HUD line
 // Whether the room is dark (the stage record's flashlight flag, main.c s_env.dark): the enemies'
 // sight and pace depend on it (light_index). Set before each enemy_update.

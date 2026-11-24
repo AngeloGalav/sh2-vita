@@ -6389,6 +6389,19 @@ float enemy_nearest(float x, float z)
 	return best;
 }
 
+// 0x515690's test: an active enemy (0x2xx, +0x148 & 0x400, not dead) within range of James across the floor.
+// Stand-in: every live one counts as active, but the creepers' nests and Pyramid Head behind the bars (stage 7).
+bool enemy_near(float range)
+{
+	for (int i = 0; i < ENEMY_MAX; i++) {
+		const Enemy* e = &s_en[i];
+		if (enemy_alive(e) && e->model != MDL_TY2 && e->model != MDL_TY3 && !(e->kind == EN_KIND_RED && s_stage == 7) &&
+		    (e->x - s_px) * (e->x - s_px) + (e->z - s_pz) * (e->z - s_pz) < range * range)
+			return true;
+	}
+	return false;
+}
+
 void enemy_init(const char* pack)
 {
 	snprintf(s_pack, sizeof s_pack, "%s", pack);

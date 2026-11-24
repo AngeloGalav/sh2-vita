@@ -1,6 +1,8 @@
 #include "bgm.h"
 #include "audio.h"
+#include "combat.h"
 #include "demo.h"
+#include "enemy.h"
 #include "events.h"
 #include "levels.h"
 #include "prog.h"
@@ -325,12 +327,14 @@ static int bgm_control(int stage, int room, bool scene, int demo)
 #undef F
 }
 
-// 0x515690: bgm_control's page when it is 4 or more. Below that an enemy within 6000 units (3) or
-// James' 0x144 under 0.2 (2) would win; not ported (enemy flags 0x148 & 0x400 and the 0x144 value
-// not traced), so the stage's own page stands.
+// 0x515690: bgm_control's page when it is 4 or more. Below that an enemy within 6000 units across (3) or
+// James' health under 0.2 (2, the character's +0x144) wins.
 static int situation(int stage, int room, bool scene, int demo)
 {
-	return bgm_control(stage, room, scene, demo);
+	int page = bgm_control(stage, room, scene, demo);
+	if (page > 3)
+		return page;
+	return enemy_near(6000.0f) ? 3 : combat_hp() < 0.2f * combat_hp_max() ? 2 : page;     // 0x6c5f5c, 0x63345c
 }
 
 // 0x8a9eb8: the fixed mixes of situation pages 6..15, fade-in type per track (0 off), fade-out type
