@@ -5648,6 +5648,16 @@ static void filters_frame(void)
 		motion = t < 211.0f ? 100 : t < 271.0f ? (int)(100.0f + (t - 211.0f) * -70.0f / 60.0f) : 0;
 	else if ((stage == 34 || stage == 36) && dn == 0x47 && t >= 831.0f && t < 1481.0f)
 		motion = (int)((stage == 34 ? 80.0f : 96.0f) - (t - 831.0f) / 650.0f);
+	else if (stage == 21 && dn == 0x23)          // 0x58d3f0
+		motion = t >= 81.0f && t < 244.0f ? (int)(90.0f + 30.0f * (t - 81.0f) / 163.0f) : 0;
+	else if (stage == 29 && dn == 0x35)          // 0x587b50
+		motion = t > 374.0f ? 100 : t > 359.0f ? (int)(100.0f * (t - 359.0f) / 15.0f) : 0;
+	else if (stage == 30 && dn == 0x37)          // 0x5873c0
+		motion = t > 210.0f ? 100 : t > 195.0f ? (int)(100.0f * (t - 195.0f) / 15.0f) : 0;
+	else if (stage == 33 && dn == 0x3d)          // 0x584440
+		motion = t > 207.0f ? 100 : t > 192.0f ? (int)(100.0f * (t - 192.0f) / 15.0f) : 0;
+	else if (stage == 47 && dn == 0x53)          // 0x575790: mode 3 with 64 and 64 (stand-in: mode 2's blur)
+		motion = 64;
 	else if (stage >= 48 && stage <= 51 && dn == 0x57)
 		motion = t < 340.0f ? 90 : (int)(90.0f - 90.0f * (t - 340.0f) / 59.0f);
 	if (blur_a >= 0.0f)
