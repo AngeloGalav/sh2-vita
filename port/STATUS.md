@@ -419,8 +419,11 @@ Ordered by weight. Each line names where the work starts.
   panels are drawn by `touchui_draw_pc`, with no PC function behind them yet.
 - Fog on the PS Vita (`port/vita/compat/c3d_gl.c`): the sprites are drawn at half size and without
   the PC's depth test, so a sprite also lays over what stands in front of it. Chosen on a console: it
-  covers the far half-loaded geometry that showed through with the test, and costs less. The test
-  is the Debug tab's Map Test (it was SELECT + L).
+  covers the far half-loaded geometry that showed through with the test, and costs less. In the open areas
+  only (2026-11-24): inside and on the observation deck the fog lies outside windows and over the lake, and
+  without the test it covered the room (312, the parking lot's first scene; reported from play), so those
+  have it (`c3d_fog_depth_test`). And 0x476ff0's gate is in (`fog_here`): the open areas while light, 19
+  listed maps else. Not run on a console.
 - Controls (`move.c`, `combat.c`, `main.c`): the arms' aim pitch and the shotgun's three aim heights
   (0x535a90); the swing lunges (0x558830 per-frame speeds) and the combo window (0x544ac0);
   0x1fba908/0x1fba904 bit 0x40 freeing the gait mid-attack (the port keeps it for the whole attack);

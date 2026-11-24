@@ -101,6 +101,7 @@ static struct {
 static struct {
 	bool on, active;
 	bool no_test;                // SELECT + L's third state: the half size without the depth test
+	bool place_test;             // the place's fog is tested all the same (c3d_fog_depth_test)
 	bool show_depth;             // its fourth: the scene's depth as read, over the screen
 	C3D_RenderTarget rt;         // the half-size target
 	C3D_Tex tex;
@@ -126,7 +127,7 @@ static void half_fog_init(void)
 // SELECT + L: off, on with the depth test, on without it (the start), the depth shown.
 // Not the PC's: its sprites test the scene's depth. Without the test each sprite also lays over
 // what stands in front of it, which on a console covers the far half-loaded geometry that with the
-// test showed through the fog, and costs less (stand-in, port/STATUS.md).
+// test showed through the fog, and costs less (stand-in, port/STATUS.md). Outdoors only: c3d_fog_depth_test.
 void c3d_half_fog_toggle(void)
 {
 	int st = !HF.on ? 0 : HF.show_depth ? 3 : HF.no_test ? 2 : 1;
@@ -135,6 +136,10 @@ void c3d_half_fog_toggle(void)
 	static const char* const NAME[4] = { "off", "on", "on, without its depth test", "on, the depth it reads shown" };
 	vita_log("fog at half size %s", NAME[st]);
 }
+
+// fog.c, each frame: inside and on the observation deck the fog lies behind walls and windows (312's over
+// the lake), so it is tested there whatever the state above.
+void c3d_fog_depth_test(bool on) { HF.place_test = on; }
 
 // The small fog target's colour work in half, for the SGX's rate, or float: SELECT + triangle (ctru.c)
 // changes it at once, to compare in one spot. With no depth test the whole program goes in half.
@@ -1793,7 +1798,7 @@ static Program* current_program(void)
 	if (s_gpu_test == 1)
 		k.lights = 0, k.d0_on = 0;
 	if (HF.active)
-		k.halffog = (u8)(F.depth_on && !HF.no_test ? 2 + (F.depth_func & 7) : 1), k.fog_float = s_fog_float;
+		k.halffog = (u8)(F.depth_on && (!HF.no_test || HF.place_test) ? 2 + (F.depth_func & 7) : 1), k.fog_float = s_fog_float;
 	k.fog = G.fog_mode == GPU_FOG && G.fog_lut;
 	k.fog_flip = k.fog && G.fog_flip;
 	k.alpha_func = G.alpha_test && !alpha_test_moot() ? (u8)(G.alpha_func + 1) : 0;
@@ -2076,7 +2081,7 @@ static void half_fog_begin(void)
 	}
 	HF.passes++;
 	HF.zdata = NULL;
-	if (!HF.no_test) {
+	if (!HF.no_test || HF.place_test) {
 		// the scene's depth as a texture: m is bound for reading and drawing
 		glActiveTexture(GL_TEXTURE6);
 		glBindTexture(GL_TEXTURE_2D, HF.ztex);
