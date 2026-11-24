@@ -597,14 +597,16 @@ def build_motions(exe, data, folder_dir, ent, cname, ids, m, stage=None, n_clust
         n = rec[1]                                   # stored frames; start..end is what plays
         best = None
         for rank, (path, d) in enumerate(files):
-            for o in ([off] if off is not None else []) + [seq]:
+            for k, o in enumerate(([off] if off is not None else []) + [seq]):
                 offs = anm_frames(d, o, n, nb, roots)
                 if offs is None:
                     continue
                 end = offs[-1]
                 # a real motion ends at the end of the file or where another motion of the table starts
                 fits = len(d) - end < 4 or any(abs(end - b) < 4 for b in bounds if b > o)
-                key = (0 if fits else 1, rank, smoothness(d, offs, nb))
+                # the setters add the table's offset to the file (0x540f60, 0x53cef0): it goes before
+                # the guess, which fits as well where it lands on another motion (1047 for 1048)
+                key = (0 if fits else 1, rank, k, smoothness(d, offs, nb))
                 if best is None or key < best[0]:
                     best = (key, path, d, offs)
         if best is None:
