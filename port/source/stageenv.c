@@ -276,6 +276,10 @@ void stageenv_frame(RoomEnv* e, StageLights* l, const StageEnvIn* in)
 		break;
 	}
 	case 12:                                 // 0x596890
+		if (f(147) && !f(148)) {             // 0x5964e0: the four seconds' shot of the stairwell has light 2
+			static const float d[3] = { 0.3f, 0.9055f, 0.3f }, c2[3] = { 2.2f, 2.2f, 2.4f };
+			light(l, 2, d, c2, false);
+		}
 		if (e->map_id == 0x9000a) {
 			e->clip_near = 50.0f;
 		} else if (e->map_id == 0x90058 && dn != 0x13) {

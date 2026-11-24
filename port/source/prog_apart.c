@@ -770,7 +770,7 @@ static int s12_apart_boss_siren(Prog* p)
 
 // 0x5964e0 EvProgApartBossEnd: the siren, Pyramid Head leaves; four seconds of camera.
 // its shot (0x8e2040, 0x8e2050, roll 0x8e2070) for four seconds (_DAT_006318a4); the light that goes with
-// it (0x47b6c0 with 0x8e2020 / 0x8e2030) is not ported
+// it (0x47b6c0 with 0x8e2020 / 0x8e2030) is stageenv.c's
 static int boss_end_shot(Prog* p)
 {
 	static const float eye[3] = { 99438.0f, -3961.0f, -100124.0f }, at[3] = { 99438.375f, -3960.13f, -100123.688f };
