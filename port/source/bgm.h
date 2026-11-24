@@ -20,6 +20,7 @@ void bgm_update(int stage, int glb_crd, const float pos[3], float dt);
 void bgm_set_page(int page);
 bool bgm_page_pending(void);   // the page asked for has not started yet (0x1f837c8 != 0)
 void bgm_warped(void);         // a warp: SeBgmChange picks the page again, as the PC does on a load
+void bgm_set_menu(bool open);  // a menu that stops the game is open: the music goes to half
 void bgm_set_music_box(bool on);   // 0x1d85fa4: the music box plays with the boxes in a wrong order
 
 void bgm_stop(void);           // title screen: silence, forget the page

@@ -348,7 +348,10 @@ static const u8 s_mix[10][2][TRACKS] = {
 };
 
 // SeBgmManager's duck (0x516080, its end): 1.0 or 0.7 by DramaDemoNumber, moving 0.5 a second.
-// It is 0.5 while gEventIndex is 5..9 (the menus that stop the game); not ported.
+// It is 0.5 while gEventIndex is 5..9 (the map, the items and memos, options, pause, the save screen).
+static bool s_menu;
+void bgm_set_menu(bool open) { s_menu = open; }
+
 static float duck_target(int demo)
 {
 	switch (demo) {
@@ -492,7 +495,7 @@ void bgm_update(int stage, int glb, const float pos[3], float dt)
 	if (!scene)
 		demo = prog_demo_number();
 	s_situation = situation(stage, room, scene, demo);
-	float duck = duck_target(demo);
+	float duck = s_menu ? 0.5f : duck_target(demo);
 	s_duck = s_duck > duck ? fmaxf(duck, s_duck - 0.5f * dt) : fminf(duck, s_duck + 0.5f * dt);
 	if (s_page != s_playing_page) {
 		bool silent = true;

@@ -502,8 +502,8 @@ Ordered by weight. Each line names where the work starts.
   speeds from the PC's table.
 - Music (`bgm.c`): situation pages 2 and 3 (0x515690: James under 0.2 health, an enemy within 6000 units; 19
   stages have areas for them) count every live enemy as active (the PC asks +0x148 & 0x400), but nests and
-  Pyramid Head in stage 7. Not run on a console. No 0.5 duck in the menus that stop the game (gEventIndex
-  5..9); scenes duck by DramaDemoNumber. Stage 15 still waits for flag 159 instead
+  Pyramid Head in stage 7; the menus that stop the game duck it to 0.5 (gEventIndex 5..9). Neither run on a
+  console. Scenes duck by DramaDemoNumber. Stage 15 still waits for flag 159 instead
   of `DAT_01F837D0`. EvProgMariaMeetingStandby's held page 0xd is asked for when EvProgMariaMeeting
   starts. Stage 10's `bgm_control` reads its room test live, where the PC sets it at room init
   (0x598700). The ending programs' page 0x2b and the page-0 sets in their results are not ported. The

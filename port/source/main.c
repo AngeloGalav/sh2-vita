@@ -6211,6 +6211,8 @@ int main(void)
 				   : map_is_open() || s_inv_open || s_memo_open ? RADIO_ITEMS : RADIO_PLAY;
 			} else
 				last_stage = -1;
+			bgm_set_menu(s_state == ST_GAME && !movie_active() && (savescreen_active() || optmenu_active() || s_paused ||
+			             map_is_open() || s_inv_open || s_memo_open));
 			radio_update(rs, dt);
 		}
 		touchui_debug(s_state == ST_VIEWER || s_debug_hud);
