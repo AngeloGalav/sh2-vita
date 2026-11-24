@@ -61,6 +61,9 @@ MOTIONS = [
     # burning stairs after her scene (EvProgAngelaInFire 0x575630, list 0x8c9b44), 0x5407c0
     (0xf3f, 0x6e5c20, 0xf3c, 0xf3f, 'chr/agl/agl.mdl', 'demo/papa_agl/agl.anm', 'agl', 'agl_papa'),
     (0xf41, 0x6e5c20, 0xf3c, 0xf40, 'chr/agl/agl.mdl', 'demo/fire_agl/agl.anm', 'agl', 'agl_fire'),
+    # Mary in the endings' last corridor (0x440350, 0x43f500, 0x574c80; Maria's 0x4410d0), 0x53a990
+    (0xffb, 0x6d50cc, 0xffa, 0xffb, 'chr/mry/mry.mdl', 'demo/mry_yarinaoshi_a/mry.anm', 'mry', 'mry_wait'),
+    (0xffc, 0x6d50cc, 0xffa, 0xffc, 'chr/mry/mry.mdl', 'demo/mar_isho_a/mry.anm', 'mry', 'mry_wait_maria'),
 ]
 
 # (model, anm, output folder, output name): the whole .anm

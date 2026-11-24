@@ -385,7 +385,7 @@ Ordered by weight. Each line names where the work starts.
   - Audit after those reports (2026-11-24): the 327 stage programs and the 130 stage functions decompiled and compared with the port by script, for the flags, sounds, messages, items, places, music, characters, map parts, shadows, walls and frame-timed actions they have; the pack's references (textures, models, motions, voices, sounds) all resolve. Found and put in, none run on a console:
     - What programs do at a frame of their scene (`s_cues`): the clock's, the chute's and the tape's sounds, the can opener (stand-in), the hospital turning in its scenes (213, 214) rather than after, 531 in Maria's ending, the radio late in the revelation.
     - The last corridor (0x43eac0 and its three copies): Mary and the boss trade places frame by frame (`mary_swap`); both were drawn one over the other. The blur starts at each ending's own frame.
-    - Characters the stages leave in place: Angela through the Abstract Daddy's fight and on the burning stairs. Repack, or copy chr/agl/agl_{papa,fire}.s3a.
+    - Characters the stages leave in place: Angela through the Abstract Daddy's fight and on the burning stairs, Mary in the last corridor. Repack, or copy chr/agl/agl_{papa,fire}.s3a, chr/mry/mry_wait{,_maria}.s3a.
     - Found and not ported: pad vibration (0x4f4930); nothing else of weight.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).

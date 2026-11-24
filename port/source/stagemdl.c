@@ -84,6 +84,8 @@ static float s_play = -1.0f;      // seconds into the music box's tune, < 0 when
 //   0x580e30 EvProgAngelaAttackPapa, 0x581090 (stage 35, room 0x8a, 333 on and 335 off): Angela through the
 //     Abstract Daddy's fight, 0x5407c0 motion 0xf3f
 //   0x575630 EvProgAngelaInFire (stage 47, 482 on): Angela on the burning stairs, motion 0xf41, once
+//   0x440350, 0x4410d0, 0x43f500, 0x574c80 (stages 48..51, 505 off): Mary (0x109) at the end of the last
+//     corridor, 0x53a990 motion 0xffb, in Maria's ending 0xffc
 // A negative rate: the record's loop is 0, the motion plays once and holds its last frame.
 // The rate is the record's speed (2048 is 30 frames a second, as boat.c). A model with a motion keeps the
 // turn the room function gives it; the revolver, which has none, is a stay object (stay_turned).
@@ -112,6 +114,10 @@ static const Npc k_npc[] = {
 	{ 37, 0x90, 0x42a, 378, 0, 0, "item", "i_colt", NULL, 30.0f, { 140490.766f, -7.18504620f, -100389.664f }, 0.0f },               // 0x8cfd2c
 	{ 35, 0x8a, 0x107, 333, 335, 0, "agl", "agl", "agl_papa", 30.0f, { 20925.5352f, 425.188263f, 60553.9375f }, 3.1415927f },      // 0x8d3028
 	{ 47, -1, 0x107, 482, 0, 0, "agl", "agl", "agl_fire", -1.875f, { -100233.477f, -2562.906f, -75598.5781f }, 3.1415927f },        // 0x8c9b80, speed 128
+	{ 48, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait", 30.0f, { 56532.3242f, -15972.3398f, 57998.4766f }, 3.1415927f },          // 0x7b4024
+	{ 49, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait_maria", 30.0f, { 59175.082f, -15822.8672f, 59013.1367f }, 3.1415927f },     // 0x7b4c34
+	{ 50, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait", 30.0f, { 56532.3242f, -15972.3398f, 57998.4766f }, 3.1415927f },          // 0x7b330c
+	{ 51, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait", 30.0f, { 56532.3242f, -15972.3398f, 57998.4766f }, 3.1415927f },          // 0x8c97d4
 };
 #define N_NPC ((int)(sizeof k_npc / sizeof k_npc[0]))
 
