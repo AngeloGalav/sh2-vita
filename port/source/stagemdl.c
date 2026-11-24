@@ -46,6 +46,7 @@ typedef struct {
 	u16 kind, flag_off, flag_on;
 	u8 model;
 	s16 pickup;              // the stage's pickup index, -1 for a placed model
+	bool gone;               // taken by the program running (stagemdl_item_taken)
 	float pos[3], rot[3];
 } Place;
 
@@ -580,11 +581,45 @@ static bool shown(const Place* p, float x, float z, float* d2)
 	bool tune = s_play >= 0.0f && p->kind >= 0x718 && p->kind <= 0x71a;
 	if ((p->flag_off && ev_flag(p->flag_off) && !tune) || (p->flag_on && !ev_flag(p->flag_on)))
 		return false;
+	if (p->gone && prog_running())
+		return false;                // its flag comes as the program ends
 	if (demo_has_kind(p->kind))
 		return false;                // the cutscene moves its own copy
 	float dx = p->pos[0] - x, dz = p->pos[2] - z;
 	*d2 = dx * dx + dz * dz;
 	return true;
+}
+
+// The placed model of an item (0x892640's kind) nearest to James, as 0x4a1fb0 looks it up (0x537950).
+static Place* item_place(int item)
+{
+	int k = item_model(item);
+	float me[3], yaw, d2, best = 4000.0f * 4000.0f;
+	Place* r = NULL;
+	if (k < 0)
+		return NULL;
+	p_player(me, &yaw);
+	for (int i = 0; i < s_nplaces; i++)
+		if (s_places[i].pickup < 0 && s_places[i].kind == s_itemmdl[k].kind && shown(&s_places[i], me[0], me[2], &d2) && d2 < best)
+			best = d2, r = &s_places[i];
+	return r;
+}
+
+bool stagemdl_item_y(int item, float* y)
+{
+	for (int i = 0; i < s_nplaces; i++)
+		s_places[i].gone = false;
+	const Place* p = item_place(item);
+	if (p)
+		*y = p->pos[1];
+	return p != NULL;
+}
+
+void stagemdl_item_taken(int item)
+{
+	Place* p = item_place(item);
+	if (p)
+		p->gone = true;
 }
 
 int stagemdl_look_points(float (*out)[3], int max, float y)

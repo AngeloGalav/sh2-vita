@@ -117,6 +117,9 @@ void combat_fall(bool back);             // James starts to fall (0x52eb40)
 void combat_event_motion(int id);
 void combat_event_tick(float dt);
 bool combat_event_playing(void);
+bool combat_event_held(void);            // it stands on its hold frame (20001: bent down), or there is none
+void combat_event_release(void);
+void combat_event_stop(void);
 bool combat_busy(void);                  // no enemy starts an attack on him (0x542e00)
 const Enemy* combat_stomp_enemy(void);   // the one he is kicking or stomping (0x542de0)
 bool combat_has_ammo(void);              // any owned gun with rounds in it or spare (0x4a6340)

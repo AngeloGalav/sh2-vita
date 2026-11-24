@@ -936,6 +936,8 @@ bool combat_held(void) { return s_mode == M_HELD; }
 // or it ended less than 2 seconds ago (0x1fbacdc: 2.0 set by 0x547bf0 / 0x54e0f0 as state 0x19 ends, the
 // frame time taken off it by 0x556490). No attack starts meanwhile; one under way goes on.
 static bool s_event_motion;       // M_FALL plays an event's motion
+static float s_event_hold;        // the frame it stops on until it is let go (the clip's +0xb, 0x53ad70), 0 none
+static bool s_event_held;
 
 void combat_event_motion(int id)
 {
@@ -950,6 +952,8 @@ void combat_event_motion(int id)
 		clip = (JAnim){ c->first, c->last, 0, (s16)c->speed };
 		s_mode = M_FALL;
 		s_event_motion = true;
+		s_event_hold = (float)(c->flags >> 8);
+		s_event_held = false;
 		s_target = NULL;
 		s_attack_seq = false;
 		play(&clip);
@@ -959,11 +963,34 @@ void combat_event_motion(int id)
 
 bool combat_event_playing(void) { return s_event_motion && s_mode == M_FALL; }
 
-void combat_event_tick(float dt)
+bool combat_event_held(void) { return !combat_event_playing() || s_event_held; }
+
+// 0x539490: on from where it stopped
+void combat_event_release(void)
+{
+	s_event_hold = 0.0f;
+	s_event_held = false;
+}
+
+void combat_event_stop(void)
 {
 	if (!combat_event_playing())
 		return;
+	s_mode = M_FREE;
+	s_event_motion = false;
+	play(&J_STAND);
+}
+
+void combat_event_tick(float dt)
+{
+	if (!combat_event_playing() || s_event_held)
+		return;
 	step(dt);
+	if (s_event_hold > 0.0f && s_frame - s_cur->start >= s_event_hold) {
+		s_frame = s_cur->start + s_event_hold;   // 0x539470
+		s_event_held = true;
+		return;
+	}
 	if (s_end) {
 		s_mode = M_FREE;
 		s_event_motion = false;

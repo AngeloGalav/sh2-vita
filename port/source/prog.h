@@ -190,6 +190,8 @@ bool prog_exists(int stage, int prog_no);
 // Starts ev_prog[prog_no] of the stage; flag is the event's rslt1 & 0x3fff (0 = none).
 void prog_start(int stage, int prog_no, int flag);
 void prog_scene_tick(int stage, float dt);   // a scene's frame: the stage's map part switches
+// 0x48c3a0: James takes the stage's pickup i, run as a program.
+void prog_start_pickup(int i);
 bool prog_running(void);
 // While the program runs and has James in event mode the player does not move.
 bool prog_player_locked(void);

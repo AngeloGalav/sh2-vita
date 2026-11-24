@@ -556,9 +556,11 @@ static int s10_look_family_picture(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 10, p_message(p, 0))
 	PROG_STEP(p, 2, p_picture(p, "apt_p_family"))
 		p_picture_hide();
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -635,7 +637,9 @@ static int s11_wallet_out_toilet(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 0x10, p_message_text(p, wallet_text(4)))
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }

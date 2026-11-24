@@ -15,6 +15,9 @@ void stagemdl_prefetch(int stage, float x, float z, void (*want)(const char* pat
 void stagemdl_preload(int stage, float x, float z);
 // Whether the stage code has a character of that kind standing where James is now (the table in stagemdl.c).
 bool stagemdl_npc_placed(int kind);
+// An item's placed model near James: its height; and it goes, while the program taking it still runs.
+bool stagemdl_item_y(int item, float* y);
+void stagemdl_item_taken(int item);
 // What James' head turns to besides enemies (0x542300): the 0x7xx models lying about (pickups, keys, coins)
 // from 600 over his chest to 1000 under it, and the people the stage's code placed. y is his feet.
 int stagemdl_look_points(float (*out)[3], int max, float y);

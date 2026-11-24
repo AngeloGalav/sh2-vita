@@ -391,7 +391,9 @@ static int s20_only_needle(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 0xf, p_message(p, 0xb))
+	PROG_STEP(p, 1, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -400,7 +402,9 @@ static int s20_only_hair(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 0xf, p_message(p, 0xc))
+	PROG_STEP(p, 1, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -410,9 +414,11 @@ static int s20_in_shower_drain(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "hsp_p_drainage"))
 	PROG_STEP(p, 0xf, p_message(p, p_flag(172) ? 9 : 8))
 		p_picture_hide();
+	PROG_STEP(p, 1, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -684,11 +690,13 @@ static int s21_read_diary(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 0x1e, p_message(p, 0))
 	PROG_STEP(p, 0x11, p_picture(p, "hsp_p_diary"))
 	PROG_STEP(p, 10, p_message(p, 1))
 		p_picture_hide();
 	PROG_STEP(p, 0x1f, p_message(p, 2))
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -1044,7 +1052,9 @@ static int s26_director_bronze_key(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 0xf, p_message(p, p_flag(242) ? 3 : 4))
+	PROG_STEP(p, 1, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }

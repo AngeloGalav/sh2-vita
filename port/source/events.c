@@ -149,7 +149,12 @@ bool ev_pickup_place(int i, int* item, float pos[3], float* rot_y)
 	return true;
 }
 
-bool ev_pickup_shown(int i) { return i >= 0 && (u32)i < s_nitems && item_lying(&s_items[i], false); }
+static int s_pick_held = -1;       // taken, but shown until its message closes (0x48c3a0)
+
+bool ev_pickup_shown(int i) { return i >= 0 && (u32)i < s_nitems && (i == s_pick_held || item_lying(&s_items[i], false)); }
+void ev_pickup_hold(int i) { s_pick_held = i; }
+// 0x48c3a0: James bends down for what lies at most 100 above his feet
+bool ev_pickup_low(int i, float y) { return i >= 0 && (u32)i < s_nitems && y - s_items[i].pos[1] < 100.0f; }
 
 void ev_give_item(int item, int n)
 {
@@ -960,15 +965,24 @@ static bool item_reachable(const ItemRec* it, const EvPlayer* p)
 	return item_lying(it, true) && it->pos[1] >= p->y - 750.0f && it->pos[1] <= p->y + 100.0f && item_seen(it, p);
 }
 
-static void take_pickup(ItemRec* it, EvAction* out)
+// Takes it and gives its message
+const char* ev_pickup_take(int i)
 {
+	if (i < 0 || (u32)i >= s_nitems)
+		return NULL;
+	ItemRec* it = &s_items[i];
 	ev_flag_set(it->flag + 1, true);
 	ev_give_item(it->gives_item, ev_item_get_amount(it->gives_item));
 	prog_stat_item_get(it->gives_item);   // ItemGet counts the pickup (0x49e310)
+	return msg_get(&s_common, it->system_message);
+}
+
+static void take_pickup(int i, EvAction* out)
+{
 	memset(out, 0, sizeof *out);
-	out->kind = EV_MESSAGE;
+	out->kind = EV_PROGRAM;
 	out->event = -1;
-	out->text = msg_get(&s_common, it->system_message);
+	prog_start_pickup(i);                 // prog.c
 }
 
 static bool items_update(const EvPlayer* p, EvAction* out)
@@ -978,7 +992,7 @@ static bool items_update(const EvPlayer* p, EvAction* out)
 	for (u32 i = 0; i < s_nitems; i++) {
 		ItemRec* it = &s_items[i];
 		if (item_reachable(it, p) && look_point(p->x, p->z, p->yaw, it->pos[0], it->pos[2], 400.0f)) {
-			take_pickup(it, out);
+			take_pickup((int)i, out);
 			return true;
 		}
 	}
@@ -1029,7 +1043,7 @@ static bool reach_assist(const EvPlayer* p, EvAction* out)
 			bd = d, best_item = (int)i, best_ev = -1;
 	}
 	if (best_item >= 0) {
-		take_pickup(&s_items[best_item], out);
+		take_pickup(best_item, out);
 		return true;
 	}
 	if (best_ev >= 0) {

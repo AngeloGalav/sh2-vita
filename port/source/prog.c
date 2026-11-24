@@ -452,6 +452,8 @@ bool prog_player_locked(void) { return s_running && s_p.locked; }
 
 void prog_abort(void)
 {
+	combat_event_stop();
+	ev_pickup_hold(-1);
 	s_running = false;
 	s_demo_no = 0;
 	p_panel(NULL);
@@ -518,6 +520,7 @@ bool prog_update(u32 down, u32 held, float dt)
 	// EventExecProgram: the rslt1 flag is set when the program returns nonzero
 	if (s_p.flag_set && s_p.flag)
 		ev_flag_set(s_p.flag, true);
+	combat_event_stop();
 	s_running = false;
 	s_demo_no = 0;                   // prog_update is not called again until the next program
 	p_panel(NULL);
@@ -530,6 +533,25 @@ bool prog_update(u32 down, u32 held, float dt)
 // 0x53adb0: James plays one of the stage's own motions (20001, 20002, ...); 0x5394c0: it has played out.
 void p_motion(int id) { combat_event_motion(id); }
 bool p_motion_done(void) { return !combat_event_playing(); }
+
+int p_bend(Prog* p)
+{
+	if (p->sub == 0) {
+		combat_event_motion(20001);
+		p->sub = 1;
+		return 0;
+	}
+	return combat_event_held();
+}
+
+int p_rise(Prog* p)
+{
+	if (p->sub == 0) {
+		combat_event_release();
+		p->sub = 1;
+	}
+	return !combat_event_playing();
+}
 void p_lock(Prog* p, bool on) { p->locked = on; }
 void p_fade(int type) { if (s_host.fade) s_host.fade(type); }
 void p_se(int id) { if (s_host.se) s_host.se(id); }
@@ -904,8 +926,19 @@ void p_item_lose(int item)
 int p_item_get(Prog* p, int item, int msg)
 {
 	switch (p->sub) {
-	case 0:
+	case 0: {
+		// 0x4a1fb0: he bends down for an item whose model is at most 100 above his feet
 		p->locked = true;
+		float me[3], yaw, y;
+		p_player(me, &yaw);
+		if (stagemdl_item_y(item, &y) && me[1] - y < 100.0f)
+			combat_event_motion(20001);
+		p->sub = 9;
+	}
+		// fallthrough
+	case 9:
+		if (!combat_event_held())
+			return 0;
 		message(ev_stage_message(msg));
 		p_se(0x2b21);
 		p->sub = 3;
@@ -914,12 +947,48 @@ int p_item_get(Prog* p, int item, int msg)
 		if (message_open())
 			return 0;
 		p_item_get_now(item);
+		stagemdl_item_taken(item);
+		combat_event_release();
+		p->sub = 8;
+		// fallthrough
+	case 8:
+		if (combat_event_playing())
+			return 0;
 		p->locked = false;
 		p->sub = 0xb;
 		// fallthrough
 	default:
 		return 1;
 	}
+}
+
+// 0x48c3a0: a pickup (a drink, rounds): he bends down for a low one, takes it, its model goes as the message
+// closes and he stands up. The world waits (0x79b830).
+static int pickup_prog(Prog* p)
+{
+	PROG_BEGIN(p)
+		float me[3], yaw;
+		p_player(me, &yaw);
+		p->work[1] = ev_pickup_low(p->work[0], me[1]);
+	PROG_STEP(p, 4, !p->work[1] || p_bend(p))
+		ev_pickup_hold(p->work[0]);
+		message(ev_pickup_take(p->work[0]));
+		p_se(0x2b21);
+	PROG_STEP(p, 2, !message_open())
+		ev_pickup_hold(-1);
+	PROG_STEP(p, 5, !p->work[1] || p_rise(p))
+		p_lock(p, false);
+	PROG_END(p)
+}
+
+void prog_start_pickup(int i)
+{
+	s_fn = pickup_prog;
+	s_running = true;
+	memset(&s_p, 0, sizeof s_p);
+	s_p.stage = ev_stage();
+	s_p.locked = true;
+	s_p.work[0] = i;
 }
 
 int p_item_get_quiet(Prog* p, int item, int msg)

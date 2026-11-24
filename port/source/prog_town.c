@@ -252,9 +252,11 @@ static int s05_spana_note(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "out_p_spana"))
 	PROG_STEP(p, 10, p_message(p, 0x20))
 		p_picture_hide();
+	PROG_STEP(p, 1, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -359,6 +361,12 @@ static int s05_memo_falled(Prog* p)
 	switch (p->step) {
 	case 0:
 		p_lock(p, true);
+		p->step = 0x10, p->sub = 0;
+		// fallthrough
+	case 0x10:
+		if (!p_bend(p))
+			return 0;
+		p->sub = 0;
 		if (p_flag(51) ? p_flag(50) : (p_flag(52) || p_flag(54) || p_flag(58) || p_flag(56) || p_flag(610)))
 			PROG_JUMP(p, 0x1f);
 		p->step = 0x1e, p->sub = 0;
@@ -375,6 +383,11 @@ static int s05_memo_falled(Prog* p)
 			p->work[0]++;
 			p->sub = 0;
 		}
+		p->step = 1, p->sub = 0;
+		// fallthrough
+	case 1:
+		if (!p_rise(p))
+			return 0;
 		// fallthrough
 	default:
 		for (int i = 0; i < 6; i++)
@@ -426,6 +439,7 @@ static int s14_park_map(Prog* p)
 	PROG_BEGIN(p)
 		p_lock(p, true);
 	PROG_STEP(p, 0x1e, p_message(p, 0x5f))
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "out_p_outmapw"))
 		p_picture_hide();
 		if (p_flag(251) || p_flag(1536))
@@ -433,6 +447,7 @@ static int s14_park_map(Prog* p)
 	PROG_STEP(p, 0x1c, p_map_mark(p, 3))       // the hotel goes onto the map
 	PROG_STEP(p, 0x1f, p_message(p, 0x6e))
 	case 0xd:
+	PROG_STEP(p, 1, p_rise(p))
 		p_set(1536);                    // FLAGW_1536 |= 1
 		p_set(1530);                    // FLAGW_1504 |= 0x4000000
 		p_lock(p, false);
@@ -592,6 +607,7 @@ static int s14_use_wrench(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "out_statuebox"))
 	PROG_STEP(p, 9, p_item_use(p, 0x3a, 0x49, 0))
 	PROG_STEP(p, 0x12, p_item_get_quiet(p, 0x28, 0x4a))

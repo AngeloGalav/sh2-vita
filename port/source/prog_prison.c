@@ -68,7 +68,9 @@ static int s30_get_spiral_key(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 0xf, p_item_get_quiet(p, 0x29, 5))
+	PROG_STEP(p, 1, p_rise(p))
 		p_set(269);                     // FLAGW_256 |= 0x12000
 		p_set(272);
 		p_lock(p, false);
@@ -138,6 +140,7 @@ static int s30_use_spiral_key(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x10, p_bend(p))
 	PROG_STEP(p, 10, p_item_use(p, 0x29, 6, 0x2b39))
 		p_se(0x2b36);
 		p_set(271);                     // FLAGW_256 |= 0x8000
@@ -209,12 +212,14 @@ static int s31_try_open_floor(Prog* p)
 	PROG_BEGIN(p)
 		p_set(2038);                    // FLAGW_2016 |= 0x400000
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "dls_p_pull_off"))
 	PROG_STEP(p, 10, p_message(p, p_flag(280) ? 5 : p_flag(281) ? 6 : p_flag(282) ? 4 : 7))
 		p_clear(280);                   // FLAGW_256 &= 0xf8ffffff
 		p_clear(281);
 		p_clear(282);
 		p_picture_hide();
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -227,10 +232,12 @@ static int s31_success_open_floor(Prog* p)
 		p_set(2038);                    // FLAGW_2016 |= 0xc00000
 		p_set(2039);
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 	PROG_STEP(p, 2, p_picture(p, "dls_p_pull_on"))
 		p_picture_hide();
 		p_se(0x4658);
 		p_place(-102900.0f, 0.0f, 89000.0f, -1.5707964f);
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }
@@ -510,12 +517,14 @@ static int s35_news_of_papa(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
+	PROG_STEP(p, 0x1b, p_bend(p))
 		if (p_flag(331))
 			PROG_JUMP(p, 2);
 	PROG_STEP(p, 10, p_message(p, 1))
 	PROG_STEP(p, 2, p_picture(p, "dls_p_newspaper"))
 	PROG_STEP(p, 7, p_message(p, 0))
 		p_picture_hide();
+	PROG_STEP(p, 0x1c, p_rise(p))
 		p_lock(p, false);
 	PROG_END(p)
 }

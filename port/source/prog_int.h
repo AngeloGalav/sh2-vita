@@ -76,6 +76,8 @@ int p_wait(Prog* p, float seconds);                 // timer on p->timer
 
 void p_motion(int id);                              // 0x53adb0
 bool p_motion_done(void);                           // 0x5394c0
+int p_bend(Prog* p);                                // 0x53adb0 0x4e21 + 0x53ad70: James bends down and stays
+int p_rise(Prog* p);                                // 0x539490 + 0x5394c0: and stands up
 void p_lock(Prog* p, bool on);                      // JmsEventMode
 void p_cursor_start(void);                          // the cursor over a still, in its middle
 void p_cursor(Prog* p);                             // 0x4a25c0: one frame of it, every frame it shows

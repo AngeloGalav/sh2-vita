@@ -87,6 +87,9 @@ int ev_items_lying(float (*out)[3], int max);
 // and turn; and whether it lies there now (not taken, and EventItemConditionCheck's model test).
 bool ev_pickup_place(int i, int* item, float pos[3], float* rot_y);
 bool ev_pickup_shown(int i);
+void ev_pickup_hold(int i);                        // shown though taken (-1: none)
+bool ev_pickup_low(int i, float y);
+const char* ev_pickup_take(int i);
 // Item combinations (PC 0x891858 / 0x49e900): the result id for up to three items (0 unused), 0 if
 // they do not combine; whether James has a result's parts; ItemLose of an item or a result's parts.
 int ev_combine(int a, int b, int c);
