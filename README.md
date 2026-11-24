@@ -19,11 +19,14 @@ sh2-vita plays Silent Hill 2 from the PC version's own data, as native code on t
 
 ## What it does
 
+- The main scenario (*Letter from Silent Heaven*) and *Born From a Wish*, with the movies, the scenes' voices and the subtitles
 - Runs at the display's 960 x 544, at a steady 30 fps in most of the game
 - Single-screen menus: title, pause, items, options, save and load, map, drawn after the original game's
+- Enemies, combat, camera and puzzles ported from the PC's code, compared with the original game running side by side
+- The Enhanced Edition's fixes, high resolution font, art, maps and picture set, and its soft shadows
 - Textures in DXT straight from the PC's pixels, with their mipmaps
 - The fog drawn on a smaller target, with a choice of detail in the options
-- The Enhanced Edition's high resolution font, art and maps
+- Saves from the PC version, converted with `tools/pcsave.py` ([how](port/vita/README.md#saves-from-the-pc))
 
 ## Install
 
@@ -102,7 +105,7 @@ The first time each shader is needed it is compiled and kept on the card, so the
 | Circle | Flashlight on / off | Back |
 | Square | Run (with R held, standing: guard) | |
 | Triangle | Map | |
-| L | Camera behind James | Previous Options page |
+| L | Look ahead, the camera behind James (hold) | Previous Options page |
 | R | Ready the weapon (aim) | Next Options page |
 | START | Inventory | Skip a movie (Cross skips too) |
 | SELECT | Pause menu | |
@@ -110,9 +113,11 @@ The first time each shader is needed it is compiled and kept on the card, so the
 | Right stick | Camera (targets while aiming) | |
 | Rear touch pad's lower corners | Strafe; both together turn James round | |
 
+This is the layout of [sh3-vita](https://github.com/AngeloGalav/sh3-vita). Kicks and stomps are Cross with the weapon down, on an enemy on the floor. On the picture puzzles with buttons (the elevators) the left stick or the D-Pad moves a cursor and Cross presses.
+
 The next weapon, quick heal and quick turn have no button by default; bind one in *Options*, *Controls*, *Buttons* (a D-Pad direction bound to an action no longer moves James).
 
-In menus, Cross confirms and Circle goes back, whatever the console's own setting. Actions can be rebound in *Options*, *Controls*, *Buttons*. More in [CONTROLS.md](port/CONTROLS.md).
+In menus, Cross confirms and Circle goes back, whatever the console's own setting. Every action can be rebound in *Options*, *Controls*, *Buttons*, where *Defaults* brings this layout back. More in [CONTROLS.md](port/CONTROLS.md).
 
 ## Status
 
@@ -128,10 +133,12 @@ The game is ported by reading the PC executable in Ghidra and translating its fu
 | --- | --- |
 | [port/vita/README.md](port/vita/README.md) | How the Vita layer works |
 | [port/STATUS.md](port/STATUS.md) | What works and what differs from the PC |
+| [port/CONTROLS.md](port/CONTROLS.md), [port/UI.md](port/UI.md) | Controls and the interface |
+| [port/ENEMIES.md](port/ENEMIES.md), [port/PROGRAMS.md](port/PROGRAMS.md) | Enemies and combat; stage programs and puzzles |
 | [port/PERFORMANCE.md](port/PERFORMANCE.md) | Frame budget and streaming, from the 3DS work |
 | [docs/RESEARCH.md](docs/RESEARCH.md) | How the executable was mapped, and key addresses |
 
-To test on a console, these combinations work while holding SELECT: L changes the fog's mode, R the GPU cost test, Triangle the fog's precision and Square the ETC1 levels. `vita_log.txt` and `perf.txt` are written next to the game data.
+To test on a console, *Options*, *Debug* has the test views and logs. `tools/console/vita.sh` puts a build on the console over Wi-Fi and fetches its logs ([how](port/vita/README.md#on-the-console)). `vita_log.txt`, `perf.txt` (with the performance log on) and `stall.txt` (written when the game stops responding: attach it to a report of a freeze) are next to the game data.
 
 ## Thanks
 

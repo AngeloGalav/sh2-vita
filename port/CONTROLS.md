@@ -33,8 +33,8 @@ The layout is sh3-vita's (https://github.com/AngeloGalav/sh3-vita). L is the PC'
 view ahead of James. The guard (0x533e60) is on the PC's run key with the weapon down; here it wants R too.
 
 The right stick is the game's search camera, through James' head (`main.c`, `search_view`). Bindings
-saved in `controls.txt` win over these. Test combinations, held with SELECT: L fog, R GPU cost test,
-Triangle the fog's precision, Square ETC1 levels.
+saved in `controls.txt` win over these. The test views and logs are in
+the Options' Debug tab.
 
 ## Default layouts
 

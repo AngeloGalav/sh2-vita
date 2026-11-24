@@ -60,16 +60,15 @@ installs it from there. `vita_log.txt` starts over at every launch, so run `pull
 | `compat/c3d_shaders.c` | The six `.v.pica` programs translated to Cg, register for register |
 | `compat/c3d_gl.c` | State, render targets (FBOs in the PICA's portrait orientation), draws, the fragment programs generated from the TEV, fragment lighting, alpha test and fog state, and presenting |
 
-Input: the 3DS's A is the console's confirm button (Cross or Circle as the system is set), B the
-other, X Triangle, Y Square, L / R, START / SELECT, the left stick the Circle Pad, the right stick
+Input: the 3DS's A is Cross and B Circle, whatever the console's confirm button, X Triangle, Y Square, L / R, START / SELECT, the left stick the Circle Pad, the right stick
 the C-Stick (read with `sceCtrlPeekBufferPositive`: the "2" reads report the shoulders as L1 / R1).
 ZL / ZR are the rear touch pad's outer lower corners. The game's own default bindings on the Vita are in `controls_default` (`SH2_VITA`) and in
 `port/CONTROLS.md`. Prompts draw the PlayStation shapes; the Buttons page names them.
 
 ## Status
 
-Runs on a console: menus, rooms, characters, sound, a new game played through its first rooms.
-Vita3K freezes at the first frame of any vitaGL program (even a one-shader test), so it can't be
+Runs on a console: the game has been played from saves all through it, not yet from the start to the end
+in one go (`port/STATUS.md`). Vita3K freezes at the first frame of any vitaGL program (even a one-shader test), so it can't be
 used to check the picture. What is open, roughly in order:
 
 1. **One screen.** The game screen fills the display and there is no touch page: everything is drawn
@@ -79,22 +78,20 @@ used to check the picture. What is open, roughly in order:
    (`optmenu.c`, 0x4630c0, 0x467e70, with the port's tabs) and the file list (`savescreen.c`,
    0x4537b0). The rest (memo list, map titles, stage panels, the first run) comes from
    `touchui_draw_pc`, in the same style but not from a PC function.
-2. Check on a console: textures (the PICA's rows run top-down, so every level is flipped on
-   upload; ETC1 blocks are turned in place), the fog and lighting tables, render-to-texture.
-3. Textures: `SH2_VITA_TEX=1` packs DXT1 and DXT5 straight from the PC's pixels, each with its whole
+2. Textures: `SH2_VITA_TEX=1` packs DXT1 and DXT5 straight from the PC's pixels, each with its whole
    chain (`vitatex.py encode_png`); menu art and stills at up to 1024 wide, the font from the
    Enhanced Edition's sheet when present (`ui.py`).
-4. `C3D_SyncDisplayTransfer` and `C3D_SyncTextureCopy` do nothing yet: the game-over still
+3. `C3D_SyncDisplayTransfer` and `C3D_SyncTextureCopy` do nothing yet: the game-over still
    (`gameover.c`) is black and the screenshot (`main.c`) is empty.
-5. Resolution: 960 x 544, the display's own, at a locked 30 fps (`main.c`, `C3D_FrameEnd`). The
+4. Resolution: 960 x 544, the display's own, at a locked 30 fps (`main.c`, `C3D_FrameEnd`). The
    2x2 target (always on, `supersample.c`) is made at that size with the game's viewports scaled
    (`C3D_RenderTargetCreate`, `C3D_SetViewport`), and `C3D_AspectRatioTop` is the display's shape,
    so the 3D is 16:9 (the scenes' 4:3 framing kept by the EE's ReduceCutsceneFOV, `demo.c`). The 2D,
    laid out in 400 x 240, is drawn across the whole width, 6.7% wider than on the 3DS.
    Textures at the PC's sizes: profile.c reads the 3DS's heaps, which the layer reports as the New
    3DS's 124 MB mode (`__wrap_main`); left at 0 they had every texture halved.
-6. Memory (textures held twice).
-7. No 3D (stereo.c's right eye is never shown), no surround (`ndspSetOutputMode` mono or stereo).
+5. Memory (textures held twice).
+6. No 3D (stereo.c's right eye is never shown), no surround (`ndspSetOutputMode` mono or stereo).
 
 Shaders are compiled through vitashark directly and handed to vitaGL as programs
 (`vglShaderGxpBinary`): vitaGL's own `glCompileShader` fails on every source with this SDK.
