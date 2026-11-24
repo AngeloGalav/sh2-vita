@@ -174,6 +174,8 @@ void enemy_set_difficulty(int level);    // gActionDifficulty 0..4 (2 = normal)
 int enemy_difficulty(void);
 // Distance from (x, z) to the nearest living enemy in the room (a large value when there is none).
 float enemy_nearest(float x, float z);
+// The moths (Mary's, room 202's), after the opaque scene; bind sets the flat world program (main.c).
+void enemy_moths_draw(const C3D_Mtx* proj, const C3D_Mtx* view, void (*bind)(const C3D_Mtx* proj, const C3D_Mtx* view));
 const char* enemy_status(void);          // debug HUD line
 // Whether the room is dark (the stage record's flashlight flag, main.c s_env.dark): the enemies'
 // sight and pace depend on it (light_index). Set before each enemy_update.

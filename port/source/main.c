@@ -5686,6 +5686,8 @@ static u32 draw_top(const PictureTarget* t, const C3D_Mtx* proj, const C3D_Mtx* 
 			C3D_FogColor(s_fog_color);   // the room's fog again (blood.c fogs to black)
 			C3D_FogLutBind(&s_fog_lut);
 		}
+		if (s_cam.mode == CAM_PLAYER)
+			enemy_moths_draw(proj, mv, ui_program_flat);
 		mist_draw(proj, mv);       // the hyper spray's puffs (mist.c)
 		if (s_cam.mode == CAM_PLAYER)
 			roomfx_draw(proj, mv);     // the burning stairs' flames and smoke (roomfx.c)

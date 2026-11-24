@@ -4685,43 +4685,192 @@ static void moths_update(float dt)
 	}
 }
 
-static void moths_draw(const C3D_Mtx* view, int uModelView, int uBones)
+// 0x4a46f0: a moth is a camera-facing quad 100 across with its quarter of the sheet, white vertices and no
+// light: the sheet's black shapes, cut out by its alpha. All of them are one draw of the world program's
+// vertices: one at a time through the skinned models' path cost a draw each, and that path draws the sheet's
+// empty part too (black).
+typedef struct { float x, y, z, u, v; u8 c[4]; s8 n[4]; } MothVert;
+#define MOTH_VERTS ((MOTH_COUNT + 10) * 6)
+static MothVert* s_moth_verts[2];
+static int s_moth_buf, s_moth_n;
+
+static void moth_quad(const C3D_Mtx* view, const float at[3], int frame)
 {
-	if (!s_moths.on || !s_moth_ok)
+	MothVert* out = s_moth_verts[s_moth_buf];
+	if (!out || s_moth_n + 6 > MOTH_VERTS)
 		return;
-	// the view's rotation transposed turns the quads to the camera; 100 units across
-	float rot[3][3];
-	for (int i = 0; i < 3; i++) {
-		rot[i][0] = view->r[0].c[3 - i] * 100.0f;
-		rot[i][1] = view->r[1].c[3 - i] * 100.0f;
-		rot[i][2] = view->r[2].c[3 - i] * 100.0f;
+	MothVert c[4];
+	for (int k = 0; k < 4; k++) {
+		float sx = k == 1 || k == 2 ? 50.0f : -50.0f, sy = k < 2 ? 50.0f : -50.0f;   // the sheet's top is up
+		c[k].x = at[0] + view->r[0].x * sx + view->r[1].x * sy;
+		c[k].y = at[1] + view->r[0].y * sx + view->r[1].y * sy;
+		c[k].z = at[2] + view->r[0].z * sx + view->r[1].z * sy;
+		c[k].u = (float)(frame & 1) * 0.5f + (sx > 0.0f ? 0.5f : 0.0f);
+		c[k].v = (float)(frame >> 1) * 0.5f + (sy > 0.0f ? 0.0f : 0.5f);
+		memset(c[k].c, 0xff, 4);
+		c[k].n[0] = c[k].n[2] = c[k].n[3] = 0, c[k].n[1] = -127;
 	}
-	float at[3] = { s_moths.cx, s_moths.cy, s_moths.cz };
-	chrlight_at(at, false);
+	static const u8 tri[6] = { 0, 1, 2, 0, 2, 3 };
+	for (int k = 0; k < 6; k++)
+		out[s_moth_n++] = c[tri[k]];
+}
+
+static void moths_quads(const C3D_Mtx* view)
+{
+	if (!s_moths.on)
+		return;
 	for (int k = 0; k < MOTH_COUNT; k++) {
 		// a fixed pseudo-random orbit per moth
 		float a = k * 2.399963f, sp = 0.6f + (k % 7) * 0.12f, h = ((k * 37) % 11 - 5) * 0.12f;
 		float ang = a + s_moths.t * sp * (k & 1 ? 1.0f : -1.0f);
 		float r = s_moths.spread * (0.35f + ((k * 53) % 13) / 19.0f);
-		float x = s_moths.cx + cosf(ang) * r;
-		float z = s_moths.cz + sinf(ang) * r;
-		float y = s_moths.cy + h * s_moths.spread + sinf(s_moths.t * 7.0f + k) * 40.0f;
-		C3D_Mtx model, mv;
-		Mtx_Identity(&model);
-		Mtx_Translate(&model, x, y, z, true);
-		Mtx_Multiply(&mv, view, &model);
-		C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uModelView, &mv);
+		float at[3] = { s_moths.cx + cosf(ang) * r, s_moths.cy + h * s_moths.spread + sinf(s_moths.t * 7.0f + k) * 40.0f,
+		                s_moths.cz + sinf(ang) * r };
 		// 0x400 per tick on a 0x2580 cycle of four frames, at 60 ticks a second
-		int frame = (int)((s_moths.t * 60.0f * 1024.0f + k * 2400.0f) / 2400.0f) & 3;
-		for (int b = 0; b < 4; b++) {
-			Mtx34* m = &s_moth_chr.skin[b];
-			memset(m, 0, sizeof *m);
-			if (b == frame)
-				for (int i = 0; i < 3; i++)
-					m->m[i][0] = rot[i][0], m->m[i][1] = rot[i][1], m->m[i][2] = rot[i][2];
-		}
-		chr_draw(&s_moth_chr, uBones);
+		moth_quad(view, at, (int)((s_moths.t * 60.0f * 1024.0f + k * 2400.0f) / 2400.0f) & 3);
 	}
+}
+
+// The moths of Wood Side's room 202 (PC room 0x16): the stage's room function (0x59bba0) calls enSetInsect
+// (0x4ab430) with five of them round (-22800, -700, 59200), in the state 4 (0x4abf40) of EnLOCAL kind 15
+// (0x4ac070); leaving the room takes them away (0x4ab1c0). They fly round that point at 500, and while
+// James' lamp is on (0x1f7fa28) with no wall between, round a point 600 ahead of him at 1500: a step of
+// noise in the heading, the speed and the height each (0x4ab780, at 30 a second here). Each is drawn twice,
+// the second quad 25 from the first on an arm that turns about all three axes (0x4a46f0, EnINS_DATA
+// view_rot, rot_add, twin_dist). Stand-in: at a wall (0x4ab5d0) a moth only stops short of it.
+#define ROOM_MOTHS 5
+static struct {
+	bool on;
+	float t;                 // until the next 1/30 s step
+	struct { float x, y, z, yaw, tv, spd, sv, ydv, rot[3], rv[3], twin, twv; int cyc; } m[ROOM_MOTHS];
+} s_rm;
+static const float k_moth_home[3] = { -22800.0f, -700.0f, 59200.0f };    // 0x8e5f24
+
+static void room_moth_step(int i, const EnPlayer* p)
+{
+	float tx = k_moth_home[0], ty = k_moth_home[1], tz = k_moth_home[2], turn = 0.0872665f, speed = 500.0f;
+	if (p->light && p->alive) {
+		float cx = p->x, cz = p->z;
+		if (s_col)
+			col_clamp_ray(s_col, s_rm.m[i].x, s_rm.m[i].z, &cx, &cz, p->y - 500.0f);
+		if (fabsf(cx - p->x) + fabsf(cz - p->z) < 40.0f) {
+			tx = p->x + sinf(p->yaw) * 600.0f, tz = p->z + cosf(p->yaw) * 600.0f;
+			turn = 0.174533f, speed = 1500.0f;
+		}
+	}
+	s_rm.m[i].yaw = wrap(s_rm.m[i].yaw + rnd_signed(-0.523599f, 0.1f));
+	s_rm.m[i].spd = 500.0f;                       // (its slv never leaves 0, so each step starts over)
+	s_rm.m[i].ydv = (rnd_signed(-250.0f, 0.1f) + s_rm.m[i].ydv - (s_rm.m[i].y - ty) * 0.05f) * 0.95f;
+	float d = wrap(dir_to(s_rm.m[i].x, s_rm.m[i].z, tx, tz) - s_rm.m[i].yaw);
+	s_rm.m[i].tv = 0.9f * s_rm.m[i].tv + d * 0.1f;
+	float step = s_rm.m[i].tv, lim = turn * 2.0f;  // 0x4a6d60: p3 x 60 a second
+	s_rm.m[i].yaw = wrap(s_rm.m[i].yaw + (step > lim ? lim : step < -lim ? -lim : step));
+	s_rm.m[i].sv = (rnd_signed(-250.0f, 0.1f) + s_rm.m[i].sv - (s_rm.m[i].spd - speed) * 0.1f) * 0.98f;
+	s_rm.m[i].spd += s_rm.m[i].sv;
+	if (s_rm.m[i].spd < speed * 0.5f || s_rm.m[i].spd > speed * 2.0f)
+		s_rm.m[i].spd = s_rm.m[i].spd < speed * 0.5f ? speed * 0.5f : speed * 2.0f, s_rm.m[i].sv = 0.0f;
+	const float dt = 1.0f / 30.0f;
+	float nx = s_rm.m[i].x + sinf(s_rm.m[i].yaw) * s_rm.m[i].spd * dt;
+	float nz = s_rm.m[i].z + cosf(s_rm.m[i].yaw) * s_rm.m[i].spd * dt;
+	s_rm.m[i].y += s_rm.m[i].ydv * 3.0f * dt;
+	if (s_col) {
+		float cx = nx, cz = nz;
+		col_clamp_ray(s_col, s_rm.m[i].x, s_rm.m[i].z, &cx, &cz, s_rm.m[i].y);
+		if (fabsf(cx - nx) + fabsf(cz - nz) > 1.0f)
+			nx = s_rm.m[i].x, nz = s_rm.m[i].z;
+	}
+	s_rm.m[i].x = nx, s_rm.m[i].z = nz;
+	for (int k = 0; k < 3; k++)
+		s_rm.m[i].rot[k] = wrap(s_rm.m[i].rot[k] + s_rm.m[i].rv[k] * dt);
+	s_rm.m[i].twv = (rnd_signed(-5.0f, 0.1f) + s_rm.m[i].twv - (s_rm.m[i].twin - 25.0f) * 0.05f) * 0.95f;
+	s_rm.m[i].twin += s_rm.m[i].twv;
+	s_rm.m[i].cyc = (s_rm.m[i].cyc + 0x800) % 0x2580;   // 0x400 a tick of 1/60 s
+}
+
+static void room_moths_update(const EnPlayer* p, float dt)
+{
+	bool here = s_stage == 7 && bgm_room_id(ev_glb_crd(), p->x, p->z) == 0x16;
+	if (!here) {
+		s_rm.on = false;
+		return;
+	}
+	if (!s_rm.on) {
+		moths_load();
+		memset(&s_rm, 0, sizeof s_rm);
+		for (int i = 0; i < ROOM_MOTHS; i++) {
+			s_rm.m[i].x = k_moth_home[0] + (rnd() * 2.0f - 1.0f) * 500.0f;
+			s_rm.m[i].y = k_moth_home[1] + (rnd() * 2.0f - 1.0f) * 500.0f;
+			s_rm.m[i].z = k_moth_home[2] + (rnd() * 2.0f - 1.0f) * 500.0f;
+			s_rm.m[i].spd = 500.0f, s_rm.m[i].twin = 25.0f;
+			s_rm.m[i].yaw = rnd() * 6.2831853f;
+			for (int k = 0; k < 3; k++) {
+				s_rm.m[i].rot[k] = (rnd() * 2.0f - 1.0f) * 3.1415927f;
+				s_rm.m[i].rv[k] = (rnd() * 2.0f - 1.0f) * 12.566371f;
+			}
+			s_rm.m[i].cyc = (int)(rnd() * 0x2580);
+		}
+		s_rm.on = true;
+	}
+	for (s_rm.t += dt; s_rm.t >= 1.0f / 30.0f; s_rm.t -= 1.0f / 30.0f)
+		for (int i = 0; i < ROOM_MOTHS; i++)
+			room_moth_step(i, p);
+}
+
+static void room_moths_quads(const C3D_Mtx* view)
+{
+	if (!s_rm.on)
+		return;
+	for (int i = 0; i < ROOM_MOTHS; i++) {
+		float at[3] = { s_rm.m[i].x, s_rm.m[i].y, s_rm.m[i].z };
+		int frame = s_rm.m[i].cyc / 2400 & 3;
+		moth_quad(view, at, frame);
+		C3D_Mtx r;
+		Mtx_Identity(&r);
+		Mtx_RotateZ(&r, s_rm.m[i].rot[2], true);
+		Mtx_RotateY(&r, s_rm.m[i].rot[1], true);
+		Mtx_RotateX(&r, s_rm.m[i].rot[0], true);
+		C3D_FVec o = Mtx_MultiplyFVec4(&r, FVec4_New(s_rm.m[i].twin, s_rm.m[i].twin, s_rm.m[i].twin, 0.0f));
+		at[0] += o.x, at[1] += o.y, at[2] += o.z;
+		moth_quad(view, at, frame);
+	}
+}
+
+void enemy_moths_draw(const C3D_Mtx* proj, const C3D_Mtx* view, void (*bind)(const C3D_Mtx* proj, const C3D_Mtx* view))
+{
+	if ((!s_moths.on && !s_rm.on) || !s_moth_ok || !s_moth_chr.tex_ok[0])
+		return;
+	for (int i = 0; i < 2; i++)
+		if (!s_moth_verts[i])
+			s_moth_verts[i] = linearAlloc(MOTH_VERTS * sizeof(MothVert));
+	if (!s_moth_verts[0] || !s_moth_verts[1])
+		return;
+	s_moth_buf ^= 1;
+	s_moth_n = 0;
+	moths_quads(view);
+	room_moths_quads(view);
+	if (!s_moth_n)
+		return;
+	MothVert* base = s_moth_verts[s_moth_buf];
+	GSPGPU_FlushDataCache(base, (u32)s_moth_n * sizeof *base);
+	bind(proj, view);
+	C3D_DepthMap(true, -1.0f, 0.0f);
+	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_COLOR);
+	C3D_AlphaTest(true, GPU_GREATER, 0);
+	C3D_CullFace(GPU_CULL_NONE);
+	C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ZERO, GPU_ONE);
+	C3D_TexEnv* env = C3D_GetTexEnv(0);
+	C3D_TexEnvInit(env);
+	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
+	C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+	C3D_TexEnvInit(C3D_GetTexEnv(1));
+	C3D_TexEnvInit(C3D_GetTexEnv(2));
+	C3D_TexBind(0, &s_moth_chr.tex[0]);
+	C3D_BufInfo* bi = C3D_GetBufInfo();
+	BufInfo_Init(bi);
+	BufInfo_Add(bi, base, sizeof(MothVert), 4, 0x3210);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, s_moth_n);
+	C3D_AlphaTest(false, GPU_ALWAYS, 0);
+	C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
 }
 
 static void bos_moths(Enemy* e, const EnPlayer* p, float dt)
@@ -6294,6 +6443,11 @@ void enemy_exit(void)
 	maria_exit();
 	if (s_moth_ok)
 		chr_free(&s_moth_chr);
+	for (int i = 0; i < 2; i++) {
+		linearFree(s_moth_verts[i]);
+		s_moth_verts[i] = NULL;
+	}
+	s_moths.on = s_rm.on = false;
 	s_moth_ok = s_moth_tried = false;
 	s_moths.on = false;
 	for (int m = 0; m < MDL_COUNT; m++) {
@@ -6382,6 +6536,7 @@ void enemy_clear(void)
 	memset(s_comm, 0, sizeof s_comm);
 	s_col = NULL;
 	s_moths.on = false;
+	s_rm.on = false;
 }
 
 // The model of an Enemy_List kind, -1 for kinds the port does not spawn from the list
@@ -6665,6 +6820,7 @@ void enemy_update(const EnPlayer* p, float dt)
 		spawn_list(s_stage, s_col);
 	}
 	moths_update(dt);
+	room_moths_update(p, dt);
 	for (int i = 0; i < 8; i++)
 		if (s_comm[i].time > 0.0f)
 			s_comm[i].time -= pc_frames(dt);
@@ -6776,7 +6932,6 @@ void enemy_draw(const C3D_Mtx* view, int uModelView, int uBones, float dt)
 		shadow_cast(c, at, e->yaw);     // its flashlight shadow, if it has a .kg1 (shadow.c)
 		chr_draw(c, uBones);
 	}
-	moths_draw(view, uModelView, uBones);
 	maria_draw(view, uModelView, uBones);
 }
 
