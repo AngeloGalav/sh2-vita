@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "gamecam.h"
 #include "sfx.h"
 #include <stdio.h>
 #include <string.h>
@@ -763,13 +764,22 @@ static int s12_apart_boss_siren(Prog* p)
 }
 
 // 0x5964e0 EvProgApartBossEnd: the siren, Pyramid Head leaves; four seconds of camera.
+// its shot (0x8e2040, 0x8e2050, roll 0x8e2070) for four seconds (_DAT_006318a4); the light that goes with
+// it (0x47b6c0 with 0x8e2020 / 0x8e2030) is not ported
+static int boss_end_shot(Prog* p)
+{
+	static const float eye[3] = { 99438.0f, -3961.0f, -100124.0f }, at[3] = { 99438.375f, -3960.13f, -100123.688f };
+	gamecam_event(eye, at, 0.196f, 0.0f);
+	return p_wait(p, 4.0f);
+}
+
 static int s12_apart_boss_end(Prog* p)
 {
 	PROG_BEGIN(p)
 		p_lock(p, true);
 		p_se(0x4a4f);
 		p_set(147);                     // FLAGW_128 |= 0x80000
-	PROG_STEP(p, 0x16, p_wait(p, 4.0f))      // _DAT_006318a4
+	PROG_STEP(p, 0x16, boss_end_shot(p))
 		p_set(148);
 		p_lock(p, false);
 	PROG_END(p)
