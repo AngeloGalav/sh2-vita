@@ -585,6 +585,24 @@ static void room_enter(int stage, int room)
 		if (room == 0x79 && !p_flag(332))
 			p_clear(633);
 		break;
+	case 36:
+		// 0x5803c0: the ropes hang lower where they were pulled (355..360); the corpses' room takes the pulls
+		// back when no key is there (343..348) and sets 365.
+		if (room == 0x8c)
+			for (int i = 0; i < 6; i++)
+				stagemdl_lift(0x41c, i, p_flag(355 + i) ? 155.5f : 0.0f);
+		else if (room == 0x8b) {
+			bool key = false;
+			for (int i = 343; i <= 348; i++)
+				key = key || p_flag(i);
+			for (int i = 355; !key && i <= 360; i++)
+				if (p_flag(i)) {
+					p_clear(i);
+					p_set(365);
+					p_enemy_list();
+				}
+		}
+		break;
 	case 56:
 		// 0x571a30: leaving the candle's light (710) for another room puts it out
 		if (p_flag(710))

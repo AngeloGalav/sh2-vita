@@ -29,6 +29,7 @@ bool stagemdl_npc_kind_here(int kind);   // skin program and lights bound
 void stagemdl_music_box(float seconds);
 // Stage code turning a placed model (the cube in the labyrinth, 0x582bd0): the angles are added to
 // the place's turn of every model of that kind, until set again (0, 0, 0 puts it back).
+void stagemdl_lift(int kind, int idx, float dy);   // the idx-th place of the kind, dy lower
 void stagemdl_turn(int kind, float rx, float ry, float rz);
 // Stage code moving one bone of a placed model (the labyrinth lift's gates, 0x5831aa): the offset is
 // added to the bone's own place, until set again.

@@ -313,6 +313,32 @@ void stagemdl_prefetch(int stage, float x, float z, void (*want)(const char* pat
 
 void stagemdl_music_box(float seconds) { s_play = seconds; }
 
+static struct { int kind, idx; float dy; } s_lift[8];
+
+// The idx-th of the stage's models of that kind stands dy lower (Y down) than its place says.
+void stagemdl_lift(int kind, int idx, float dy)
+{
+	int k = 0;
+	while (k < 7 && s_lift[k].kind && (s_lift[k].kind != kind || s_lift[k].idx != idx))
+		k++;
+	s_lift[k].kind = kind, s_lift[k].idx = idx, s_lift[k].dy = dy;
+}
+
+static float place_lift(int i)
+{
+	for (int k = 0; k < 8; k++)
+		if (s_lift[k].kind == s_places[i].kind) {
+			int n = 0;
+			for (int j = 0; j < i; j++)
+				n += s_places[j].kind == s_places[i].kind;
+			for (k = 0; k < 8; k++)
+				if (s_lift[k].kind == s_places[i].kind && s_lift[k].idx == n)
+					return s_lift[k].dy;
+			return 0.0f;
+		}
+	return 0.0f;
+}
+
 static struct { int kind; float r[3]; } s_turn[4];
 
 void stagemdl_turn(int kind, float rx, float ry, float rz)
@@ -732,7 +758,7 @@ void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones)
 			continue;
 		C3D_Mtx model, mv;
 		Mtx_Identity(&model);
-		Mtx_Translate(&model, p->pos[0], p->pos[1], p->pos[2], true);
+		Mtx_Translate(&model, p->pos[0], p->pos[1] + place_lift(i), p->pos[2], true);
 		float r[3] = { p->rot[0], p->rot[1], p->rot[2] };
 		for (int k = 0; k < 4; k++)
 			if (s_turn[k].kind == p->kind)
