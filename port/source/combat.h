@@ -131,8 +131,6 @@ bool combat_dying(void);                       // the death animation, or dead
 // James' push column for enemy_push_apart, once a frame: its radius (0: none) and how far ahead of
 // his feet it stands, eased toward what his state and weapon ask for (the PC's 0x52ed60 / 0x534d70).
 void combat_column(float dt, float* radius, float* ahead);
-// Seconds since the killing blow while dying or dead, else 0 (main.c draws the screen bleeding to red).
-float combat_dying_time(void);
 // Seconds since the last blow that took health (main.c flashes the screen red), large when none.
 float combat_hit_time(void);
 

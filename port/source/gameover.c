@@ -164,7 +164,7 @@ void gameover_draw_back(void)
 #endif
 	if (!s_on)
 		return;
-	// The frame James fell in, already bled red by the dying veil (main.c draw_dying), keeps sinking
+	// The frame James fell in keeps sinking
 	// under the text with a slow beat and goes to black as the text leaves. It closes in all along.
 	float bleed = smooth(s_all / 4.0f);
 	float bright = 1.0f - 0.4f * bleed + 0.04f * sinf(s_all * 5.7f) * bleed;   // about a beat a second

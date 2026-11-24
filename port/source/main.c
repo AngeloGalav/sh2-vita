@@ -5648,6 +5648,12 @@ static const PtHost s_pt_host = {
 	pt_inv_index, pt_collision, james_can_see,
 };
 
+// James is dead (0x1fbad17 2, when his damage motion is over): EventMain (0x48ecb0) goes to the game over with
+// 0x4ee620(1, 2.0), which keeps the last frame (0x478860, 0x4774d0) and takes it to black over two seconds,
+// with the sound stopped; 0x498780 goes on from there. Here the world stands still and is drawn under the fade.
+#define OVER_FADE 2.0f
+static float s_over_t;               // into the fade, 0 in play
+
 static void pt_frame(u32* down, u32* held, float dt)
 {
 	PtState st = {
@@ -5661,25 +5667,7 @@ static void pt_frame(u32* down, u32* held, float dt)
 	playtest_frame(&st, down, held, dt);
 }
 
-// The screen as James dies: a red veil deepening over two and a half seconds and the edges darkening
-// (font.h quads, flat with a colour per corner). 3DS-only; the PC cuts to the game over's black.
-static void draw_dying(float t)
-{
-	float k = t / 2.5f;
-	k = k > 1.0f ? 1.0f : k;
-	k = k * k * (3.0f - 2.0f * k);
-	u32 veil = 0x5a0a0800u | (u32)(150.0f * k);
-	const u32 all[4] = { veil, veil, veil, veil };
-	font_quad_px(NULL, 0.0f, 0.0f, 400.0f, 240.0f, 0, 0, 0, 0, all);
-	u32 e = (u32)(200.0f * k), o = 0;
-	const u32 l[4] = { e, o, e, o }, r[4] = { o, e, o, e }, tp[4] = { e, e, o, o }, b[4] = { o, o, e, e };
-	font_quad_px(NULL, 0.0f, 0.0f, 140.0f, 240.0f, 0, 0, 0, 0, l);
-	font_quad_px(NULL, 260.0f, 0.0f, 400.0f, 240.0f, 0, 0, 0, 0, r);
-	font_quad_px(NULL, 0.0f, 0.0f, 400.0f, 80.0f, 0, 0, 0, 0, tp);
-	font_quad_px(NULL, 0.0f, 160.0f, 400.0f, 240.0f, 0, 0, 0, 0, b);
-}
-
-// A blow that takes James' health: the same red as the dying veil, gone in a third of a second (3DS-only).
+// A blow that takes James' health: red, gone in a third of a second (3DS-only; not for the one that kills).
 static void draw_hit(float t)
 {
 	float k = 1.0f - t / 0.35f;
@@ -5876,12 +5864,7 @@ after_world:
 		if (cross > 0.0f && s_state == ST_GAME && s_cam.mode == CAM_PLAYER && !demo_active() && !s_pic_shown &&
 		    !s_inv_open && !s_paused && !(prog_running() && prog_player_locked()) && !combat_dying())
 			draw_low_health(ortho, cross * (1.0f - black));
-		// 3DS-only: from the killing blow the picture bleeds to dark red and the edges close in, the
-		// way into the game over's still (gameover.c)
-		float dying = combat_dying_time();
-		if (dying > 0.0f && s_state == ST_GAME && s_cam.mode == CAM_PLAYER && !demo_active())
-			draw_dying(dying);
-		else if (combat_hit_time() < 0.35f && s_state == ST_GAME && s_cam.mode == CAM_PLAYER && !demo_active())
+		if (combat_hit_time() < 0.35f && !combat_dying() && s_state == ST_GAME && s_cam.mode == CAM_PLAYER && !demo_active())
 			draw_hit(combat_hit_time());
 		float dim = (s_paused && !optmenu_brightness()) || s_inv_open ? (s_inv_open ? 0.6f : 0.5f) : 0.0f;
 #ifdef SH2_VITA
@@ -5892,6 +5875,7 @@ after_world:
 		}
 #endif
 		dim = dim > black ? dim : black;
+		dim = dim > s_over_t / OVER_FADE ? dim : fminf(s_over_t / OVER_FADE, 1.0f);
 		if (dim > 0.0f)
 			draw_fade(ortho, dim);
 		if (noise_on() && !s_pic_shown) {
@@ -6226,7 +6210,7 @@ int main(void)
 			// 0x401fc0 runs 0x48cbc0 every frame: the radio's level by what gEventIndex shows
 			static int last_stage = -1;
 			RadioScene rs = RADIO_SILENT;
-			if (s_state == ST_GAME && s_loaded) {
+			if (s_state == ST_GAME && s_loaded && s_over_t <= 0.0f) {
 				if (ev_stage() != last_stage)
 					radio_stage_loaded(last_stage = ev_stage());
 				// 5 the map (0x49de50), 6 the items and memos (0x475b80), 7 options (0x469ad0), 9 save (0x453fc0)
@@ -6330,10 +6314,20 @@ int main(void)
 			enter_title();
 			continue;
 		}
-		if (!viewer && !demo_active() && pause_update(down)) {
+		if (!viewer && !demo_active() && s_over_t <= 0.0f && pause_update(down)) {
 			if (s_state == ST_TITLE)
 				continue;
 			down = held = gdown = gheld = s_gdown = 0;   // the menu took the buttons; the game is frozen below
+			dt = s_anim_dt = 0.0f;
+		}
+		if (s_over_t > 0.0f) {
+			s_over_t += dt;
+			if (s_over_t >= OVER_FADE) {
+				s_over_t = 0.0f;
+				gameover_start();
+				continue;
+			}
+			down = held = gdown = gheld = s_gdown = 0;
 			dt = s_anim_dt = 0.0f;
 		}
 		if (gdown & KEY_B)
@@ -6408,7 +6402,7 @@ int main(void)
 			cp.dx = cp.dy = cs.dx = cs.dy = 0;
 		fade_update(dt);
 		t_part = svcGetSystemTick();
-		if (s_paused) {
+		if (s_paused || s_over_t > 0.0f) {
 			cp.dx = cp.dy = 0;
 #ifdef SH2_VITA
 		} else if (s_inv_open && s_state == ST_GAME) {
@@ -6552,13 +6546,11 @@ int main(void)
 					enemy_event_tick(dt);
 				}
 				blood_frame(dt);
-				if (combat_dead()) {     // game over: the PC's screen, then the title (0x401fc0)
-					gameover_start();
-					u32 transfer;
-					C3D_RenderTarget* shown = supersample_shown(&transfer);
-					gpu_sync();          // the last frame of play is drawn
-					gameover_capture(shown->frameBuf.colorBuf, shown->frameBuf.width, shown->frameBuf.height);
-					continue;
+				if (combat_dead()) {     // game over: the fade, then the PC's screen and the title (0x401fc0)
+					s_over_t = 0.001f;
+					bgm_stop();
+					audio_stop_voice();
+					sfx_stop_all();
 				}
 			}
 		} else if (s_cam.mode == CAM_FLY) {
@@ -6619,7 +6611,8 @@ int main(void)
 			s_fogf.scr_z = 224.0f / tanf(fovy * 0.5f);
 			sfx_listener(feet, eye);
 			u64 tb = svcGetSystemTick();
-			bgm_update(ev_stage(), ev_glb_crd(), feet, real_dt);
+			if (s_over_t <= 0.0f)
+				bgm_update(ev_stage(), ev_glb_crd(), feet, real_dt);
 			perf_part("bgm", tb);
 			float near, far;
 			env_clip(&near, &far);
@@ -6701,7 +6694,8 @@ int main(void)
 			s_fogf.scr_z = tp ? 224.0f / tanf(fovy * 0.5f) : gamecam_scr_z();
 			sfx_listener(gp.pos, view_eye());
 			tb = svcGetSystemTick();
-			bgm_update(gp.stage, gp.glb_crd, gp.pos, real_dt);
+			if (s_over_t <= 0.0f)
+				bgm_update(gp.stage, gp.glb_crd, gp.pos, real_dt);
 			perf_part("bgm", tb);
 			float near, far;
 			env_clip(&near, &far);

@@ -332,7 +332,6 @@ static int s_stick_dir;                 // last circle pad direction (0 centre, 
 static float s_invuln, s_dead_t, s_flash;
 static float s_lull;                    // 0x1fbacdc (combat_busy)
 static float s_shot_t = -1.0f;         // seconds since the last shot, < 0 once its light is out
-static float s_die_t;                    // since the killing blow (combat_dying_time)
 static float s_hit_t = 99.0f;            // since the last blow that hurt (combat_hit_time)
 static float s_tip[3], s_root[3];       // melee weapon's grip and far end in James' bind space
 static float s_prev_end[3];             // the blow's far end the frame before (0x543b10 keeps it at +0x128)
@@ -881,7 +880,8 @@ static void cycle_weapon(void)
 }
 
 // James is dead, or Maria is (game over all the same).
-bool combat_dead(void) { return (s_mode == M_DEAD && s_dead_t > 1.5f && !s_carried) || maria_dead(); }
+// 0x559100: dead (0x1fbad17 2) as the damage motion ends
+bool combat_dead(void) { return (s_mode == M_DEAD && !s_carried) || maria_dead(); }
 
 EnPlayer combat_enplayer(const CombatBody* b, bool light)
 {
@@ -1080,7 +1080,6 @@ void combat_column(float dt, float* radius, float* ahead)
 	*radius = s_col_r;
 	*ahead = s_col_ahead;
 }
-float combat_dying_time(void) { return combat_dying() ? s_die_t : 0.0f; }
 float combat_hit_time(void) { return s_hit_t; }
 
 bool combat_has_ammo(void)
@@ -1113,7 +1112,6 @@ void combat_hold_damage(float ap, float dt)
 		s_hp = 0.0f;
 		sfx_play(pdef()->snd_die, 1.0f, 0.0f);
 		s_mode = M_DYING;
-		s_die_t = 0.0f;
 		s_die_held = true;
 		play(&J_DIE);
 	}
@@ -1238,7 +1236,6 @@ void combat_damage_james(int attack_id, float ap, float from_x, float from_z)
 		s_hp = 0.0f;
 		sfx_play(pdef()->snd_die, 1.0f, 0.0f);   // dying scream
 		s_mode = M_DYING;
-		s_die_t = 0.0f;
 		s_die_held = false;
 		const JAnim* fall = damage_motion(attack_id, true, from_x, from_z);
 		play(fall ? fall : &J_DIE);
@@ -2620,8 +2617,6 @@ bool combat_update(CombatBody* b, const circlePosition* cp, u32 down, u32 held, 
 		s_dead_t += dt;
 		break;
 	}
-	if (s_mode == M_DYING || s_mode == M_DEAD)
-		s_die_t += dt;
 	s_hit_t += dt;
 	if (s_mode == M_READY)
 		s_combo_req = false;

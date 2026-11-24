@@ -607,9 +607,11 @@ the title. `gameover.c` keeps that timing, sound and text between `combat_dead()
 `enter_title()`. `ui.py` writes the picture's top left quarter as `pack/ui/gameover.t3x` and copies
 voice 143 (demos.py's `copy_voice`).
 
-The port presents it its own way (3DS-only). From the killing blow the picture bleeds into dark red
-and the edges close in over two and a half seconds (`main.c` `draw_dying`; a blow that only hurts
-flashes the same red for a third of a second, `draw_hit`). When the game over starts, the last frame
+When the damage motion ends (0x559100) the world stands still and goes to black over two seconds, the sound
+stopped, as the PC's copy of the last frame does (0x48ecb0, 0x4ee620(1, 2.0); `main.c` `s_over_t`). A blow
+that only hurts flashes red for a third of a second (`draw_hit`, the port's own).
+
+On the 3DS the game over itself is the port's own. When the game over starts, the last frame
 of play is copied into a texture with the transfer engine (`gameover_capture`) and stays under the
 screen where the PC has black: it sinks darker with a slow beat and pushes in by 7 % over six
 seconds, the grain runs over it whatever the Noise Effect option, and it goes to black with the text.
