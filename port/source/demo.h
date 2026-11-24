@@ -1,6 +1,7 @@
 #pragma once
 #include <3ds.h>
 #include <citro3d.h>
+#include "chr.h"
 
 // In-engine cutscenes (the PC's DramaDemo player, Event/demoview.c), from pack/demo/<key>.dem written
 // by tools/sh2conv/demos.py. See port/CUTSCENES.md.
@@ -57,6 +58,9 @@ void demo_light_hook(void (*set_scale)(float scale));
 
 // True if the scene brings its own James (the player model is hidden while it plays).
 bool demo_has_james(void);
+// The James of the running scene for his flashlight (0x536190), posed for this frame: his model, with his
+// place and yaw written to pos and yaw. NULL, and both left alone, when the scene has none.
+const Character* demo_lamp_james(float pos[3], float* yaw);
 bool demo_has_kind(int kind);
 bool demo_shows_kind(int kind);     // in the scene and under its motion now (its show flag is on)      // a character of the running scene is of this kind (stagemdl.c)
 

@@ -1827,11 +1827,18 @@ static float lut_nl(float x, float unused)
 }
 
 // The flashlight's lamp (0x536190): hung on James' bone 3 at (60.98, -78.37, 94.97) in its space and
-// aimed at (-9, -34, 1117), then through his world placement. False without his model.
+// aimed at (-9, -34, 1117), then through his world placement. In a scene with a James of its own it
+// hangs on that one (0x5361a5: the player's 0x2000 bit, then kind 0x103, 0x102). False without his model.
 static bool flash_from_bone(float pos[3], float dir[3])
 {
-	const Character* c = &s_james;
-	if (!s_have_james || c->n_bones <= 3)
+	float at[3] = { s_px, s_py, s_pz }, yaw = s_yaw;
+	const Character* c = demo_lamp_james(at, &yaw);
+	if (!c) {
+		c = &s_james;
+		if (!s_have_james)
+			return false;
+	}
+	if (c->n_bones <= 3)
 		return false;
 	// the bone's world matrix B = skin * bind, bind the inverse of inv_bind
 	const Mtx34* sk = &c->skin[3];
@@ -1867,8 +1874,8 @@ static bool flash_from_bone(float pos[3], float dir[3])
 		m0[i] = B[i][0] * P0[0] + B[i][1] * P0[1] + B[i][2] * P0[2] + B[i][3];
 		m1[i] = B[i][0] * P1[0] + B[i][1] * P1[1] + B[i][2] * P1[2] + B[i][3];
 	}
-	float cs = cosf(s_yaw), sn = sinf(s_yaw);
-	pos[0] = s_px + cs * m0[0] + sn * m0[2], pos[1] = s_py + m0[1], pos[2] = s_pz - sn * m0[0] + cs * m0[2];
+	float cs = cosf(yaw), sn = sinf(yaw);
+	pos[0] = at[0] + cs * m0[0] + sn * m0[2], pos[1] = at[1] + m0[1], pos[2] = at[2] - sn * m0[0] + cs * m0[2];
 	float d[3] = { m1[0] - m0[0], m1[1] - m0[1], m1[2] - m0[2] };
 	float l = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 	if (l < 1.0f)

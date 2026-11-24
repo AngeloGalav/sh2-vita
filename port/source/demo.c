@@ -1626,6 +1626,32 @@ bool demo_mirror(const float pos[3], C3D_Mtx* reflect)
 	return true;
 }
 
+// Where a scene's character stands this frame. DdsPlay sets every one's rotation to (0, pi, 0); the
+// motion turns the root.
+static void char_place(int i, float t, float p[3])
+{
+	for (int k = 0; k < 3; k++)
+		p[k] = lerp(S.last.chr_pos[i][k], S.next.chr_pos[i][k], t);
+	p[0] += S.h->add_x, p[2] += S.h->add_z;
+}
+
+// 0x536190 looks for kind 0x103, then 0x102; the in-game James kinds (0x100, 0x101) are the player's own
+// character on the PC, so a scene that has one of those moves the player and the lamp with him.
+const Character* demo_lamp_james(float pos[3], float* yaw)
+{
+	if (!S.active)
+		return NULL;
+	for (int kind = 0x103; kind >= 0x100; kind--)
+		for (int i = 0; i < S.n_chars; i++)
+			if (S.chars[i].model && S.chars[i].rec->kind == kind) {
+				char_place(i, blend(), pos);
+				*yaw = (float)M_PI;
+				pose_char(&S.chars[i]);
+				return S.chars[i].model;
+			}
+	return NULL;
+}
+
 void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
 	if (!S.active)
@@ -1646,10 +1672,7 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		if (!dc->model || (!S.next.visible[i] && stagemdl_npc_kind_here(dc->rec->kind)))
 			continue;
 		float p[3];
-		for (int k = 0; k < 3; k++)
-			p[k] = lerp(S.last.chr_pos[i][k], S.next.chr_pos[i][k], t);
-		p[0] += S.h->add_x, p[2] += S.h->add_z;
-		// DdsPlay sets every character's rotation to (0, pi, 0); the motion turns the root
+		char_place(i, t, p);
 		C3D_Mtx model, mv;
 		Mtx_Identity(&model);
 		Mtx_Translate(&model, p[0], p[1], p[2], true);

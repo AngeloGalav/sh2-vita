@@ -324,6 +324,8 @@ How the converter finds things:
 - The music box plays org_b when the puzzle is solved and org_a when not, as the PC program does
   (0x57c470, `prog_hotel.c`).
 - Maria as the player model in Born From a Wish is done in `combat.c` (see ENEMIES.md, batch 4).
+- The flashlight in a scene is the scene's James' (0x536190, `demo_lamp_james`); lying about as an object
+  (0x5367e0) it is not ported.
 - A motion's data is at the table's offset in its file; `demos.py` guesses (one after the other) only where
   that does not fit. A motion that is wrong in one scene only: look at its offset there first.
 - Motion ids whose first frame is not 0 would need the PC's stride arithmetic (FUN_00538920); no
