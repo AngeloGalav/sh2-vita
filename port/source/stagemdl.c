@@ -616,6 +616,10 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 // Whether a place shows a model now (its flags, the cutscene), and its squared distance from x, z.
 static bool shown(const Place* p, float x, float z, float* d2)
 {
+	// 0x572b20, 0x572a00 (stage 55): the door stands open (0x572) in place of shut (0x43b) from 722
+	// (stand-in: the PC takes the open one away again when the room is entered anew)
+	if ((p->kind == 0x572 && !ev_flag(722)) || (p->kind == 0x43b && s_stage == 55 && ev_flag(722)))
+		return false;
 	if (p->pickup >= 0) {
 		if (!ev_pickup_shown(p->pickup))
 			return false;

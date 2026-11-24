@@ -833,6 +833,7 @@ static const Cue s_cues[] = {
 	{ "dust", 60.0f, 0, -1, 0x3e85, { -103202.05f, -97.754f, 8977.81f } },                // 0x59b1e0 EvProgUseCannedJuice
 	{ "go_to_ura_a", 132.0f, 213, -1 },  // 0x58b910 EvProgHospitalBack1st: the room's parts and sound turn
 	{ "go_to_ura_b", 430.0f, 214, -1 },  // 0x58ba80 EvProgHospitalBack2nd
+	{ "inai", 6000.0f, 722, -1 },        // 0x572a00 EvProgErnestLiquid
 	{ "end_maria_a", 600.0f, 531, -1 },  // 0x440c80: the three other endings' set it at the start (prog_hotel.c)
 };
 
@@ -1851,6 +1852,8 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		// stands in for it and the scene's is not drawn over it.
 		if (!dc->model || (!S.next.visible[i] && stagemdl_npc_kind_here(dc->rec->kind)))
 			continue;
+		if (S.h->demo_no == 0x68 && dc->rec->kind == 0x43b && ev_flag(722))
+			continue;                // 0x572a00: the shut door goes as the open one (0x572) comes
 		// 0x599ab0 (stage 9): the closet scene's first Mannequin is out of the picture while James hides
 		// (from 359, the Enhanced Edition's FogAdjustments.cpp; the exe has 360)
 		if (S.h->demo_no == 0xe && dc->rec->kind == 0x201 && dc->rec->id == 0 && S.cur - 1.0f >= 359.0f && S.cur - 1.0f < 1696.0f)

@@ -291,7 +291,7 @@ static int s55_ernest_3(Prog* p)
 static int s55_ernest_liquid(Prog* p)
 {
 	PROG_BEGIN(p)
-	PROG_STEP(p, 0x16, p_demo(p, DEMO_WISH_LIQUID))
+	PROG_STEP(p, 0x16, (demo_active() && demo_timer() > 6000.0f ? p_set(722) : (void)0, p_demo(p, DEMO_WISH_LIQUID)))
 		p_set(722);                     // FLAGW_704 |= 0x40000
 		wish_end(p);
 	PROG_END(p)
