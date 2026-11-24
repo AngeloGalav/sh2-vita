@@ -609,6 +609,16 @@ def build_motions(exe, data, folder_dir, ent, cname, ids, m, stage=None, n_clust
                 key = (0 if fits else 1, rank, k, smoothness(d, offs, nb))
                 if best is None or key < best[0]:
                     best = (key, path, d, offs)
+        if best is None and off is not None and files:
+            # the file ends before the motion does (i_magazine's 10069 has 855 of its 880 frames; the
+            # PC reads on past the end): the frames it has
+            path, d = files[0]
+            k = n - 1
+            while k > n // 2 and (offs := anm_frames(d, off, k, nb, roots)) is None:
+                k -= 1
+            if k > n // 2:
+                print('    %s: motion %d: %d of %d frames in %s' % (cname, a, k, n, os.path.relpath(path, data)))
+                best = ((0, 0, 0, 0.0), path, d, offs)
         if best is None:
             print('    %s: motion %d (%d frames) not found in %s' % (cname, a, n, [os.path.basename(p) for p, _ in files]))
             continue
@@ -618,6 +628,7 @@ def build_motions(exe, data, folder_dir, ent, cname, ids, m, stage=None, n_clust
         seq = offs[-1] + (offs[-1] & 1)
         last = max(0, min(rec[4], n - 1))
         offs = offs[:last + 2]
+        last = len(offs) - 2
         blob = d[offs[0]:offs[-1]]
         table = struct.pack('<%dI' % len(offs), *[o - offs[0] for o in offs])
         # the face clusters' track for this motion, in the .cls next to the .anm it came from
