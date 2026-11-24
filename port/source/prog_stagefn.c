@@ -784,6 +784,15 @@ static void end_stairs_tick(const float* me, float dt)
 		s_fall_t[0] = s_fall_t[1] = s_fall_y[0] = s_fall_y[1] = 0.0f;
 }
 
+// The display function's map part switches alone: it runs through a scene on the PC (0x478bb0's caller), so
+// that a scene's flag shows in it (the armchair of 312 on 475).
+void prog_stagefn_parts(int stage, float dt)
+{
+	float pos[3], yaw;
+	p_player(pos, &yaw);
+	stageparts_tick(stage, bgm_room_id(ev_glb_crd(), pos[0], pos[2]), dt);
+}
+
 void prog_stagefn_tick(int stage, float dt)
 {
 	float pos[3], yaw;

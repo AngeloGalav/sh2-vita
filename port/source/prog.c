@@ -222,6 +222,8 @@ void prog_stage_tick(int stage, float dt)
 	prog_stagefn_tick(stage, dt);
 }
 
+void prog_scene_tick(int stage, float dt) { prog_stagefn_parts(stage, dt); }
+
 void prog_debug_line(const char* line)
 {
 	int a, b, c, d;

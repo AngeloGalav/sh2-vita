@@ -6239,6 +6239,7 @@ int main(void)
 #endif
 		} else if (s_cam.mode == CAM_PLAYER && demo_active()) {
 			enemy_event_tick(dt);
+			prog_scene_tick(ev_stage(), dt);
 			if (demo_update(down, dt))
 				demo_finish();
 		} else if (s_cam.mode == CAM_PLAYER && screens_update(down, held, &cp, dt)) {

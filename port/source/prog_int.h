@@ -31,7 +31,8 @@ extern const ProgStage prog_prison_stages[];    // stages 28..37 (prog_prison.c)
 extern const ProgStage prog_hotel_stages[];     // stages 38..52 (prog_hotel.c)
 extern const ProgStage prog_wish_stages[];      // stages 53..58 (prog_wish.c)
 void prog_hotel_tick(int stage);
-void prog_stagefn_tick(int stage, float dt);      // prog_stagefn.c: the stages' room and per-frame code
+void prog_stagefn_tick(int stage, float dt);
+void prog_stagefn_parts(int stage, float dt);      // prog_stagefn.c: the stages' room and per-frame code
 // 0x1d85d40: how far the flooded elevator's two door leaves are moved from their open places (stage
 // 43, model 0x519): 250, shut, on entering room 0xb8 until flag 479 (0x577600); opened by
 // EvProgOpenElevatorWater (prog_hotel.c).
