@@ -289,14 +289,14 @@ void savescreen_draw_top(void)
 		u32 c = faded((u32)(255.0f * b) << 24 | (u32)(255.0f * b) << 16 | (u32)(255.0f * b) << 8 | 0xff, in);
 		const u32 pic[4] = { c, c, c, c };
 #ifdef SH2_VITA
-		// As the Enhanced Edition shows it on a wide screen (FullscreenImages Start00Scaling: 4096 * 2732 / 2048
-		// either side, 853 by 480): whole, over all of it. Its file is 4:3 but holds the picture squeezed, James'
-		// head 3/4 as wide as in the 2001 one.
+		// As the Enhanced Edition shows it on a wide screen (FullscreenImages Start00Scaling, 4096 * 2732 / 2048
+		// either side): 853 by 512 over 853 by 480, so 1/32 of it past the top and the bottom (measured in sh2-nx
+		// in widescreen). Its file is 4:3 but holds the picture squeezed, James' head 3/4 as wide as in the 2001 one.
 		(void)u80, (void)u400, (void)v0, (void)v1, (void)pic;
 		{
 			u32 still = faded(0xffffffff, in);
 			const u32 k[4] = { still, still, still, still };
-			font_quad_px(&s_bg, 0.0f, 0.0f, 400.0f, 240.0f, 0.0f, 0.0f, 1.0f, 1.0f, k);
+			font_quad_px(&s_bg, 0.0f, 0.0f, 400.0f, 240.0f, 0.0f, 1.0f / 32.0f, 1.0f, 31.0f / 32.0f, k);
 		}
 #else
 		font_quad_px(&s_bg, 80.0f, 0.0f, 400.0f, 240.0f, u80, v0, u400, v1, pic);
