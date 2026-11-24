@@ -15,6 +15,7 @@ void maria_exit(void);
 void maria_reset(void);                       // new game or loaded save: full health, no room yet
 void maria_room_enter(const Collision* col);  // a room was loaded (MariaInitOnConnect)
 void maria_update(const EnPlayer* p, float dt);
+void maria_event_tick(float dt);                // a stage program has James: she stands and waits
 void maria_draw(const C3D_Mtx* view, int uModelView, int uBones);
 
 // An enemy blow from (x, z) facing yaw, reaching `reach` within `arc` radians to either side:

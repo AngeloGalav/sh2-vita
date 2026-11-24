@@ -6363,6 +6363,7 @@ void enemy_event_remove(void)
 // does not run then).
 void enemy_event_tick(float dt)
 {
+	maria_event_tick(dt);
 	s_jwas_ok = false;                   // James is placed by the scene, not walked
 	if (s_ev_want.on && (s_ev_want.delay -= dt) <= 0.0f)
 		event_spawn();

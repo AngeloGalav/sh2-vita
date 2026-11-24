@@ -1,5 +1,6 @@
 #include "chrlight.h"
 #include "maria.h"
+#include "demo.h"
 #include "shadow.h"
 #include <math.h>
 #include <stdio.h>
@@ -554,17 +555,28 @@ bool maria_target(const EnPlayer* james, EnPlayer* out)
 float maria_distance(void) { return s_ending_dist; }
 bool maria_dead(void) { return M.sub == SUB_DYING && M.dead_time > 1.5f; }
 
+void maria_event_tick(float dt)
+{
+	if (!M.here || M.sub >= SUB_DAMAGE || !s_loaded)
+		return;
+	M.speed = 0.0f;
+	if (M.anim != MA_STAND)
+		set_anim(MA_STAND);
+	step_anim(1.0f, dt);
+}
+
 void maria_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
-	// Stage programs stop the world (enemy_update is not called) while they hold James for a demo,
-	// and the demos show their own Maria: she is left out when she was not updated since the last
-	// frame.
-	static bool fresh;               // the second eye of a 3D frame takes the first one's (stereo.h)
+	// Stage programs stop the world (enemy_update is not called) while they hold James, and the scenes
+	// show their own Maria: from a scene until she is updated again she is left out. Before one (the
+	// hospital's lift under way, its radio) she is there.
+	static bool fresh, scene;        // the second eye of a 3D frame takes the first one's (stereo.h)
 	if (!stereo_eye()) {
 		fresh = M.updated != M.drawn;
 		M.drawn = M.updated;
+		scene = demo_scene_shown() || (scene && !fresh);
 	}
-	if (!fresh || !maria_present() || !s_loaded)
+	if (scene || !maria_present() || !s_loaded)
 		return;
 	C3D_Mtx model, mv;
 	Mtx_Identity(&model);
