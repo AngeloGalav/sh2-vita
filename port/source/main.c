@@ -5715,6 +5715,8 @@ static void filters_frame(void)
 		const float* e = view_eye();
 		if (e[2] < 50000.0f && e[1] > -2000.0f)
 			soft = 0.4f;
+	} else if (s_env.map_id == 0xc005b) {
+		soft = 0.4f;                         // 0x579150, room 312: mode 6 with the same strength (a stand-in as there)
 	} else if (stage == 7 && dn == 10 && t > 1.0f && t < 164.0f) {
 		motion = (int)(90.0f + (t - 1.0f) * (60.0f - 90.0f) / (164.0f - 1.0f));   // 0x59c130, 0x8e5f50..5c
 	}
