@@ -12,6 +12,7 @@
 #include "stagemdl.h"
 #include "movie.h"
 #include "prog.h"
+#include "sfx.h"
 #include "stereo.h"
 
 // In-engine cutscenes, ported from the PC's DramaDemo player (Event/demoview.c in the PS2 beta):
@@ -807,9 +808,9 @@ static Character* load_model(const char* pack_dir, int upto, const DemChar* rec,
 }
 
 // What the PC programs do while their scene plays (they run every frame beside DramaDemoMain; the
-// port's wait for the whole request): set a flag the stage's bgm_control reads once gCutsceneTimer
-// passes a frame, or the BGM page between two scenes of one program (frame -1: at the start).
-typedef struct { const char* key; float frame; short flag, page; } Cue;
+// port's wait for the whole request): set a flag the stage's code reads once gCutsceneTimer passes a
+// frame, a sound at a place, or the BGM page between two scenes of one program (frame -1: at the start).
+typedef struct { const char* key; float frame; short flag, page; u16 se; float at[3]; } Cue;
 static const Cue s_cues[] = {
 	{ "tenbou", 1400.0f, 517, -1 },      // 0x5a0a30 EvProgLetterFromMary (_DAT_006b61a8)
 	{ "piano_lau_b", 243.0f, 528, -1 },  // 0x57beb0 EvProgLauraPlayPiano state 0x17 (_DAT_00715f0c)
@@ -819,6 +820,11 @@ static const Cue s_cues[] = {
 	{ "tomatta", -1.0f, 475, -1 },       // the same: the armchair towards the television (0x578950), the light,
 	{ "tomatta", -1.0f, 625, -1 },
 	{ "tomatta", -1.0f, 476, -1 },       // and the television's picture (0x558)
+	{ "vtr", 295.0f, 0, -1, 0x44c9, { 59596.75f, -26.75f, 18650.0f } },                  // its state 0x17
+	{ "clock_open", 45.0f, 0, -1, 0x3e82, { -58808.852f, -606.0f, 22913.494f } },         // 0x59c4b0 EvProgUseClockKey
+	{ "clock_close", 50.0f, 0, -1, 0x3e8b, { -58808.852f, -606.0f, 22913.494f } },
+	{ "clock_push", 30.0f, 0, -1, 0x3e84, { -58722.551f, 0.0f, 23009.684f } },            // 0x59a6b0 EvProgTryMoveClock
+	{ "dust", 60.0f, 0, -1, 0x3e85, { -103202.05f, -97.754f, 8977.81f } },                // 0x59b1e0 EvProgUseCannedJuice
 };
 
 static void scene_cues(void)
@@ -832,6 +838,8 @@ static void scene_cues(void)
 			ev_flag_set(c->flag, true);
 		if (c->page >= 0)
 			bgm_set_page(c->page);
+		if (c->se)
+			sfx_play_at(c->se, 1.0f, c->at);
 	}
 }
 

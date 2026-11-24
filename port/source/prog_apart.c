@@ -265,7 +265,6 @@ static int s07_use_canned_juice(Prog* p)
 {
 	PROG_BEGIN(p)
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_DUST))
-		p_se(0x3e85);
 		p_lock(p, false);
 	PROG_END(p)
 }
