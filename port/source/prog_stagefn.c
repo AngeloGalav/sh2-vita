@@ -899,6 +899,18 @@ void prog_stagefn_tick(int stage, float dt)
 		}
 		break;
 	case 32: prison_bars_tick(dt); break;
+	case 55:
+		// 0x572b20, room 0xc3: the boards stand in the tombstone as they were turned in (683..685, 692..694,
+		// 701..703: a quarter back, half, a quarter on)
+		if (room == 0xc3)
+			for (int b = 0; b < 3; b++) {
+				const int f = 683 + 9 * b;
+				float t = p_flag(f) ? -1.5707964f : 0.0f;
+				t += p_flag(f + 1) ? 3.1415927f : 0.0f;
+				t += p_flag(f + 2) ? 1.5707964f : 0.0f;
+				stagemdl_turn(0x753 + b, t, 0.0f, 0.0f);
+			}
+		break;
 	case 43:
 		// 0x577690: in room 0xb8, while 479 is off, the door's leaves (model 0x519, bones 0 and 1) are
 		// moved along z by 0x1d85d40: 250 brings them together, shut, and 0 is their own places, open.

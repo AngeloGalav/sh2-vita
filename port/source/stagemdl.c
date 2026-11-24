@@ -339,12 +339,12 @@ static float place_lift(int i)
 	return 0.0f;
 }
 
-static struct { int kind; float r[3]; } s_turn[4];
+static struct { int kind; float r[3]; } s_turn[8];
 
 void stagemdl_turn(int kind, float rx, float ry, float rz)
 {
 	int k = 0;
-	while (k < 3 && s_turn[k].kind && s_turn[k].kind != kind)
+	while (k < 7 && s_turn[k].kind && s_turn[k].kind != kind)
 		k++;
 	s_turn[k].kind = kind;
 	s_turn[k].r[0] = rx, s_turn[k].r[1] = ry, s_turn[k].r[2] = rz;
@@ -760,7 +760,7 @@ void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		Mtx_Identity(&model);
 		Mtx_Translate(&model, p->pos[0], p->pos[1] + place_lift(i), p->pos[2], true);
 		float r[3] = { p->rot[0], p->rot[1], p->rot[2] };
-		for (int k = 0; k < 4; k++)
+		for (int k = 0; k < 8; k++)
 			if (s_turn[k].kind == p->kind)
 				r[0] += s_turn[k].r[0], r[1] += s_turn[k].r[1], r[2] += s_turn[k].r[2];
 		Mtx_RotateZ(&model, r[2], true);
