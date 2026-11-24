@@ -15,6 +15,7 @@
 #include "stagemdl.h"
 #include "room.h"
 #include "game/view/sh2cam.h"
+#include "radio.h"
 #include "sfx.h"
 #include "gamecam.h"
 #include <math.h>
@@ -104,6 +105,11 @@ static void stage_init(int stage)
 		break;
 	case 15:                             // 0x591da0
 		p_clear(15);
+		break;
+	case 46:                             // 0x575b00: the radio's mode back, and the map's marks
+		radio_set_mode(0);
+		for (int i = 2324; i <= 2326; i++)
+			p_set(i);
 		break;
 	case 49:                             // 0x4410a0
 		p_set(45);
@@ -453,6 +459,22 @@ static void room_enter(int stage, int room)
 			s_h22_steps = 0, s_h22_t = 0.0f;
 		}
 		break;
+	case 44:                             // 0x576960: the map's marks of doors James has no need to try
+		if (room == 0xae)
+			for (int i = 2258; i <= 2272; i++)
+				if (i != 2265)
+					p_set(i);            // 0x1f7d6f8 |= 0xfdfc0000, 0x1f7d6fc |= 1
+		if (room == 0xad)
+			for (int i = 2246; i <= 2248; i++)
+				p_set(i);                // 0x1f7d6f8 |= 0x1c0
+		break;
+	case 45: {                           // 0x575eb0: the same
+		static const short b2[] = { 2283, 2285, 2286, 2288, 2289, 2290, 2292, 2293, 0 };   // 0x376800
+		static const short b4[] = { 2296, 2297, 2299, 2300, 2302, 2304, 2305, 2306, 2308, 2309, 2313, 2314, 0 };
+		for (const short* m = room == 0xb2 ? b2 : room == 0xb4 ? b4 : b2 + 8; *m; m++)
+			p_set(*m);
+		break;
+	}
 	case 43:                             // 0x577600: the flooded elevator's room
 		if (room == 0xb8) {
 			// the doors are shut (250) while the water is up (479 off); 0x2f80400 into 0x1f7d6f4
