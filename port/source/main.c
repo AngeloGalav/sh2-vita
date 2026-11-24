@@ -249,7 +249,7 @@ static void list_rooms(void)
 #define MAX_NB 4
 // how near a touching tile has to be to load, and how many stay resident: profile.c (quality level)
 
-// The blocks of the open areas' grids. 0x494ef0 finds the block of a cell in one table per area
+// The blocks of the open areas' grids, and the indoor maps the PC loads. 0x494ef0 finds the block of a cell in one table per area
 // (0x88e568 ca, 0x88e5c8 cb, 0x88e6a8 cc, 0x88e7d8 and 0x88e7f0 cd) and the PC loads only those
 // (0x514070, 0x513700). The folders also hold maps that no cell names, and those are never
 // streamed or stood in: ca02 (a grove whose roots are at height 0, 3000 above the cemetery lake's
@@ -262,6 +262,11 @@ static const struct { char area[3]; u8 n; u8 r[10][2]; } k_grid[] = {
 	              { 49, 55 }, { 57, 69 } } },
 	{ "cc", 3, { { 1, 57 }, { 60, 77 }, { 99, 99 } } },
 	{ "cd", 3, { { 1, 2 }, { 4, 6 }, { 11, 11 } } },
+	// indoors: the maps of every room (0x88e210, four bytes a room) of glb 9 and 13. ap62 and ru65 are in no
+	// room's list and have no collision or camera: ap62's untextured planes, 270000 units across, stood as a
+	// black wall in Wood Side's 3F hall (x 42831, reported from play), ru65 in the flooded elevator's room
+	{ "ap", 2, { { 1, 61 }, { 64, 111 } } },
+	{ "ru", 2, { { 1, 64 }, { 69, 76 } } },
 };
 
 static bool block_in_grid(const char* area, const char* room)
