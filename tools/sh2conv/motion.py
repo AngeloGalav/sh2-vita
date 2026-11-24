@@ -64,6 +64,8 @@ MOTIONS = [
     # Mary in the endings' last corridor (0x440350, 0x43f500, 0x574c80; Maria's 0x4410d0), 0x53a990
     (0xffb, 0x6d50cc, 0xffa, 0xffb, 'chr/mry/mry.mdl', 'demo/mry_yarinaoshi_a/mry.anm', 'mry', 'mry_wait'),
     (0xffc, 0x6d50cc, 0xffa, 0xffc, 'chr/mry/mry.mdl', 'demo/mar_isho_a/mry.anm', 'mry', 'mry_wait_maria'),
+    # Laura in the hospital's storeroom (stage 18 room 0x31, 0x590d10, list 0x8dceb0), 0x540ab0
+    (0xb56, 0x6e696c, 0xb54, 0xb56, 'chr/lau/lau.mdl', 'demo/lau_damasu/lau.anm', 'lau', 'lau_hospital'),
 ]
 
 # (model, anm, output folder, output name): the whole .anm
