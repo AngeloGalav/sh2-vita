@@ -2198,21 +2198,28 @@ void vita_capture_view(void)
 	CAP.ready = true;
 }
 
-// Into the game view, in the 400 x 240 layout: a display position (xs, ys) of 960 x 544 is the surface's
-// (1 - ys / 544, 1 - xs / 960) (blit), and the still's whole picture fills the rectangle
-void vita_capture_draw(float x0, float y0, float x1, float y1)
+// A part (u0, v0)-(u1, v1) of the still (0,0 its top left) over a rectangle of the 400 x 240 layout, times a
+// colour, opaque (a display position (xs, ys) of 960 x 544 is the surface's (1 - ys / 544, 1 - xs / 960), blit): the item screen's panel and its noise (0x46f180 with the state 0x46a150).
+static GLuint s_tint_prog;
+static GLint s_tint_tex, s_tint_rgb;
+void vita_capture_part(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1,
+                       float r, float g, float b)
 {
 	if (!CAP.ready || !G.target)
 		return;
-	quad_state();
+	quad_state();                        // the plain copy's program, should the tinted one not be built
+	if (s_tint_prog) {
+		glUseProgram(s_tint_prog);
+		glUniform1i(s_tint_tex, 0);
+		glUniform4f(s_tint_rgb, r, g, b, 1.0f);
+	}
 	glBindTexture(GL_TEXTURE_2D, CAP.tex.gl);
 	float pos[8], uv[8];
-	static const float F[4][2] = { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } };
 	for (int i = 0; i < 4; i++) {
-		float fx = F[i][0], fy = F[i][1];
+		float fx = (float)(i & 1), fy = (float)(i >> 1);
 		float xs = (x0 + (x1 - x0) * fx) / 400.0f, ys = (y0 + (y1 - y0) * fy) / 240.0f;
 		pos[i * 2] = 2.0f * (1.0f - ys) - 1.0f, pos[i * 2 + 1] = 2.0f * (1.0f - xs) - 1.0f;
-		uv[i * 2] = 1.0f - fy, uv[i * 2 + 1] = 1.0f - fx;
+		uv[i * 2] = 1.0f - (v0 + (v1 - v0) * fy), uv[i * 2 + 1] = 1.0f - (u0 + (u1 - u0) * fx);
 	}
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, pos);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, uv);
@@ -2634,6 +2641,10 @@ static const char FX_FS[] =
 	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float alpha) : COLOR\n"
 	"{ return float4(tex2D(tex, o_uv).rgb, alpha); }\n";
 
+static const char TINT_FS[] =
+	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float4 tint) : COLOR\n"
+	"{ return float4(tex2D(tex, o_uv).rgb * tint.xyz, 1.0); }\n";
+
 static const char FX4_FS[] =
 	"float4 main(float2 o_uv : TEXCOORD0, uniform sampler2D tex, uniform float4 off, uniform float alpha) : COLOR\n"
 	"{ float3 c = tex2D(tex, o_uv - off.xy).rgb + tex2D(tex, o_uv - off.zw).rgb + tex2D(tex, o_uv + off.zw).rgb +\n"
@@ -2663,6 +2674,11 @@ static GLuint quad_prog(const char* fs, const char* what)
 
 static void present_init(void)
 {
+	s_tint_prog = quad_prog(TINT_FS, "still's tint");
+	if (s_tint_prog) {
+		s_tint_tex = glGetUniformLocation(s_tint_prog, "tex");
+		s_tint_rgb = glGetUniformLocation(s_tint_prog, "tint");
+	}
 	s_mask_prog = quad_prog(MASK_FS, "shadow mask");
 	if (s_mask_prog)
 		s_mask_v = glGetUniformLocation(s_mask_prog, "v");

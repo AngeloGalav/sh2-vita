@@ -435,8 +435,9 @@ Ordered by weight. Each line names where the work starts.
 - Right stick on the PS Vita (`main.c`, `search_view`): it moves the game's search camera through James' head
   (0x535720, as the Enhanced Edition's RestoreSearchCamMovement), with no button held first, which is the
   port's. Letting go ends it.
-- Item screen on the PS Vita (`itemmenu.c`, 0x475230): the bars' brightness per row is a guess, and the status
-  panel's noise is flat red where the PC's strips sample the still. Adjust volume shows the level as a number (stand-in for 0x46ee90's blocks). The memo list and stage
+- Item screen on the PS Vita (`itemmenu.c`, 0x475230): the bars' brightness per row is a guess. The status
+  panel is 0x46f180's (the still's beat, the tints, the strips cut from the still; a strip's two lines show one row of
+  it); not run on a console. Adjust volume shows the level as a number (stand-in for 0x46ee90's blocks). The memo list and stage
   panels are drawn by `touchui_draw_pc`, with no PC function behind them yet.
 - Fog on the PS Vita (`port/vita/compat/c3d_gl.c`): the sprites are drawn at half size and without
   the PC's depth test, so a sprite also lays over what stands in front of it. Chosen on a console: it

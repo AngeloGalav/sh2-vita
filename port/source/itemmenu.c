@@ -39,7 +39,6 @@ static float s_eq_fade[MAX_ITEMS];
 static int s_mark[3];
 static float s_mark_a[3];
 static int s_hold, s_seed;
-static float s_tint_t;
 static bool s_moved;                   // the frame is on its way (0x9443c2)
 static char s_pack[96];
 static int s_read_page;                // ST_READ: which of the item's texts
@@ -47,6 +46,8 @@ static C3D_Tex s_pic;                  // ST_PIC: the item's picture (0x46a850)
 static bool s_pic_ok;
 static int s_pic_side;                 // 0x9443aa: 1 the front, 2 a coin's back
 
+static float s_beat_t;                 // 0x9445e0
+static float health(void);
 static float X(float x) { return 200.0f + x * 0.625f; }
 static float Y(float y) { return 120.0f + y * 0.46875f; }
 
@@ -347,7 +348,9 @@ static void step(void)
 		s_mark_a[i] += s_mark[i] ? 0.133f : -0.133f;     // 4 a second
 		s_mark_a[i] = fminf(fmaxf(s_mark_a[i], 0.0f), 1.0f);
 	}
-	s_tint_t += 1.0f / 30.0f;
+	s_beat_t += 1.0f / 30.0f;
+	if (s_beat_t > health() + 0.2f)
+		s_beat_t = 0.0f;
 }
 
 static bool any(u32 down, u32 bits) { return (down & bits) != 0; }
@@ -680,27 +683,50 @@ static void frame(void)
 	}
 }
 
-// 0x46f180: the panel's tint and the noise that grows as James is hurt, both red while he is below 0.7
+// 0x46f180: the status panel. The still of the frame as the menu opened, and from under nine tenths of his
+// health it beats, down to 0.4 and up again over a fifth of a second, the sooner the less he has left; a tint
+// over it, pale green while he is hurt, red and beating under 0.7; and strips of the still itself, two lines
+// of 480 high, more of them as he is hurt, red under half.
+static float health(void)
+{
+	float max = combat_hp_max(), f = max > 0.0f ? combat_hp() / max : 0.0f;
+	return fminf(fmaxf(f, 0.0f), 1.0f);
+}
+
 static void status(void)
 {
-	float hp = combat_hp(), max = combat_hp_max(), f = max > 0.0f ? hp / max : 0.0f;
-	f = fminf(fmaxf(f, 0.0f), 1.0f);
-	if (f < 0.7f) {
-		float beat = 0.5f + 0.5f * sinf(s_tint_t * (6.2831853f * (1.4f + (1.0f - f) * 1.4286f) / 4.0f));
-		u32 c = 0xb0000000u | (u32)(beat * (1.0f - f) * 160.0f);
-		const u32 k[4] = { c, c, c, c };
-		font_quad_px(NULL, X(-230), Y(-175), X(-90), Y(-70), 0, 0, 0, 0, k);   // over the still
-	}
-	int count = (int)(10.0f - f * 10.0f);
-	srand((unsigned)s_seed++);
-	for (int i = 0; i < count; i++) {
+	extern void vita_capture_part(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1,
+	                              float r, float g, float b);
+	float f = health(), px0, py0, px1, py1, level = 1.0f;
+	itemmenu_panel(&px0, &py0, &px1, &py1);
+	if (f < 0.9f && s_beat_t < 0.1f)
+		level = 1.0f - s_beat_t * 6.0f;
+	else if (f < 0.9f && s_beat_t < 0.2f)
+		level = s_beat_t * 6.0f - 0.2f;
+	vita_capture_part(px0, py0, px1, py1, 0.0f, 0.0f, 1.0f, 1.0f, level, level, level);
+	u32 tint = 0;
+	if (f < 0.1f)
+		tint = 0xb0000000u | (u32)(level * 64.0f);
+	else if (f < 0.7f)
+		tint = 0xb0000000u | (u32)((0.7f - f) / 0.6f * level * 64.0f);
+	else if (f < 1.0f)
+		tint = 0x80ff8016u;
+	if (tint & 0xff)
+		flat(px0, py0, px1, py1, tint);
+	float w = level * 160.0f / 255.0f, gb = f < 0.5f ? w * 2.0f * f : w;
+	for (int i = 0; (float)i < 10.0f - f * 10.0f; i++) {
+		srand((unsigned)s_seed++);
 		int a = rand() % 140, b = rand() % 105, len = rand() % 105;
 		if (rand() % 6 >= 1)
 			continue;
 		int x = a - 230, y = b - 173;
 		if (x + len > -90)
 			len = -90 - x;
-		flat(X((float)x), Y((float)y), X((float)(x + len)), Y((float)y + 4.0f), 0xd01818c0u);
+		// its picture's lines run two whole heights over the strip's two, from b + 2: what shows is half
+		// the panel away
+		float v = fmodf((float)(b + 2) / 105.0f + 0.5f, 1.0f);
+		float u0 = (float)a / 140.0f, u1 = (float)(a + len) / 140.0f;
+		vita_capture_part(X((float)x), Y((float)y - 2.0f), X((float)(x + len)), Y((float)y), u0, v, u1, v, w, gb, gb);
 	}
 }
 
@@ -766,11 +792,7 @@ static void written(int msg, float x, float y)
 static void draw_all(void)
 {
 	const u32 black = 0x000000ffu, full = 0xfefefeffu, dim = 0x404040ffu;
-	float px0, py0, px1, py1;
-	itemmenu_panel(&px0, &py0, &px1, &py1);
 	flat(0, 0, 400, 240, black);
-	extern void vita_capture_draw(float x0, float y0, float x1, float y1);
-	vita_capture_draw(px0, py0, px1, py1);       // 0x46f180: the still of the frame
 	status();
 	bars();
 	command_bar();
