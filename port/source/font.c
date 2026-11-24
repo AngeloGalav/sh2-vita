@@ -174,7 +174,11 @@ static int next_code(const char** s)
 	const char* p = *s;
 	u8 c = (u8)*p++;
 	int code = c >= 0x20 ? c - 0x20 : -1;
-	if (c == FONT_FULL_WIDTH) {
+	if (c == FONT_MARK && *p) {              // a message's mark (main.c draw_message_top): nothing to draw
+		c = (u8)*p++;
+		for (int k = c == 'y' ? 3 : c == 'c' ? 1 : 0; k > 0 && *p; k--)
+			p++;
+	} else if (c == FONT_FULL_WIDTH) {
 		code = 0;
 		for (int k = 0; k < 4; k++, p++) {
 			char h = (char)(*p | 0x20);      // either case

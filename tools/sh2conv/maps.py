@@ -153,7 +153,7 @@ def main():
         for png, _, _ in j:
             os.remove(os.path.join(pack, png))
     mdir = os.path.join(data, 'etc', 'message')
-    write_msg_langs(pack, 'memo.msg', os.path.join(mdir, 'memo_x_msg'))
+    write_msg_langs(pack, 'memo.msg', os.path.join(mdir, 'memo_x_msg'), marks=True)
     print('wrote map.dat,', len(textures), 'textures and memo.msg')
 
 

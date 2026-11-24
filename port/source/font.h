@@ -17,6 +17,7 @@ typedef struct { float x, y, u, v; u32 rgba; } FontVert;    // top-screen pixels
 typedef void (*FontDrawFn)(C3D_Tex* tex, const FontVert* v, int n);
 
 #define FONT_FULL_WIDTH '\x06'
+#define FONT_MARK '\x07'     // and a letter: a message's position or colour (sh2mes.py), skipped by the text functions
 enum { FONT_BIG = 0, FONT_SMALL = 1 };                     // 20x30 and 16x24 cells
 enum { FONT_LEFT = 0, FONT_CENTER = 1, FONT_RIGHT = 3 };   // the PC's alignment modes
 

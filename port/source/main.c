@@ -5089,31 +5089,106 @@ static bool pause_update(u32 down)
 
 // ---------------------------------------------------------------- messages on the top screen
 
-// The PC's message window (0x47ff50 without a position) in the big font: the block of lines
-// centred on its widest line and left-aligned from there, the first line at 476 - (lines + 4) * 15
-// (another half line higher for each line past three). The pack's messages no longer carry the
-// PC's position words, so all of them sit there. A one-pixel dark shadow (not on the PC) keeps the
-// text readable over bright rooms.
-static void draw_message_top(const char* page)
+// The PC's message window (0x47ff50) in the big font. Without a position the block of lines is centred on
+// its widest line and left-aligned from there, the first line at 476 - (lines + 4) * 15 (another half line
+// higher for each line past three). The marks of sh2mes.py: 'v' the block centred on the middle of the
+// screen (or on 'y', its height), as notes and memos are, 'h' each line centred, 'c' the colour (0x47eca0),
+// 'b' the ends of a blotted-out part, a bar in the text's colour (0x47e7b0, 0x481f30). Packs made before the
+// marks have none. A one-pixel dark shadow (not on the PC) keeps the text readable over bright rooms.
+static void message_line(const char* line, float x, float y, bool shadow, int* colour, bool* blot)
+{
+	char seg[256];
+	int n = 0, h = font_line_height(FONT_BIG);
+	for (const char* c = line;; c++) {
+		if (*c != FONT_MARK && *c && n < (int)sizeof seg - 1) {
+			seg[n++] = *c;
+			continue;
+		}
+		seg[n] = 0;
+		if (n) {
+			u32 top, bottom;
+			font_pc_color(*colour, &top, &bottom);
+			float w = font_width(FONT_BIG, seg) + 2.0f;       // font_width leaves the last 2 out
+			if (*blot && !shadow) {
+				u32 q[4] = { top, top, bottom, bottom };
+				font_quad_px(NULL, 200.0f + (x + 1.0f - 256.0f) * 0.625f, 120.0f + (y + 3.0f - 256.0f) * 0.46875f,
+				             200.0f + (x + w - 3.0f - 256.0f) * 0.625f, 120.0f + (y + h - 1.0f - 256.0f) * 0.46875f,
+				             0, 0, 0, 0, q);
+			} else if (!*blot && shadow) {
+				font_text(FONT_BIG, x + 1.6f, y + 2.1f, seg, FONT_LEFT, 0x000000c0, 0x000000c0);
+			} else if (!*blot) {
+				font_text(FONT_BIG, x, y, seg, FONT_LEFT, top, bottom);
+			}
+			x += w;
+			n = 0;
+		}
+		if (!*c || !c[1])
+			return;
+		c++;
+		if (*c == 'b')
+			*blot = !*blot;
+		else if (*c == 'c' && c[1])
+			c++, *colour = *c <= '9' ? *c - '0' : *c - 'a' + 10;
+		else if (*c == 'y')
+			for (int k = 0; k < 3 && c[1]; k++)
+				c++;
+	}
+}
+
+// more: the lines an answer takes under it (ff f6 counts as one); returns the height of the line after the last.
+static float draw_message_lines(const char* page, int more)
 {
 	if (!page || !*page || !font_ready())
-		return;
-	char buf[640];
-	int n = 0, lines = 1;
+		return 0.0f;
+	char buf[1024];
+	int n = 0, lines = 1, at = -1;
+	bool middle = false, each = false;
+	while (page[0] == FONT_MARK && (page[1] == 'v' || page[1] == 'h' || page[1] == 'y')) {
+		middle = middle || page[1] == 'v', each = each || page[1] == 'h';
+		int len = 2;
+		if (page[1] == 'y') {
+			at = 0;
+			for (; len < 5 && page[len]; len++)
+				at = at << 4 | (page[len] <= '9' ? page[len] - '0' : page[len] - 'a' + 10);
+		}
+		page += len;
+	}
 	for (; page[n] && page[n] != '\f' && n < (int)sizeof buf - 1; n++) {
 		buf[n] = page[n];
 		lines += page[n] == '\n';
 	}
 	buf[n] = 0;
-	int h = font_line_height(FONT_BIG);
-	float y = 476.0f - (float)((lines + 4) * h / 2);
-	if (lines > 3)
-		y -= (float)((lines - 3) * h / 2);
+	int h = font_line_height(FONT_BIG), all = lines + more;
+	float y = 476.0f - (float)((all + 4) * h / 2);
+	if (all > 3)
+		y -= (float)((all - 3) * h / 2);
+	if (middle)
+		y = (at >= 0 ? (float)at : 256.0f) - (float)(all * h / 2);
+	else if (at >= 0)
+		y = (float)at;
 	float x = 256.0f - (font_width(FONT_BIG, buf) + 2.0f) * 0.5f;
-	u32 white, dummy;
-	font_pc_color(0, &white, &dummy);
-	font_text(FONT_BIG, x + 1.6f, y + 2.1f, buf, FONT_LEFT, 0x000000c0, 0x000000c0);
-	font_text(FONT_BIG, x, y, buf, FONT_LEFT, white, white);
+	for (int pass = 0; pass < 2; pass++) {
+		int colour = 0;
+		bool blot = false;
+		float ly = y;
+		for (char* line = buf; line;) {
+			char* end = strchr(line, '\n');
+			if (end)
+				*end = 0;
+			float lx = each ? 256.0f - font_width(FONT_BIG, line) * 0.5f : x;
+			message_line(line, lx, ly, pass == 0, &colour, &blot);
+			if (end)
+				*end = '\n';
+			line = end ? end + 1 : NULL;
+			ly += (float)h;
+		}
+	}
+	return y + (float)(lines * h);
+}
+
+static void draw_message_top(const char* page)
+{
+	draw_message_lines(page, 0);
 }
 
 // ---------------------------------------------------------------- movies: music under them, subtitles over them

@@ -57,13 +57,13 @@ def lang_dir(pack, lang):
     return d
 
 
-def write_msg_langs(pack, name, mes):
+def write_msg_langs(pack, name, mes, marks=False):
     """events/<name> from <mes>_e.mes, events/<l>/<name> from <mes>_<l>.mes where the game has it."""
     for lang in LANGUAGES:
         src = f'{mes}_{lang}.mes'
         if lang != 'e' and not os.path.exists(src):
             continue
-        write_msg(os.path.join(lang_dir(pack, lang), name), sh2mes.load(src))
+        write_msg(os.path.join(lang_dir(pack, lang), name), sh2mes.load(src, marks))
 
 
 SHAPES = {'point': 1, 'line': 2, 'polyline': 2, 'rect': 3, 'triangle': 4, 'quad': 4}
@@ -154,7 +154,7 @@ def main():
         msg_name = DC_STAGE_MSG.get(stage) or st['name'][4:].lower()
         mp = os.path.join(mdir, f'stage_{msg_name}_msg')
         if os.path.exists(mp + '_e.mes'):
-            write_msg_langs(pack, f's{stage:02d}.msg', mp)
+            write_msg_langs(pack, f's{stage:02d}.msg', mp, marks=True)
         else:
             print(f'  stage {stage}: no message file {mp}_e.mes')
     with open(os.path.join(src, 'rooms.txt'), 'w') as f:
