@@ -80,7 +80,6 @@ static void light_c(void)
 // ---------------------------------------------------------------- stages
 
 static int s_last_stage = -1, s_last_room = -1;
-static bool s_knife_floor;            // 0x8e315c (stage 10 room 0x24)
 static bool s_redeath;
 
 void stageparts_tick(int stage, int room, float dt)
@@ -148,11 +147,7 @@ void stageparts_tick(int stage, int room, float dt)
 		if (room == 0x13)
 			by(0x13, f(91), 0, -1);
 		break;
-	case 10:  // 0x598770 (0x8e315c: set on entering room 0x24 by 0x598700, cleared by the knife scene)
-		if (room == 0x24 && entered)
-			s_knife_floor = true;
-		if (room == 0x24 && scene())
-			s_knife_floor = false;
+	case 10:  // 0x598770
 		// EE MapMeshToggle's hook is at the function's end (0x598843), after the PC's own list: the hint
 		// on 109's door comes on top of it, in every room, variant 1 once James has met Eddie (0x55)
 		on(0x5c, f(0x55) ? 1 : 0);
@@ -162,7 +157,8 @@ void stageparts_tick(int stage, int room, float dt)
 			on(0x57, -1);
 			if (!f(85) || f(109))
 				on(0x57, 0);
-			if (s_knife_floor)
+			// 0x8e315c: EvProgAngelaWithKnife (0x598180) clears it for these frames, 0x598770 sets it again
+			if (!(scene_no(0x12) && demo_timer() >= 2126.0f && demo_timer() < 2327.0f))
 				on(0x57, 1);
 		}
 		break;

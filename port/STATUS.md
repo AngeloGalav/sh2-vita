@@ -388,7 +388,7 @@ Ordered by weight. Each line names where the work starts.
     - Characters the stages leave in place: Angela through the Abstract Daddy's fight and on the burning stairs, Mary in the last corridor, Laura in the hospital's storeroom, the door after Laura locks James in. Repack, or copy chr/agl/agl_{papa,fire}.s3a, chr/mry/mry_wait{,_maria}.s3a, chr/lau/lau_hospital.s3a.
     - Event cameras outside scenes (0x51ced0, `gamecam_event`): the closet until its key is taken, the stairwell after Pyramid Head, the cube, the flooded elevator (0x577690, 0x5777f0), the park and James' thoughts after Maria's death (0x591fb0, 0x592430). The cube's models turn to the rings now, in place of a text panel.
     - Walls: the door on the sixth layer (309), the last boss' platform and stairs (503, 504, 507), four of Born From a Wish's town. Repack, or copy events/stagewalls.bin.
-    - Motion blur of scenes 0x3f, 0x43, 0x44, 0x47 and 0x57; map parts in scenes 0x44 and 0x47; the stairwell's water (0x3e95).
+    - Motion blur of scenes 0x3f, 0x43, 0x44, 0x47 and 0x57; map parts in scenes 0x44 and 0x47 and Angela's knife scene; the stairwell's water (0x3e95).
     - Found and not ported: pad vibration (0x4f4930); nothing else of weight.
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
 - A coin's back on the item screen shows for a moment and the frame closes (0x474410 cases 0xc, 0xd: it stays only on the top riddle level, so this may be the PC's own; to be compared).
