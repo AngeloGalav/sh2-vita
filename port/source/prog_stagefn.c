@@ -222,6 +222,8 @@ static void hospital_sounds(int room, const float* me, float dt)
 	}
 }
 
+static bool s_bugs_on;
+static float s_bugs_v;         // 0x1d86284
 static float s_t25, s_t28, s_t32, s_mv[3], s_mv_dir;   // 0x1d862f8, 0x1d862bc, 0x1f83780; a moving sound
 
 static void frame_sounds(int stage, int room, const float* me, float yaw, float dt)
@@ -400,6 +402,16 @@ static void frame_sounds(int stage, int room, const float* me, float yaw, float 
 				sfx_play_at(0x9cfe, 1.0f, at);
 				p_set(549);
 			}
+		}
+		break;
+	case 30:                             // 0x587780, room 0x65
+		if (room == 0x65 && !ev_have_item(55)) {
+			if (!s_bugs_on) {
+				after_load(0x4278, 0.0f, NULL);      // EvProgUseDryCell (0x586f40) starts it silent
+				s_bugs_on = true, s_bugs_v = 0.0f;
+			}
+			s_bugs_v = fminf(s_bugs_v + dt, 1.0f);
+			sfx_set_volume(0x4278, s_bugs_v);
 		}
 		break;
 	case 55:                             // 0x572ce0: the present (model 0x752, after 721) is in James' room
@@ -584,6 +596,14 @@ static void room_enter(int stage, int room)
 		// 0x5814f0: room 0x79 before the Abstract Daddy (332): Angela's scream plays again (633)
 		if (room == 0x79 && !p_flag(332))
 			p_clear(633);
+		break;
+	case 30:
+		// 0x587690: room 0x65 (the trap room) while James has no battery (item 55, 0x1f7d3e4 bit 23): the bugs
+		s_bugs_on = false;
+		if (room == 0x65 && !ev_have_item(55)) {
+			after_load(0x4278, 1.0f, NULL);
+			s_bugs_on = true, s_bugs_v = 1.0f;
+		}
 		break;
 	case 36:
 		// 0x5803c0: the ropes hang lower where they were pulled (355..360); the corpses' room takes the pulls
