@@ -667,6 +667,17 @@ float* p_damage_stats(void) { return s_damage; }
 u8* p_flag_bytes(int pc_addr) { return (u8*)ev_flag_block() + (pc_addr - 0x1f7d5e0); }
 #define SCORE(addr) (*(float*)p_flag_bytes(addr))
 
+// 0x1f7d9dc, gInGameTime when EvProgMariaMeeting (0x5928e0) begins: how far South Vale's dusk has come, 0..1
+// in 300 seconds (0x5954b0, 0x5914a0). A save made before the port kept it has the evening.
+void prog_dusk_begin(void) { SCORE(0x1f7d9dc) = s_time > 0.001f ? s_time : 0.001f; }
+float prog_dusk(void)
+{
+	float at = SCORE(0x1f7d9dc), t = s_time - at;
+	if (!(at >= 0.0001f) || t < 0.0f || t > 300.0f)
+		return 1.0f;
+	return t / 300.0f;
+}
+
 // 0x48ecb0 (EventMain): time at low health weighted by 1 - sin(pi * hp) (0x1f7d9d8), time near
 // Maria (under 1000 units, 0x1f7d9cc) and far from her (over 5000, 0x1f7d9d0).
 void prog_score_frame(float dt, float hp, float maria_dist)

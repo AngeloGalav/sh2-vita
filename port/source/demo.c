@@ -281,6 +281,7 @@ static struct {
 	DemoChar chars[DEMO_MAX_CHARS];
 	char key[32];
 	u32 cues;                  // the s_cues already done in this scene
+	int cuts;                  // cuts after the scene's first record (0x1f7d3a4 & 1)
 	u32 can_ticks;             // kanzume's can opener: the second its sound last played
 	char status[64];
 } S;
@@ -689,8 +690,10 @@ static void dds_record(void)
 			break;                       // not in any script; stop rather than read garbage
 		obj = *S.p++;
 	}
-	if (S.flags & 2)
+	if (S.flags & 2) {
 		S.cut = true;
+		S.cuts += S.loaded > 0;
+	}
 	if (S.flags & 4) {
 		motions_start(frame);
 		S.flags &= ~4u;
@@ -1379,6 +1382,7 @@ bool demo_camera(C3D_Mtx* view, float* fovy, float eye_out[3], float* focus)
 	return true;
 }
 
+int demo_cuts(void) { return S.active ? S.cuts : 0; }
 int demo_number(void) { return S.active ? S.h->demo_no : -1; }
 float demo_timer(void) { return S.active ? S.cur - 1.0f : 0.0f; }
 

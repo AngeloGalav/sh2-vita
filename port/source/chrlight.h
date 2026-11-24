@@ -1,6 +1,7 @@
 #pragma once
 #include <3ds.h>
 #include <citro3d.h>
+#include "stageenv.h"
 
 // Character lighting as on the PC: the light list FUN_00508a90 builds from the room's DrawEnvData
 // record (PS2 Chacter_Draw/light_n.c: parallels, spots, points, fake points and fake spots), the
@@ -25,6 +26,8 @@ void chrlight_load(const char* pack_dir, const char* map, const char* variant);
 // 0x59c090 (stage 7's code): how many of the record's point lights are on, until the next chrlight_load
 // (all of them after it).
 void chrlight_points(int n);
+// The stage's lights for the frame (stageenv.c), NULL for none.
+void chrlight_stage(const StageLights* l);
 // Before drawing characters: view matrix, the record Ambient (rgb), the flashlight level
 // (0x8a2ba8), the brightness factor and the flashlight.
 void chrlight_begin(const C3D_Mtx* view, const float ambient[3], float level, float bright, const ChrFlash* fl);

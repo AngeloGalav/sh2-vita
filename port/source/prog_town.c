@@ -507,6 +507,7 @@ static int s14_maria_meeting(Prog* p)
 	p_demo_number(0x15);                // DAT_01f7d3c4 = 0x15 every frame
 	PROG_BEGIN(p)
 		p_set(525);                     // FLAGW_512 |= 0x2000 while it plays
+		prog_dusk_begin();              // 0x1f7d9dc = gInGameTime
 		// BGM page 0xd: EvProgMariaMeetingStandby (0x592830) asks for it and holds it (0x1f837d0),
 		// this program lets it start; the hold is not ported, so the page is asked for here
 		p_bgm_page(0xd);

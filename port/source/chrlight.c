@@ -224,6 +224,10 @@ void chrlight_load(const char* pack_dir, const char* map, const char* variant)
 
 void chrlight_points(int n) { L.pt_on = (u8)n; }
 
+// 0x47adf0: the stage's parallel lights in place of the record's 1 and 2 (light slots 2 and 3)
+static const StageLights* s_stage_lights;
+void chrlight_stage(const StageLights* l) { s_stage_lights = l; }
+
 static bool point_off(int slot)
 {
 	return slot >= L.pt_first + L.pt_on && slot < L.pt_first + L.pt_count;
@@ -354,6 +358,12 @@ void chrlight_at(const float pos[3], bool james)
 	int g = 0;
 	for (int i = 1; i < NSLOT && g < CL_PAR; i++) {
 		Slot* s = &L.s[i];
+		if (s_stage_lights && (i == 2 || i == 3) && s_stage_lights->set[i - 1]) {
+			memcpy(pdir[g], s_stage_lights->dir[i - 1], sizeof pdir[g]);
+			memcpy(pcol[g], s_stage_lights->col[i - 1], sizeof pcol[g]);
+			g++;
+			continue;
+		}
 		if (s->kind != K_PARALLEL)
 			continue;
 		if (s->fake) {
@@ -375,9 +385,12 @@ void chrlight_at(const float pos[3], bool james)
 	// points and spots by influence (0x50c3d0 with the character radius 800, 0x50ce10)
 	Pick pick[NSLOT];
 	int n = 0;
+	if (s_stage_lights && s_stage_lights->pt0_set && L.pt_count)
+		memcpy(L.s[L.pt_first].col, s_stage_lights->pt0, sizeof L.s[L.pt_first].col);
 	for (int i = 0; i < NSLOT; i++) {
 		Slot* s = &L.s[i];
-		if ((s->kind != K_POINT && s->kind != K_SPOT) || point_off(i))
+		if ((s->kind != K_POINT && s->kind != K_SPOT) || point_off(i) ||
+		    (s_stage_lights && s_stage_lights->points == 0 && s->kind == K_POINT))
 			continue;
 		float d[3] = { pos[0] - s->pos[0], pos[1] - s->pos[1], pos[2] - s->pos[2] };
 		float dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);

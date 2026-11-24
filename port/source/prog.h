@@ -240,6 +240,8 @@ void prog_stage_tick(int stage, float dt);
 // The ending score (counters the PC keeps for 0x576660, the hotel's ending decision). Call
 // prog_score_frame every game frame: hp is James' health as a part of his maximum, maria_dist the
 // distance to Maria or < 0 when she is not with him. The others report single happenings.
+void prog_dusk_begin(void);
+float prog_dusk(void);
 void prog_score_frame(float dt, float hp, float maria_dist);
 void prog_score_examine(int item);     // inventory examine (the photo / letter of Mary count)
 void prog_score_overheal(float part);  // health items used over the maximum (0x49e7e0)

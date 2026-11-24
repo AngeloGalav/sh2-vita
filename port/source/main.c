@@ -1734,6 +1734,9 @@ static const char* env_variant(const char* area)
 	return "-";
 }
 
+static RoomEnv s_env_base;               // the record as loaded; s_env is the frame's (stageenv.c)
+static StageLights s_stage_lights;
+
 static void env_room_changed(void)
 {
 	if (!s_nrooms)
@@ -1760,6 +1763,7 @@ static void env_room_changed(void)
 	if (s_ambient >= 0.0f)
 		s_env.amb[0] = s_env.amb[1] = s_env.amb[2] = s_ambient;
 	s_env_dirty = true;
+	s_env_base = s_env;
 	fog_set_color(s_env.fogp[0], s_env.fogp[1], s_env.fogp[2], s_env.fogp[3]);   // 0x47c6cd
 }
 
@@ -1942,8 +1946,36 @@ static void env_luts(void)
 
 // Per frame: map light uniforms (world space), the flashlight from James' chest along his facing
 // (view space, only in dark rooms as on the PC), fog. Unlit viewer modes draw full bright.
+static void stage_env_frame(const C3D_Mtx* view)
+{
+	static bool fogp_was;
+	RoomEnv was = s_env;
+	s_env = s_env_base;
+	StageEnvIn in = { ev_stage(), bgm_room_id(ev_glb_crd(), s_px, s_pz), demo_number(), demo_timer(), demo_cuts(),
+	                  { 0 }, { -view->r[2].x, -view->r[2].y, -view->r[2].z }, { s_px, s_py, s_pz },
+	                  s_paused || stereo_eye() ? 0.0f : s_anim_dt };
+	for (int k = 0; k < 3; k++)               // the eye this view has, a scene's too
+		in.eye[k] = -(view->r[0].c[3 - k] * view->r[0].w + view->r[1].c[3 - k] * view->r[1].w + view->r[2].c[3 - k] * view->r[2].w);
+	stageenv_frame(&s_env, &s_stage_lights, &in);
+	if (s_env.fog_end != was.fog_end || s_env.fog_start != was.fog_start || s_env.fog_near_f != was.fog_near_f ||
+	    s_env.fog_far_f != was.fog_far_f || s_env.clip_near != was.clip_near || s_env.clip_far != was.clip_far)
+		s_env_dirty = true;
+	if (s_stage_lights.fogp_set)
+		fog_set_color(s_stage_lights.fogp[0], s_stage_lights.fogp[1], s_stage_lights.fogp[2], s_stage_lights.fogp[3]);
+	else if (fogp_was)
+		fog_set_color(s_env.fogp[0], s_env.fogp[1], s_env.fogp[2], s_env.fogp[3]);
+	fogp_was = s_stage_lights.fogp_set;
+	chrlight_stage(&s_stage_lights);
+}
+
 static void lighting_frame(const C3D_Mtx* view, bool player)
 {
+	if (player && s_state == ST_GAME) {
+		stage_env_frame(view);
+	} else {
+		memset(&s_stage_lights, 0, sizeof s_stage_lights);
+		chrlight_stage(NULL);
+	}
 	if (s_env_dirty) {
 		env_luts();
 		s_env_dirty = false;
@@ -1979,7 +2011,13 @@ static void lighting_frame(const C3D_Mtx* view, bool player)
 	// 0x50a7d0 -> 0x47b6c0(&0x8a2c00, 0.3 * level, 1): with the flashlight off a dark room gets a grey
 	// fill light along the camera's view in place of its light 1 (shader slot 0 in the dark set),
 	// 0.3 x level before the usual x0.25 (FUN_0047a7b0)
-	if (player && s_env.dark && !flash && s_flash_level > 0.0f) {
+	for (int i = 1; i < 3; i++)               // 0x47b3c0: lights 1 and 2, in the dark set's slots 0 and 1
+		if (s_stage_lights.set[i] && !s_stage_lights.chars[i]) {
+			int slot = s_env.dark ? i - 1 : i;
+			for (int k = 0; k < 3; k++)
+				s_slot_dir[slot][k] = s_stage_lights.dir[i][k], s_slot_col[slot][k] = s_stage_lights.col[i][k] * 0.25f;
+		}
+	if (player && s_env.dark && !flash && s_flash_level > 0.0f && !s_stage_lights.set[1]) {
 		float k = 0.3f * s_flash_level * 0.25f;
 		s_slot_dir[0][0] = -view->r[2].x, s_slot_dir[0][1] = -view->r[2].y, s_slot_dir[0][2] = -view->r[2].z;
 		s_slot_col[0][0] = s_slot_col[0][1] = s_slot_col[0][2] = k;
