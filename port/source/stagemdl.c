@@ -87,6 +87,7 @@ static float s_play = -1.0f;      // seconds into the music box's tune, < 0 when
 //   0x440350, 0x4410d0, 0x43f500, 0x574c80 (stages 48..51, 505 off): Mary (0x109) at the end of the last
 //     corridor, 0x53a990 motion 0xffb, in Maria's ending 0xffc
 //   0x590d10 (stage 18, room 0x31; 207 is its scene): Laura, 0x540ab0 motion 0xb56
+//   0x58b750 EvProgLauraDeceive3rd (stage 22, 209 on): the door of the room under the hospital's floor (0x419)
 // A negative rate: the record's loop is 0, the motion plays once and holds its last frame.
 // The rate is the record's speed (2048 is 30 frames a second, as boat.c). A model with a motion keeps the
 // turn the room function gives it; the revolver, which has none, is a stay object (stay_turned).
@@ -120,6 +121,7 @@ static const Npc k_npc[] = {
 	{ 50, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait", 30.0f, { 56532.3242f, -15972.3398f, 57998.4766f }, 3.1415927f },          // 0x7b330c
 	{ 51, -1, 0x109, 0, 505, 0, "mry", "mry", "mry_wait", 30.0f, { 56532.3242f, -15972.3398f, 57998.4766f }, 3.1415927f },          // 0x8c97d4
 	{ 18, 0x31, 0x104, 0, 207, 0, "lau", "lau", "lau_hospital", 30.0f, { -140748.547f, -158.384f, -101210.492f }, 0.0f },           // 0x8dcf28
+	{ 22, 0x30, 0x419, 209, 0, 0, "item", "b_d01", NULL, 30.0f, { -140000.0f, -487.5f, -21600.0f }, 0.0f },                         // 0x8da000
 };
 #define N_NPC ((int)(sizeof k_npc / sizeof k_npc[0]))
 
