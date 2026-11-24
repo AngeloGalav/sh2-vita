@@ -531,6 +531,7 @@ static int s35_after_papa(Prog* p)
 	PROG_BEGIN(p)
 		p_flashlight(true);             // 0x48c8b0
 	PROG_STEP(p, 0x16, p_demo(p, DEMO_ANGELA_ATTACK))
+		p_bgm_page(0x1b);
 		p_place(20007.475f, 0.0f, 60215.0f, -1.9300585f);
 		p_lock(p, false);
 	PROG_END(p)
