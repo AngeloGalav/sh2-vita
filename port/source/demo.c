@@ -511,13 +511,14 @@ static float pose_char(DemoChar* dc)
 	}
 	const DemMotion* m = dc->mot;
 	float t = (S.cur - dc->mot_start) * (float)m->speed / 2048.0f;
+	// the records' loop flag does nothing here: 0x550d00 stops at the record's last frame and stays there
+	// (state 0xff), the flag read after. Only sankaku has it, on motions of 1331 frames that stand for 1336:
+	// wrapped, Pyramid Head and the Mannequins took their first pose again for the last five.
 	if (t < 0.0f) {                              // negative speed plays from the end
 		t += (float)(m->frames - 1);
 		if (t < 0.0f)
-			t = m->loop ? fmodf(t, (float)m->frames) + (float)m->frames : 0.0f;
+			t = 0.0f;
 	}
-	if (m->loop && t >= (float)m->frames)
-		t = fmodf(t, (float)m->frames);
 	if (t > (float)(m->frames - 1))
 		t = (float)(m->frames - 1);
 	motion_keys(dc);
