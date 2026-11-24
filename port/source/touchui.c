@@ -1333,7 +1333,28 @@ static void panel_pc(const char* in_)
 			out[n++] = *p;
 	}
 	out[n] = 0;
-	txt(FONT_SMALL, 0x20, 0x30, out, FONT_LEFT, 0xfefefeffu);
+	// as the game's messages (draw_message_top): the big font, its block centred at the bottom, without the
+	// old console's blank lines and indents
+	static char msg[sizeof out];
+	int m = 0, lines = 0;
+	for (const char* ln = out; *ln;) {
+		while (*ln == ' ')
+			ln++;
+		const char* e = strchr(ln, '\n');
+		int len = e ? (int)(e - ln) : (int)strlen(ln);
+		if (len) {
+			m += snprintf(msg + m, sizeof msg - m, "%s%.*s", lines ? "\n" : "", len, ln);
+			lines++;
+		}
+		ln = e ? e + 1 : ln + len;
+	}
+	if (!lines)
+		return;
+	int h = font_line_height(FONT_BIG);
+	float y = 476.0f - (float)((lines + 4) * h / 2);
+	if (lines > 3)
+		y -= (float)((lines - 3) * h / 2);
+	txt(FONT_BIG, 256.0f - (font_width(FONT_BIG, msg) + 2.0f) * 0.5f, y, msg, FONT_LEFT, 0xfefefeffu);
 }
 
 void touchui_draw_pc(void)
