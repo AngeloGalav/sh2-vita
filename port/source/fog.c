@@ -1534,13 +1534,6 @@ void fog_draw(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* ortho)
 		emit(r[right], proj, view, ortho, nsprites, order, screen ? sq : NULL);
 		return;
 	}
-#ifdef SH2_VITA
-	{   // the open areas' fog goes without the depth test there (c3d_gl.c), everywhere else it has the PC's
-		extern void c3d_fog_depth_test(bool on);
-		int g = F.global;
-		c3d_fog_depth_test(!((g >= 1 && g <= 4) || g == 100 || g == 0x65));
-	}
-#endif
 	built = false;
 	F.drawn = 0;
 	if (!F.ready || F.global == 0xff)

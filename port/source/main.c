@@ -2047,26 +2047,10 @@ static bool ee_final_boss_nofog(float eye_y)
 static FogFrame s_fogf;
 static int s_fog_stage = -1;
 
-// 0x476ff0: the layer runs in the open areas (0x494d80) while it is light, and anywhere else on the maps
-// 0x476870 lists alone.
-static bool fog_here(void)
-{
-	static const int MAPS[] = { 0x50001, 0x90048, 0xb00b9, 0xb00bd, 0xb00c1, 0xc0029, 0xc0047, 0xc005b, 0xd0035,
-	                            0xd0049, 0xe0005, 0x10000d, 0x100015, 0x10001d, 0x100031, 0x100035, 0x10003d,
-	                            0x100051, 0x100055 };
-	int glb = ev_glb_crd();
-	if (!s_env.dark && ((glb >= 1 && glb <= 4) || glb == 0x11))
-		return true;
-	for (u32 i = 0; i < sizeof MAPS / sizeof *MAPS; i++)
-		if (s_env.map_id == MAPS[i])
-			return true;
-	return false;
-}
-
 static void fog_frame(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* ortho, float dt)
 {
 	if (stereo_eye()) {                     // the second eye: the first one's sprites, its projection
-		if (fog_here() && (fog_debug_mode() < 7 || fog_debug_mode() > 8))
+		if (fog_debug_mode() < 7 || fog_debug_mode() > 8)
 			fog_draw(proj, view, ortho);
 		return;
 	}
@@ -2074,8 +2058,6 @@ static void fog_frame(const C3D_Mtx* proj, const C3D_Mtx* view, const C3D_Mtx* o
 		s_fog_stage = ev_stage();
 		fog_reset();
 	}
-	if (!fog_here())
-		return;
 	s_fogf.glb = ev_glb_crd();
 	s_fogf.room = bgm_room_id(s_fogf.glb, s_px, s_pz);
 	s_fogf.stage = ev_stage();
