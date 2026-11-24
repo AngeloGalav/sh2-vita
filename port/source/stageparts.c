@@ -81,6 +81,7 @@ static void light_c(void)
 
 static int s_last_stage = -1, s_last_room = -1;
 static bool s_knife_floor;            // 0x8e315c (stage 10 room 0x24)
+static bool s_redeath;
 
 void stageparts_tick(int stage, int room, float dt)
 {
@@ -329,7 +330,13 @@ void stageparts_tick(int stage, int room, float dt)
 		} else if (room == 0x86) {
 			by(0x6a, f(367), 0, 1);
 		} else if (room == 0x89) {
-			// 0x1d86148 is set by the room's own code (a scene in progress); the port leaves it off
+			// 0x1d86148: from frame 830 of Maria's scene (0x5801c0) until the room is entered again (0x5803c0)
+			if (entered)
+				s_redeath = false;
+			if (scene_no(0x47) && demo_timer() >= 830.0f)
+				s_redeath = true;
+			if (s_redeath)
+				on(0x56, 0);
 			on(0x55, 0);
 		}
 		break;
