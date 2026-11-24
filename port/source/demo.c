@@ -836,6 +836,22 @@ static const Cue s_cues[] = {
 	{ "end_maria_a", 600.0f, 531, -1 },  // 0x440c80: the three other endings' set it at the start (prog_hotel.c)
 };
 
+// 0x5991f0 EvProgFirstMeetTrihead: James' shots in the closet (0x545810 at the times 0x8e3c30), their light
+// as a shot's in play (combat_shot_light). The cartridges and the smoke (0x544ff0, 0x4efd70) are not ported.
+float demo_shot_light(void)
+{
+	static const float at[] = { 1945.84f, 1957.99f, 1968.97f, 1979.95f, 1991.38f, 2004.31f, 2016.76f, 2027.65f };
+	if (!S.active || strcmp(S.key, "sankaku"))
+		return 0.0f;
+	float t = S.cur - 1.0f, v = 0.0f;
+	for (u32 i = 0; i < sizeof at / sizeof *at; i++)
+		if (t > at[i]) {
+			int n = (int)(t - at[i]);
+			v = n < 1 ? 0.0f : 0.75f - 0.15f * (float)(n - 1);
+		}
+	return v > 0.0f ? v : 0.0f;
+}
+
 static void scene_cues(void)
 {
 	for (u32 i = 0; i < sizeof s_cues / sizeof *s_cues; i++) {
