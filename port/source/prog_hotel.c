@@ -1,4 +1,5 @@
 #include "prog_int.h"
+#include "gamecam.h"
 #include "radio.h"
 #include "bgm.h"
 #include "stagemdl.h"
@@ -815,7 +816,12 @@ static int s43_elevator_water(Prog* p)
 		p->step = 0x10, p->sub = 0;
 	}
 		// fallthrough
-	case 0x10:
+	case 0x10: {
+		static const float eye[2][3] = { { -15150.0f, -840.0f, -56190.0f }, { -15060.0f, -1350.0f, -56620.0f } };
+		static const float at[2][3] = { { -15150.669f, -839.61731f, -56190.637f }, { -15060.185f, -1349.0192f, -56619.938f } };
+		int shot = p->sub >= 1 && p->timer > 4.5f;      // 0x8cb934, and 0x8cb968 from state 0x1d on
+		gamecam_event(eye[shot], at[shot], shot ? 0.515416f : 0.441786f, 0.0f);
+	}
 		// 0x10: 6 s (_DAT_0069f324), then the sound 0x4a44 and 0x1b: the timer starts again
 		p->timer += p->dt;
 		if (p->sub == 0) {

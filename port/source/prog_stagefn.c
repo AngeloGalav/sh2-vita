@@ -862,6 +862,11 @@ void prog_stagefn_tick(int stage, float dt)
 		// 0x577690: in room 0xb8, while 479 is off, the door's leaves (model 0x519, bones 0 and 1) are
 		// moved along z by 0x1d85d40: 250 brings them together, shut, and 0 is their own places, open.
 		// James is in the car, the wall 0x8cb7a0 (stagewalls.c) keeps him there until 478.
+		if (room == 0xb8 && !p_flag(478)) {
+			static const float eye[3] = { -15060.0f, -1350.0f, -56620.0f };            // 0x8cb968
+			static const float look[3] = { -15060.185f, -1349.0192f, -56619.938f };    // 0x8cb978
+			gamecam_event(eye, look, 0.515416f, 0.0f);
+		}
 		if (room == 0xb8) {
 			stagemdl_bone_move(0x519, 0, 0.0f, 0.0f, -prog_bf_elevator_door);
 			stagemdl_bone_move(0x519, 1, 0.0f, 0.0f, prog_bf_elevator_door);
