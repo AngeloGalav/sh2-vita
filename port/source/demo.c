@@ -15,6 +15,7 @@
 #include "radio.h"
 #include "sfx.h"
 #include "stereo.h"
+#include "shadow.h"
 
 // In-engine cutscenes, ported from the PC's DramaDemo player (Event/demoview.c in the PS2 beta):
 // DramaDemoMain 0x4a1c80, DramaDemoInit 0x4a0b30, DdsPlay 0x4a0f30 and the readers it calls
@@ -1730,6 +1731,91 @@ const Character* demo_lamp_james(float pos[3], float* yaw)
 	return NULL;
 }
 
+// 0x5aeb90: the characters that cast no shadow in a scene, by its number
+static bool no_shadow(int kind, int dn, float t)
+{
+	bool james = kind >= 0x100 && kind <= 0x103;
+	switch (dn) {
+	case 0x0f: return true;
+	case 0x21: case 0x27: return james;
+	case 0x22: return james && t < 902.0f;
+	case 0x30: return t > 71.0f ? kind == 0x420 || (kind == 0x106 && t >= 567.0f) : james || (kind == 0x106 && t >= 567.0f);
+	case 0x32: return kind == 0x420;
+	case 0x44: return kind == 0x204 && t >= 670.0f && t <= 798.0f;
+	case 0x48: case 0x49: case 0x4a: case 0x4b:
+		return kind == 0x438 || kind == 0x421 || kind == 0x100 || kind == 0x101 || kind == 0x205;
+	case 0x4c: return t >= 60.0f;
+	case 0x4d: return t < 1160.0f;
+	case 0x51: case 0x52: return kind == 0x412;
+	case 0x5b: return t > 2500.0f;
+	}
+	return false;
+}
+
+// 0x5add90: where the drop shadows of a scene lie, and the way they fall (false: 0x5a7730's own)
+static bool drop_shadow(int kind, int dn, float t, float* y, const float** light)
+{
+	static const float l3[3] = { 2000.0f, -10000.0f, 2000.0f }, down[3] = { 0.0f, -10000.0f, 0.0f };
+	static const float l5c[3] = { 0.0f, -10000.0f, 1000.0f };
+	bool agl = kind == 0x107, jms = kind == 0x103;
+	switch (dn) {
+	case 3:
+		*y = agl ? 2500.0f : jms ? 2480.0f : *y;
+		if (t > 2500.0f)
+			*y += agl ? 20.0f : 10.0f;
+		*light = l3;
+		return agl || jms;
+	case 4:
+		*y = agl ? 2480.0f : jms ? 2450.0f : *y;
+		*light = l3;
+		return agl || jms;
+	case 0x15: case 0x16:
+		if (kind == 0x106)
+			*y = 2990.0f;
+		return kind == 0x106;
+	case 0x48: case 0x49: case 0x4a: case 0x4b:
+		*light = down;
+		return false;
+	case 0x58: case 0x5e: case 0x60:
+		*light = down, *y = -15995.0f;
+		return true;
+	case 0x5b:
+		if (kind == 0x109)
+			*light = down, *y = -16295.0f;
+		return kind == 0x109;
+	case 0x5c:
+		*light = l5c, *y = 3009.0f;
+		return true;
+	case 0x69:
+		*light = down, *y = 2005.0f;
+		return true;
+	}
+	return false;
+}
+
+static bool (*s_floor_hook)(const float pos[3], float* y);
+void demo_floor_hook(bool (*floor)(const float pos[3], float* y)) { s_floor_hook = floor; }
+
+// Stand-ins: James casts none under a lamp (0x5acf30 keeps his arms out bone by bone, 0x5ae060, as it does
+// some parts of the others), and the darkness and reach by scene (0x5ac5d0, 0x5ac740), the maps' objects
+// and the few scenes with another light (0x5ad1e0) are the game's own.
+static void char_shadow(const DemoChar* dc, const C3D_Mtx* model, const float p[3])
+{
+	int kind = dc->rec->kind, dn = S.h->demo_no;
+	float t = S.cur - 1.0f, y = p[1];
+	const float* light = NULL;
+	bool james = kind >= 0x100 && kind <= 0x103;
+	if (no_shadow(kind, dn, t) || kind == 0x10b || (kind >= 0x400 && kind < 0x410 && kind != 0x409))
+		return;
+	if (shadow_is_drop()) {
+		if (!drop_shadow(kind, dn, t, &y, &light) && (!s_floor_hook || !s_floor_hook(p, &y)))
+			return;
+	} else if (james) {
+		return;
+	}
+	shadow_cast_scene(dc->model, model, y, light);
+}
+
 void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
 	if (!S.active)
@@ -1786,6 +1872,8 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 			if (!strcmp(s_scene_name, "sankaku"))
 				dc->model->parts[0] &= ~(1u << 3);
 		}
+		if (p[1] < 40000.0f && !upside)
+			char_shadow(dc, &model, p);
 		chr_draw(dc->model, uBones);
 		C3D_Mtx reflect;
 		if (player_kind(kind) && demo_mirror(p, &reflect)) {   // Maria too, in Born From a Wish (0xd5)

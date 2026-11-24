@@ -1658,7 +1658,8 @@ static int s_place;                 // 0x1fba8d8: 0 out of doors, 1 indoors, 2 a
 static bool s_tp_live;              // the port's behind camera is the one shown (tpcam.c, options "camera")
 static bool behind_camera(void) { return s_tp_live; }
 static float s_orbit[2];            // the behind camera's turn this frame, -1..1 (the C-Stick)
-static const float* view_eye(void) { return s_tp_live ? tpcam_eye() : gamecam_eye(); }
+static float s_demo_eye[3];              // a scene's camera
+static const float* view_eye(void) { return demo_scene_shown() ? s_demo_eye : s_tp_live ? tpcam_eye() : gamecam_eye(); }
 static const float* view_watch(bool tp) { return tp ? tpcam_watch() : gamecam_watch(); }
 
 // 0x556490: 2 in the rooms whose byte in 0x8bcce0 (by the PC room id, 0x524db0) is 0, else 0 on the
@@ -2730,7 +2731,7 @@ static void head_update(const circlePosition* cp, u32 gheld, float dt, bool on)
 
 // Character shadows this frame (shadow.c): in the dark rooms the PC casts stencil shadows from
 // James' flashlight, where the record has ShadowDarkNess set (0x47bb00); elsewhere the drop
-// shadows. None in cutscenes (their own shadow lights are not ported). The darkness is the Enhanced Edition's, faded in over about 33 frames when the
+// shadows. In cutscenes the scene's James has the lamp (flash_from_bone) and demo.c the exceptions. The darkness is the Enhanced Edition's, faded in over about 33 frames when the
 // flashlight comes on, as EE's SetShadowFading does (3 of 100 a frame).
 static float s_clip_far;                 // (defined with the projection, below)
 
@@ -2745,7 +2746,7 @@ static void shadow_frame(bool paused)
 	}
 	// 0x5a8370: the lit rooms (gFlashlightAvailable 1) and the dark ones whose record has no
 	// ShadowDarkNess get the drop shadows instead
-	if (s_cam.mode == CAM_PLAYER && s_state == ST_GAME && !demo_active() && (!s_env.dark || s_env.shadow == 0)) {
+	if (s_cam.mode == CAM_PLAYER && s_state == ST_GAME && (!s_env.dark || s_env.shadow == 0)) {
 		fade = 0.0f;
 		if (!quality()->drop_shadows) {
 			shadow_begin(s_chrflash.pos, s_chrflash.dir, s_chrflash.cone, 0.0f);
@@ -2761,7 +2762,7 @@ static void shadow_frame(bool paused)
 	// for a dark room with ShadowDarkNess). The Enhanced Edition never fades room 312's shadows and
 	// fades the others back in at 1 % every other frame after the flashlight goes off
 	// (IDirect3DDevice8.cpp SetShadowFading, zlib licence).
-	bool play = s_cam.mode == CAM_PLAYER && s_state == ST_GAME && !demo_active() && s_env.shadow != 0 &&
+	bool play = s_cam.mode == CAM_PLAYER && s_state == ST_GAME && s_env.shadow != 0 &&
 	            quality()->stencil_shadows;
 	// A room's own spot (room_spot) casts too: the PC's footage of room 205 before the flashlight is
 	// taken shows James and the mannequin throwing their shadows on the wall it lights, and the
@@ -2939,6 +2940,11 @@ static void demo_light_scale(float k)
 	chrlight_ambient_scale(k);
 }
 
+static bool scene_floor(const float pos[3], float* y)
+{
+	return s_have_col && col_floor_climb(&s_col, pos[0], pos[2], pos[1], 200.0f, 1500.0f, y);
+}
+
 // Cutscene characters (demo.c) with James' lighting; James himself only when the scene has none.
 static void draw_demo(const C3D_Mtx* proj, const C3D_Mtx* view)
 {
@@ -2958,6 +2964,7 @@ static void draw_demo(const C3D_Mtx* proj, const C3D_Mtx* view)
 		C3D_FogGasMode(GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
 	demo_set_lighting(&s_lenv, a, bright_scale());
 	demo_light_hook(demo_light_scale);
+	demo_floor_hook(scene_floor);
 	record_lights();
 	chrlight_begin(view, s_env.amb, s_flash_level, bright_scale(), &s_chrflash);
 	s_chr_begun = true;
@@ -6506,6 +6513,7 @@ int main(void)
 			demo_camera(&mv, &fovy, eye, &cam_focus);
 			s_chr_nofog = ee_final_boss_nofog(eye[1]);
 			memcpy(s_fogf.eye, eye, sizeof s_fogf.eye);
+			memcpy(s_demo_eye, eye, sizeof s_demo_eye);
 			memcpy(s_fogf.watch, feet, sizeof s_fogf.watch);
 			s_fogf.scr_z = 224.0f / tanf(fovy * 0.5f);
 			sfx_listener(feet, eye);

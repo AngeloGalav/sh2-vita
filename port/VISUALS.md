@@ -30,7 +30,7 @@ texture is seen at a slant. The PC runs at the monitor's resolution; the EE adds
 anisotropic filtering on top (`AntiAliasing`, `EnableSMAA`, `AnisotropicFiltering`).
 
 **Renderer features the port does not have** (STATUS.md, "Renderer features"): specular, the indoor
-water, blur and bloom, rain and smoke, event lights outside cutscenes, map-object and cutscene shadows.
+water, blur and bloom, rain and smoke, event lights outside cutscenes, map-object shadows.
 
 **The GPU budget.** The one console run with 3D on put the fogged forest and town at 30 to 31 ms of
 GPU for both eyes; lit rooms take about 6.5 ms per eye. So indoors there is room, and outdoors in the

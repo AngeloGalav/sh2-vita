@@ -575,6 +575,8 @@ static void cast_at(const Character* c, const Mtx34* model, const float pos[3])
 	cast(c, model, Lw, true, true);
 }
 
+bool shadow_is_drop(void) { return S.drop; }
+
 void shadow_cast(const Character* c, const float pos[3], float yaw)
 {
 	if (S.debug == 10 && !S.drop)
@@ -607,6 +609,22 @@ void shadow_cast_placed(const Character* c, const C3D_Mtx* model, int kind)
 	}
 	float pos[3] = { m.m[0][3], m.m[1][3], m.m[2][3] };
 	cast_at(c, &m, pos);
+}
+
+// A scene's character: its drop shadow lies on floor_y, not at its own place (a scene's motions move the
+// hips), and light NULL keeps the direction shadow_begin_drop chose.
+void shadow_cast_scene(const Character* c, const C3D_Mtx* model, float floor_y, const float* light)
+{
+	if (!c->kg1 || (S.debug == 10 && !S.drop))
+		return;
+	Mtx34 m;
+	c3d_to34(&m, model);
+	float pos[3] = { m.m[0][3], S.drop ? floor_y : m.m[1][3], m.m[2][3] }, keep[3];
+	memcpy(keep, S.dlight, sizeof keep);
+	if (light)
+		memcpy(S.dlight, light, sizeof S.dlight);
+	cast_at(c, &m, pos);
+	memcpy(S.dlight, keep, sizeof keep);
 }
 
 void shadow_cast_james(const Character* c, const float pos[3], float yaw, const float* light)

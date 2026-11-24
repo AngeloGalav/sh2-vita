@@ -55,6 +55,8 @@ bool demo_mirror(const float pos[3], C3D_Mtx* reflect);
 float demo_timer(void);
 // The frame Mary and the boss start to trade places in the running scene, -1 when it has none (0x43eac0).
 float demo_mary_from(void);
+// The floor under a scene's character, for its drop shadow.
+void demo_floor_hook(bool (*floor)(const float pos[3], float* y));
 // Called by demo_draw before each character with a factor for the character light (1 = normal),
 // so main.c can scale its light environment. NULL: no hook.
 void demo_light_hook(void (*set_scale)(float scale));

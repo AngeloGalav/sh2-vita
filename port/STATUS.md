@@ -390,6 +390,7 @@ Ordered by weight. Each line names where the work starts.
     - Walls: the door on the sixth layer (309), the last boss' platform and stairs (503, 504, 507), four of Born From a Wish's town. Repack, or copy events/stagewalls.bin.
     - Motion blur of scenes 0x3f, 0x43, 0x44, 0x47 and 0x57; map parts in scenes 0x44 and 0x47 and Angela's knife scene; a shadow off in the closet's room; the map's marks of stages 44 to 46; BGM page 0x1b after the Abstract Daddy; James' turn after Eddie's second scene; the stairwell's water (0x3e95).
     - The stages' fog and light functions (Stage_Data +0x34, `stageenv.c`), in play and in scenes: the town's low sun and its fog, South Vale's dusk in the 300 seconds after Maria (0x1f7d9dc, in the save; a save from before has the evening), Maria's meeting shot by shot, the forest's opening, the lake, the burning stairs' swinging lights, the last bosses' two sets of room colours by the camera's height, the light that follows the camera in the labyrinth and the stairwell, the hotel's. The far plane only moves out (port's own). Not ported: the reflection light (0x47ad10, a specular one), the event spots of stage 44 and 56, stage 12's lamp. Motion blur of scenes 0x23, 0x35, 0x37, 0x3d, 0x53. Not ported: room 312's soft picture (0x579150), the closet's (0x599b30, mode 5: near and far blur).
+    - Scenes have shadows: the lamp's volumes in the dark rooms (the lamp is the scene's James'), the drop shadows in the lit ones, with the scenes' exceptions (0x5aeb90, 0x5add90). Stand-ins: James casts none under a lamp, and the bones left out (0x5ae060), the reach by scene (0x5ac5d0, 0x5ac740) and the other lights (0x5ad1e0) are not ported.
     - The moths of Wood Side's room 202 (0x59bba0, 0x4ab430, 0x4abf40; reported from play): five pairs round the hole in the wall, drawn to the beam. All moths, Mary's too, are one draw of cut-out quads (`enemy_moths_draw`). Works on a console.
     - Found and not ported: pad vibration (0x4f4930); nothing else of weight. The stairwell's shot has its light (0x5964e0).
   - Not checked yet: per-room footsteps, Maria's voices in Born From a Wish, the arrivals (rebirth, hospital elevator car, boat, dog ending).
@@ -547,7 +548,7 @@ Ordered by weight. Each line names where the work starts.
   fades per vertex (0x4d45e0, 0x4d2fe0); the Old 3DS rebuilds the water's vertices 15 times a second;
   the light override 0x945938 (0x47af80) is not read. Classes 22 and 23 (the boat mask, 0x4e0640 /
   0x4e02b0) and the emitters 54 and 55 are not ported.
-- Shadows only from the flashlight and only for characters: none from event lights or in cutscenes.
+- Shadows only from the flashlight (or a room's spot): none from event lights, and the scenes' have stand-ins (see the audit after 0.2.1).
   Besides characters (16 a frame, sh2shd_add_char 0x5a5c70) the PC casts from up to four loaded maps'
   shadow models, the `.kg2` next to each map (0x512e40, sh2shd_add_map 0x5a4ed0, 0x5a8630), with
   per-map clip kinds and lengths (sh2shd_get_shadow_env_bg 0x5ac0a0: the 3F bars cast every

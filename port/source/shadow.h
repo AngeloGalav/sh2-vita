@@ -52,6 +52,8 @@ void shadow_map_off(int map, int obj);
 // its shadow characters like the others (0x50b5d0 -> 0x50b210 -> 0x5a5c70), save a few by the
 // room (0x5abcd0). The pickups (0x7xx) cast none.
 void shadow_cast_placed(const Character* c, const C3D_Mtx* model, int kind);
+bool shadow_is_drop(void);           // this frame's are drop shadows
+void shadow_cast_scene(const Character* c, const C3D_Mtx* model, float floor_y, const float* light);
 // Around character draws: their pixels are marked so the darkening pass leaves them alone.
 void shadow_mark_begin(void);
 void shadow_mark_end(void);
