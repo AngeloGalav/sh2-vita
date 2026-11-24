@@ -289,17 +289,14 @@ void savescreen_draw_top(void)
 		u32 c = faded((u32)(255.0f * b) << 24 | (u32)(255.0f * b) << 16 | (u32)(255.0f * b) << 8 | 0xff, in);
 		const u32 pic[4] = { c, c, c, c };
 #ifdef SH2_VITA
-		// As the Enhanced Edition shows it on a wide screen (FullscreenImages, the save picture at one scale
-		// both ways): the picture across the whole width at its own shape, still, its top and bottom past
-		// the screen. The Vita's 400 x 240 layout is 2.4 x 2.27 display pixels a unit.
-		(void)u80, (void)u400, (void)v0, (void)v1;
+		// As the Enhanced Edition shows it on a wide screen (FullscreenImages Start00Scaling: 4096 * 2732 / 2048
+		// either side, 853 by 480): whole, over all of it. Its file is 4:3 but holds the picture squeezed, James'
+		// head 3/4 as wide as in the 2001 one.
+		(void)u80, (void)u400, (void)v0, (void)v1, (void)pic;
 		{
-			const float ph = 400.0f * 0.75f * (960.0f / 400.0f) / (544.0f / 240.0f);
-			float t0 = (ph - 240.0f) * 0.5f / ph, t1 = 1.0f - t0;
 			u32 still = faded(0xffffffff, in);
 			const u32 k[4] = { still, still, still, still };
-			font_quad_px(&s_bg, 0.0f, 0.0f, 400.0f, 240.0f, 0.0f, t0, 1.0f, t1, k);
-			(void)pic;
+			font_quad_px(&s_bg, 0.0f, 0.0f, 400.0f, 240.0f, 0.0f, 0.0f, 1.0f, 1.0f, k);
 		}
 #else
 		font_quad_px(&s_bg, 80.0f, 0.0f, 400.0f, 240.0f, u80, v0, u400, v1, pic);
