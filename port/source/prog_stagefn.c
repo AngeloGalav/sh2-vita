@@ -16,6 +16,7 @@
 #include "room.h"
 #include "game/view/sh2cam.h"
 #include "sfx.h"
+#include "gamecam.h"
 #include <math.h>
 
 static int s_room = -1, s_room_stage = -1;
@@ -235,6 +236,13 @@ static void frame_sounds(int stage, int room, const float* me, float yaw, float 
 			static const float at[3] = { 60000.0f, 0.0f, 11350.0f };
 			sfx_play_at(0x9c51, 1.0f, at);
 			p_set(552);
+		}
+		// room 0x13: in the closet after Pyramid Head's scene (91) the camera looks down at the key until it
+		// is taken (89)
+		if (room == 0x13 && p_flag(91) && !p_flag(89) && me[0] > -21600.0f && me[2] < -101150.0f) {
+			static const float eye[3] = { -20820.0f, -530.0f, -101460.0f };                // 0x8e3c74
+			static const float look[3] = { -20820.996f, -529.975f, -101459.93f };          // 0x8e3c84
+			gamecam_event(eye, look, 0.098f, 0.0f);
 		}
 		break;
 	case 11:                             // 0x5974d0

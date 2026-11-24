@@ -42,6 +42,9 @@ float gamecam_fov(void);       // radians
 // The PC camera is on a shot the game sets itself: an event road of the .cam data or a camera a
 // stage program placed (user camera or watch). The port's behind camera leaves those to it.
 bool gamecam_scripted(void);
+// vcSetEventCamParamRefView (0x51ced0): the camera at eye looking at at, rolled, for this frame; called every
+// frame the shot lasts, the roads' camera comes back once it stops (0x51d170). scr_z: gCameraFOV, 0 to keep it.
+void gamecam_event(const float eye[3], const float at[3], float roll, float scr_z);
 
 // Writes the last minute of the camera's inputs and outputs to camtrace.txt in the data folder (testing).
 void gamecam_trace_dump(void);

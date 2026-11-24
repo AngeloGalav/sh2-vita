@@ -113,10 +113,13 @@ void gamecam_load_area(const char* pack_dir, const char* area, const char (*room
 		sh2cam_set_road_list(s_narrays ? s_arrays : NULL);   // the PC room loader swaps the list in place
 }
 
+static struct { float eye[4], at[4], roll, scr_z; bool on, was; } s_event;    // gamecam_event
+
 void gamecam_reset(const GameCamPlayer* p)
 {
 	sh2cam_init(s_narrays ? s_arrays : NULL, p->pos, p->yaw, 0, NULL);
 	s_started = true;
+	s_event.was = false;
 }
 
 // D3DX row layout (row vectors, translation in row 3): rotation about Y by yaw, so that local +Z
@@ -196,6 +199,14 @@ static void trace_row(const GameCamPlayer* p, float dt, bool far_view, const SH2
 	}
 }
 
+void gamecam_event(const float eye[3], const float at[3], float roll, float scr_z)
+{
+	memcpy(s_event.eye, eye, 3 * sizeof(float));
+	memcpy(s_event.at, at, 3 * sizeof(float));
+	s_event.roll = roll, s_event.scr_z = scr_z;
+	s_event.on = true;
+}
+
 bool gamecam_scripted(void)
 {
 	const _VC_WORK* w = sh2cam_work();
@@ -251,8 +262,18 @@ void gamecam_update(const GameCamPlayer* p, float dt, bool far_view, C3D_Mtx* vi
 	in.chara_watch_xz_r = 5500.0f;
 	in.chara_slots = p->chara ? p->chara : s_slots;   // empty when the caller has none
 
+	bool event = s_event.on;
+	if (event)
+		vcSetEventCamParamRefView(s_event.eye, NULL, s_event.at, NULL, s_event.roll, 1);
+	else if (s_event.was && sh2cam_work()->cur_near_road.road_p)
+		vcReturnPreAutoCamWork(1);
+	s_event.was = event;
+	s_event.on = false;
+
 	SH2CamOutput out;
 	sh2cam_exec(&in, &out);
+	if (event && s_event.scr_z > 0.0f)
+		out.scr_z = s_event.scr_z;
 	s_mv_type = out.cam_mv_type;
 
 	// row 0 right, row 1 screen down, row 2 look direction, row 3 eye position.
