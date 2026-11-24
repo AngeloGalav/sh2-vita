@@ -494,8 +494,7 @@ static void room_enter(int stage, int room)
 			static const int done[] = { 2218, 2227, 2228, 2229, 2230, 2231, 2233 };
 			for (int i = 0; i < (int)(sizeof done / sizeof done[0]); i++)
 				p_set(done[i]);
-			// not ported: model 0x200 id 0xe5 shown here (+4 bit 0x10, +0x148 bit 0x400 cleared) and
-			// hidden again by the program's state 6
+			// the Lying Figure 0xe5 is hidden here until the water is gone (enemy.c spawn_list)
 		}
 		break;
 	case 34:                             // the +0x3c part of 0x582ee0: room 0x88, and the cube room once 327 is on

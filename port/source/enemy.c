@@ -6596,6 +6596,8 @@ static void spawn_list(int stage, const Collision* col)
 			continue;
 		if (!condition_ok(l->cond) || (id >= 0 && script_replaces(stage, id)))
 			continue;
+		if (stage == 43 && id == 229 && !ev_flag(479))
+			continue;                  // 0x577600 hides it until the elevator's water is gone (0x5777f0 state 6)
 		int slot = -1;
 		bool present = false;
 		for (int k = 0; k < ENEMY_MAX; k++) {

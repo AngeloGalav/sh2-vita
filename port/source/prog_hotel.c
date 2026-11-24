@@ -850,6 +850,7 @@ static int s43_elevator_water(Prog* p)
 		p_set(502);
 		p_set(2219);                    // FLAGW_2208 |= 0x800
 		p_set(479);                     // FLAGW_448 |= 0x80000000: the water is gone
+		p_enemy_list();                 // the Lying Figure 229 comes out (0x200 id 0xe5)
 		// fallthrough
 	case 0xd:
 	default:
