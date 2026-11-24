@@ -5598,6 +5598,20 @@ static void filters_frame(void)
 			motion = 0x40;
 		break;
 	}
+	// the stages' own (0xa36004 on): 0x5817d0 (stage 35), 0x583650 (34), 0x580840 (36), and 0x43f950,
+	// 0x4407a0, 0x441790 and 0x575120 (the endings' fall)
+	if (stage == 35 && dn == 0x43)
+		motion = 80;
+	else if (stage == 35 && dn == 0x44)
+		motion = t < 191.0f ? (int)(120.0f + (t - 1.0f) * -60.0f / 190.0f)
+		       : t > 522.0f && t < 610.0f ? (int)(90.0f + (t - 522.0f) * -10.0f / 88.0f)
+		       : t > 705.0f && t < 931.0f ? (int)(80.0f + (t - 705.0f) * -30.0f / 226.0f) : 0;
+	else if (stage == 34 && dn == 0x3f)
+		motion = t < 211.0f ? 100 : t < 271.0f ? (int)(100.0f + (t - 211.0f) * -70.0f / 60.0f) : 0;
+	else if ((stage == 34 || stage == 36) && dn == 0x47 && t >= 831.0f && t < 1481.0f)
+		motion = (int)((stage == 34 ? 80.0f : 96.0f) - (t - 831.0f) / 650.0f);
+	else if (stage >= 48 && stage <= 51 && dn == 0x57)
+		motion = t < 340.0f ? 90 : (int)(90.0f - 90.0f * (t - 340.0f) / 59.0f);
 	if (blur_a >= 0.0f)
 		vita_fx_blur2(blur_a, blur_b);
 	if (soft > 0.0f)
