@@ -87,6 +87,7 @@ reference/
 /.*
 !/.github/
 !/.gitignore
+!/.gitattributes
 !/.dockerignore
 !/.mcp.json
 

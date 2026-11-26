@@ -181,6 +181,8 @@ PC's 512 px, mipmaps), `area.idx`; `chr/<folder>/<model>.s3c` + `.s3a` + `tex/`;
   (`tools/sh2conv/EE_PACKS.md`).
 - The packer runs in Docker, natively or in the player's browser (`site/packer.html`): the same
   converters, with nothing uploaded; checked file by file against the native packer.
+  The Docker image builds from a Windows clone too (issue #12: git's CRLF line endings broke
+  `#!/bin/sh`, "build.sh: not found"): `.gitattributes` keeps `*.sh` in LF and the Dockerfile strips CRs.
 - Stereoscopic 3D on the top screen (`stereo.c`): while the slider is up the world is drawn once per
   eye, with the screen plane a third of the way to what the camera looks at and 11.5 px between the eyes
   for far points at the slider's top. Text, menus, fades and the grain sit at the screen plane. The

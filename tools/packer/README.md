@@ -46,3 +46,8 @@ SH2_VITA_TEX=1 SH2_TEXENC=native tools/make_pack.sh "/path/to/Silent Hill 2" out
 ```
 
 `make_pack.sh` uses `.venv` when it is there; the system's `python3` often has no numpy.
+
+**On Windows,** use Docker, or run these commands in WSL (Ubuntu), not PowerShell or Git Bash: the
+scripts are shell scripts and texenc needs a Linux compiler. Install what they need first with
+`sudo apt install build-essential python3-venv ffmpeg`, and keep the clone inside WSL (`~/sh2-vita`)
+rather than under `/mnt/c`, which is much slower.

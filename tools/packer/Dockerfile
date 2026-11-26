@@ -14,12 +14,15 @@ RUN apt-get update && \
 
 COPY VERSION /opt/sh2-vita/VERSION
 COPY tools/texenc /opt/sh2-vita/tools/texenc
-RUN /opt/sh2-vita/tools/texenc/build.sh native
+# sed drops the CRs a Windows clone made before .gitattributes kept the scripts in LF
+RUN sed -i 's/\r$//' /opt/sh2-vita/tools/texenc/build.sh && sh /opt/sh2-vita/tools/texenc/build.sh native
 COPY tools/make_pack.sh /opt/sh2-vita/tools/make_pack.sh
 COPY tools/sh2conv /opt/sh2-vita/tools/sh2conv
 # the stage table and function list that events.py and demos.py read
 COPY sh2-3ds-port-kit/data/dc /opt/sh2-vita/sh2-3ds-port-kit/data/dc
 COPY tools/packer/entrypoint.sh /opt/sh2-vita/tools/packer/entrypoint.sh
+RUN sed -i 's/\r$//' /opt/sh2-vita/tools/make_pack.sh /opt/sh2-vita/tools/packer/entrypoint.sh && \
+    chmod +x /opt/sh2-vita/tools/make_pack.sh /opt/sh2-vita/tools/packer/entrypoint.sh
 
 # the Vita's textures (DXT from the PC's pixels) and the native encoder on every core
 ENV PY="python3 -I" \
