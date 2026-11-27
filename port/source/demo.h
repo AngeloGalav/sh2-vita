@@ -69,7 +69,10 @@ bool demo_has_james(void);
 // place and yaw written to pos and yaw. NULL, and both left alone, when the scene has none.
 const Character* demo_lamp_james(float pos[3], float* yaw);
 bool demo_has_kind(int kind);
-bool demo_shows_kind(int kind);     // in the scene and under its motion now (its show flag is on)      // a character of the running scene is of this kind (stagemdl.c)
+// The running scene has the chara of that kind and id: 0x4a0b30 takes an existing one (0x537950) for each
+// of its characters and creates one only when there is none, so a character the stage's code placed is the
+// scene's own for the whole scene (stagemdl.c), whatever the script's show flag says.
+bool demo_takes_chara(int kind, int id);
 
 // Text of the subtitle on screen now (the stage message the PC shows), NULL when none. *serial
 // changes whenever the subtitle changes, so the caller redraws only then.

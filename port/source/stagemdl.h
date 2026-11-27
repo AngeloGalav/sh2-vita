@@ -22,8 +22,6 @@ void stagemdl_item_taken(int item);
 // from 600 over his chest to 1000 under it, and the people the stage's code placed. y is his feet.
 int stagemdl_look_points(float (*out)[3], int max, float y);
 void stagemdl_draw(const C3D_Mtx* view, int uModelView, int uBones);
-// A character of that kind placed by the stage's code (Eddie, Laura, Maria, Angela in play) shows now
-bool stagemdl_npc_kind_here(int kind);   // skin program and lights bound
 // 0x57b5c0 FUN(1, 15.0): one frame of the tune that opens the box (the right order); seconds is
 // the time since it started, or < 0 to put the parts back.
 void stagemdl_music_box(float seconds);

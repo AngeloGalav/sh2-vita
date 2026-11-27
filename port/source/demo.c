@@ -1847,10 +1847,11 @@ void demo_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		// hide commands' flag (0x950be4, 0x49fcf6 / 0x49fd05) and nothing in the exe reads it (only the
 		// positions next to it, 0x4a0f30 / 0x4a183b). The port hid a character until its show command,
 		// so one shown late or never went missing (Maria in bowl_mae_1, reported from play; Eddie and
-		// Laura in bp_edi_a). Kept from the console test: while the script has a character off and the
-		// stage's own placed copy of it shows (Eddie eating while James talks, 0x591a40), that copy
-		// stands in for it and the scene's is not drawn over it.
-		if (!dc->model || (!S.next.visible[i] && stagemdl_npc_kind_here(dc->rec->kind)))
+		// Laura in bp_edi_a). A character the stage's code placed is not drawn in its stead either:
+		// 0x4a0b30 takes that chara over (0x537950) and 0x4a0f30 writes its place and turn every frame,
+		// so it is this one (Maria at the park's rail stood in for the scene's through the first 730
+		// frames of mar_deai_c and 966 of mar_deai_e, reported from play; demo_takes_chara).
+		if (!dc->model)
 			continue;
 		if (S.h->demo_no == 0x68 && dc->rec->kind == 0x43b && ev_flag(722))
 			continue;                // 0x572a00: the shut door goes as the open one (0x572) comes
@@ -1927,15 +1928,16 @@ bool demo_has_kind(int kind)
 	return false;
 }
 
-// Whether the scene has that character under its own motion now. While its flag is off (0x49fb20 case 2,
-// 0x950be4) the scene leaves it alone, and one the stage's code placed (stagemdl.c) goes on with the motion it
-// was given: Eddie eating in the bowling alley while James speaks (0x591a40, console test).
-bool demo_shows_kind(int kind)
+// 0x4a0b30: for each character of the script, 0x537950(kind, id) looks for a chara the game already has and
+// 0x48fcc0 creates one only when it finds none; the scene then owns it, its place and turn written every frame
+// (0x4a0f30, +0x1c..+0x30) and its motion at every 0x11 key (0x49f7e0), whatever its show flag (0x950be4,
+// read by nothing). A chara the stage's code placed is therefore the scene's while the scene runs.
+bool demo_takes_chara(int kind, int id)
 {
 	if (!S.active)
 		return false;
 	for (int i = 0; i < S.n_chars; i++)
-		if (S.chars[i].model && S.chars[i].rec->kind == kind && S.next.visible[i])
+		if (S.chars[i].model && S.chars[i].rec->kind == kind && S.chars[i].rec->id == id)
 			return true;
 	return false;
 }

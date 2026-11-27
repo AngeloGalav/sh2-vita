@@ -541,17 +541,6 @@ static bool npc_load(int i)
 	return true;
 }
 
-// The kinds of the stage's placed characters shown in the last drawn frame (stagemdl_npc_kind_here)
-static int s_here_kind[16], s_nhere;
-
-bool stagemdl_npc_kind_here(int kind)
-{
-	for (int i = 0; i < s_nhere; i++)
-		if (s_here_kind[i] == kind)
-			return true;
-	return false;
-}
-
 static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 {
 	float me[3], yaw;
@@ -566,16 +555,10 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 		s_npc_ms = now;
 	}
 	s_npc_clock = fmodf(s_npc_clock + dt, 3600.0f);
-	// Stand-in, from a console test: while a scene has one of the room's placed characters under its own
-	// motion, the others it left alone wait on their first frame (Eddie's pizza went on to his mouth and
-	// back in the air while the scene moved Eddie). What the PC does with their motion then isn't traced.
-	bool scene_has = false;
-	s_nhere = 0;
-	for (int i = 0; i < N_NPC; i++)
-		if (k_npc[i].stage == stage && npc_shown(i, stage, me[0], me[2]) && s_nhere < 16)
-			s_here_kind[s_nhere++] = k_npc[i].kind;
-	for (int i = 0; i < N_NPC; i++)
-		scene_has = scene_has || (k_npc[i].stage == stage && demo_shows_kind(k_npc[i].kind) && npc_shown(i, stage, me[0], me[2]));
+	// A placed character a scene takes over is the scene's until it ends (demo_takes_chara, 0x4a0b30); the
+	// others go on with their own motion, as the PC leaves them alone. (The port used to let a placed copy
+	// stand in while the script had the scene's off, and froze the rest meanwhile: Maria stayed at the park's
+	// rail through her meeting and Eddie's pizza left his hands.)
 	for (int i = 0; i < N_NPC; i++) {
 		const Npc* n = &k_npc[i];
 		if (!npc_shown(i, stage, me[0], me[2])) {
@@ -585,8 +568,8 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 				s_npc[i].failed = false;   // a missing file is asked for once a stage, not once a frame
 			continue;
 		}
-		if (demo_shows_kind(n->kind) || !npc_load(i))
-			continue;                // the scene moves its own copy while it has it shown
+		if (demo_takes_chara(n->kind, 0) || !npc_load(i))
+			continue;                // CharaCreate(kind, 0, ...): the scene has this very chara
 		C3D_Mtx model, mv;
 		Mtx_Identity(&model);
 		Mtx_Translate(&model, n->pos[0], n->pos[1], n->pos[2], true);
@@ -602,7 +585,7 @@ static void npc_draw(const C3D_Mtx* view, int uModelView, int uBones)
 				s_npc[i].t = fminf(s_npc[i].t - dt * n->fps, len - 1.0f);
 				chr_pose(&s_npc[i].chr, a, s_npc[i].t);
 			} else {
-				s_npc[i].t = scene_has ? 0.0f : fmodf(s_npc_clock * n->fps, len);
+				s_npc[i].t = fmodf(s_npc_clock * n->fps, len);
 				chr_pose_loop(&s_npc[i].chr, a, s_npc[i].t, 0, (int)a->frames - 1);
 			}
 		} else {
